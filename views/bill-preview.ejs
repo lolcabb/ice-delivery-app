@@ -1,0 +1,104 @@
+<!-- 📁 File: views/bill-preview.ejs -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bill Preview</title>
+  <style>
+    body { font-family: 'TH SarabunPSK', sans-serif; padding: 30px; font-size: 13.5px; transform: scale(0.75); transform-origin: top left; }
+    .header { text-align: center; margin-bottom: 20px; }
+    .header h1 { font-size: 32px; margin-bottom: 0; }
+    .header .sub { font-size: 18px; margin-top: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; page-break-inside: auto; }
+    td, th { border: 1px solid #000; padding: 6px 10px; }
+    .no-border td { border: none; padding: 4px 2px; }
+    .right { text-align: right; }
+    .bold { font-weight: bold; }
+    .footer { margin-top: 40px; font-size: 18px; text-align: right; page-break-inside: avoid; }
+    .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
+    .signature-box { width: 45%; text-align: center; }
+    .signature-line { margin-top: 80px; border-top: 1px solid #000; }
+    .placeholder { display: inline-block; border-bottom: 1px dotted #000; width: 120px; height: 1.2em; vertical-align: middle; }
+    @media print { button { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>โรงน้ำแข็งมวกเหล็ก</h1>
+    <div class="sub">บิลสั่งซื้อ</div>
+  </div>
+
+  <table class="no-border">
+    <tr>
+      <td><strong>บิลหมายเลข #:</strong> <%= order.id %></td>
+      <td class="right"><strong>วันที่:</strong> <%= formatDate(order.createdAt) %></td>
+    </tr>
+    <tr>
+      <td><strong>ลูกค้า:</strong> <%= order.customerName %></td>
+      <td class="right"><strong>เบอร์:</strong> <%= order.phone || '-' %></td>
+    </tr>
+    <tr>
+      <td><strong>ที่อยู่:</strong> <%= order.address || '-' %></td>
+      <td class="right"><strong>คนขับ:</strong> 
+        <% if (order.driverName) { %>
+          <%= order.driverName %>
+        <% } else { %>
+          <span class="placeholder"></span>
+        <% } %>
+      </td>
+    </tr>
+    <tr>
+      <td><strong>ผู้ออกบิล:</strong> <%= order.issuer || '-' %></td>
+      <td></td>
+    </tr>
+  </table>
+
+  <table>
+    <thead>
+      <tr>
+        <th>สินค้า</th>
+        <th class="right">ราคาหน่วย</th>
+        <th class="right">จำนวน</th>
+        <th class="right">ยอดรวม</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% let total = 0; %>
+      <% orderItems.forEach(item => { 
+           let price = item.pricePerUnit || item.price;
+           let qty = item.quantity;
+           let itemName = item.productType || item.name || '-';
+           let itemTotal = price * qty;
+           total += itemTotal;
+      %>
+        <tr>
+          <td><%= itemName %></td>
+          <td class="right"><%= price.toFixed(2) %></td>
+          <td class="right"><%= qty %></td>
+          <td class="right"><%= itemTotal.toFixed(2) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p><strong>ยอดสุทธิ:</strong> <%= total.toFixed(2) %> บาท</p>
+    <p><strong><%- toBahtText(total.toFixed(2)) %></strong></p>
+  </div>
+
+  <div class="signatures">
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div>ผู้รับสินค้า</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div>ผู้ออกบิล</div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = () => window.print();
+  </script>
+</body>
+</html>

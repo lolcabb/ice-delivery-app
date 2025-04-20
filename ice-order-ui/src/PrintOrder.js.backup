@@ -1,0 +1,141 @@
+import React, { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
+
+function numberToThaiText(number) {
+  const txtNumArr = ['ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า'];
+  const txtDigitArr = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
+
+  const bahtText = (num) => {
+    let text = '';
+    num = num.toString();
+    if (isNaN(num) || num === '') return '';
+
+    let [integer] = num.split('.');
+    let len = integer.length;
+
+    for (let i = 0; i < len; i++) {
+      let n = parseInt(integer.charAt(i));
+      if (n !== 0) {
+        if (i === len - 1 && n === 1 && len > 1) text += 'เอ็ด';
+        else if (i === len - 2 && n === 2) text += 'ยี่';
+        else if (i === len - 2 && n === 1) text += '';
+        else text += txtNumArr[n];
+        text += txtDigitArr[len - i - 1];
+      }
+    }
+    return text + 'บาทถ้วน';
+  };
+
+  return bahtText(number);
+}
+
+export default function PrintOrder() {
+  const { orderId } = useParams();
+  const [order, setOrder] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`http://localhost:4000/api/orders/${orderId}`, {
+      headers: { userId: 1 }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.message) throw new Error(data.message);
+        setOrder(data);
+        setTimeout(() => window.print(), 500);
+      })
+      .catch(err => setError(err.message));
+  }, [orderId]);
+
+  if (error) return <div className="p-6 text-red-600">Error: {error}</div>;
+  if (!order) return <div className="p-6">Loading...</div>;
+
+  const total = order.items.reduce((sum, item) => sum + item.totalAmount, 0);
+  const thaiTextTotal = numberToThaiText(total);
+
+  const productMap = {
+    'Product A': { quantity: 0, price: 0 },
+    'Product B': { quantity: 0, price: 0 },
+    'Product C': { quantity: 0, price: 0 },
+    'Product D': { quantity: 0, price: 0 },
+    'Product E': { quantity: 0, price: 0 }
+  };
+
+  order.items.forEach(item => {
+    if (productMap[item.productType]) {
+      productMap[item.productType].quantity = item.quantity;
+      productMap[item.productType].price = item.pricePerUnit;
+    }
+  });
+
+  return (
+    <div className="p-4 w-[900px] mx-auto font-mono text-sm">
+      <style>{`
+        @media print {
+          table, tr, td, th {
+            border: 1px solid black !important;
+            border-collapse: collapse !important;
+          }
+        }
+        table, tr, td, th {
+          border: 1px solid black;
+          border-collapse: collapse;
+        }
+      `}</style>
+
+      <table className="w-full text-sm">
+        <tbody>
+          <tr>
+            <td colSpan={4} className="text-center font-bold text-lg">Ice Company</td>
+            <td>Order#</td>
+            <td>{order.id}</td>
+          </tr>
+          <tr>
+            <td colSpan={4}>Customer: {order.customerName}</td>
+            <td colSpan={2}>Date: {new Date(order.createdAt).toLocaleDateString('th-TH')} {new Date(order.createdAt).toLocaleTimeString()}</td>
+          </tr>
+          <tr className="text-center font-bold">
+            <td colSpan={2}>Description</td>
+            <td>Quantity</td>
+            <td>Unit Price</td>
+            <td colSpan={2}>Total</td>
+          </tr>
+          {Object.entries(productMap).map(([product, data]) => (
+            <tr key={product} className="text-center">
+              <td colSpan={2}>{product}</td>
+              <td>{data.quantity}</td>
+              <td>{data.price}</td>
+              <td colSpan={2}>{(data.quantity * data.price).toFixed(2)}</td>
+            </tr>
+          ))}
+          <tr>
+            <td colSpan={4}></td>
+            <td className="text-right font-bold">Net Total</td>
+            <td className="text-center font-bold">{total.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div className="mt-2 font-medium">{thaiTextTotal}</div>
+
+      <div className="mt-4 grid grid-cols-4 gap-4 text-center">
+        <div style={{ border: '1px solid black', height: '80px' }} className="flex flex-col justify-end pb-2">
+          <div className="w-full text-center">..................</div>
+          <div className="text-xs">Receiver</div>
+        </div>
+        <div style={{ border: '1px solid black', height: '80px' }} className="flex flex-col justify-end pb-2">
+          <div className="w-full text-center">..................</div>
+          <div className="text-xs">Checker</div>
+        </div>
+        <div style={{ border: '1px solid black', height: '80px' }} className="flex flex-col justify-end pb-2">
+          <div className="w-full text-center">{order.driverName || '..................'}</div>
+          <div className="text-xs">Driver</div>
+        </div>
+        <div style={{ border: '1px solid black', height: '80px' }} className="flex flex-col justify-end pb-2">
+          <div className="w-full text-center">..................</div>
+          <div className="text-xs">Bill Issuer</div>
+        </div>
+      </div>
+    </div>
+  );
+}
