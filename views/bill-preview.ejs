@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bill Preview</title>
+  <style>
+    /* --- Base Styles (for screen preview if needed) --- */
+    body {
+      font-family: 'TH SarabunPSK', sans-serif; /* Keep for screen */
+      padding: 10px; /* Reduced padding for screen preview */
+      font-size: 13.5px;
+      /* Avoid scaling generally */
+    }
+    .header { text-align: center; margin-bottom: 10px; }
+    .header h1 { font-size: 24px; margin-bottom: 0; } /* Smaller for preview */
+    .header .sub { font-size: 14px; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    td, th { border: 1px solid #000; padding: 4px 6px; /* Adjust padding */ }
+    .no-border td { border: none; padding: 2px; }
+    .right { text-align: right; }
+    .bold { font-weight: bold; }
+    .footer { margin-top: 20px; font-size: 14px; text-align: right; }
+    .signatures { display: flex; justify-content: space-between; margin-top: 20px; }
+    .signature-box { width: 45%; text-align: center; }
+    .signature-line { margin-top: 40px; border-top: 1px solid #000; }
+    .placeholder { display: inline-block; border-bottom: 1px dotted #000; width: 100px; height: 1em; vertical-align: middle; }
+
+    /* --- Print-Specific Styles --- */
+    @media print {
+      @page {
+        /* Dot matrix paper size: 9 inches wide, 5.5 inches tall */
+        size: 9in 5.5in;
+        /* Adjust margins carefully for your printer */
+        /* Start with smaller margins */
+        margin: 0.25in;
+      }
+
+      /* Override base styles for printing */
+      body, html {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100%;
+        /* Use a monospace font for alignment */
+        font-family: 'Courier New', Courier, monospace !important;
+        /* Adjust font size for dot matrix (often 9pt or 10pt) */
+        font-size: 10pt !important;
+        /* Remove any scaling */
+        transform: none !important;
+        background-color: #fff !important; /* Ensure white background */
+        color: #000 !important; /* Ensure black text */
+      }
+
+      /* Ensure tables fit */
+      table {
+        margin-top: 5pt; /* Use points for print */
+        page-break-inside: auto; /* Allow tables to break across pages if needed */
+      }
+      tr {
+          page-break-inside: avoid; /* Try to keep table rows together */
+          page-break-after: auto;
+      }
+      thead {
+          display: table-header-group; /* Repeat header on new pages if table breaks */
+      }
+      tbody {
+          display: table-row-group;
+      }
+      td, th {
+        padding: 3pt 5pt; /* Use points for print */
+        border: 1px solid #000 !important; /* Ensure borders print */
+      }
+      .no-border td {
+         border: none !important;
+         padding: 1pt !important;
+      }
+
+      /* Simplify signatures if flexbox causes issues */
+      .signatures {
+         display: flex !important; /* USE FLEX for side-by-side */
+		 justify-content: space-between !important; /* Space them out */
+         margin-top: 20pt;
+         page-break-inside: avoid; /* Try to keep signatures together */
+		 width: 100%; /* Ensure it takes full width */
+      }
+      .signature-box {
+        /* display: block; */
+         width: 45%; 
+         text-align: center;
+		 page-break-inside: avoid;
+      }
+      .signature-line {
+         margin-top: 40pt; /* Use points */
+         border-top: 1px solid #000 !important;
+      }
+
+      .footer {
+          margin-top: 20pt;
+          font-size: 10pt !important; /* Match body font size */
+          page-break-inside: avoid; /* Try to keep footer together */
+      }
+
+      /* Hide non-essential elements */
+      button, .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>โรงน้ำแข็งมวกเหล็ก</h1>
+    <div class="sub">บิลสั่งซื้อ</div>
+  </div>
+
+  <table class="no-border">
+    <tr>
+      <td><strong>บิลหมายเลข #:</strong> <%= order.id %></td>
+      <td class="right"><strong>วันที่:</strong> <%= formatDate(order.createdAt) %></td>
+    </tr>
+    <tr>
+      <td><strong>ลูกค้า:</strong> <%= order.customerName %></td>
+      <td class="right"><strong>เบอร์:</strong> <%= order.phone || '-' %></td>
+    </tr>
+    <tr>
+      <td><strong>ที่อยู่:</strong> <%= order.address || '-' %></td>
+      <td class="right"><strong>คนขับ:</strong>
+        <% if (order.driverName) { %>
+          <%= order.driverName %>
+        <% } else { %>
+          <span class="placeholder"></span>
+        <% } %>
+      </td>
+    </tr>
+    <tr>
+      <td><strong>ผู้ออกบิล:</strong> <%= order.issuer || '-' %></td>
+      <td></td>
+    </tr>
+  </table>
+
+  <table>
+    <thead>
+      <tr>
+        <th>สินค้า</th>
+        <th class="right">ราคาหน่วย</th>
+        <th class="right">จำนวน</th>
+        <th class="right">ยอดรวม</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% let total = 0; %>
+      <% orderItems.forEach(item => {
+            // Directly use camelCase keys expected from backend aliases
+            let price = item.pricePerUnit || 0; // Use default 0 if null/undefined
+            let qty = item.quantity || 0;     // Use default 0 if null/undefined
+            let itemName = item.productType || '-'; // Use default '-' if null/undefined
+            let itemTotal = price * qty;
+            total += itemTotal;
+      %>
+        <tr>
+          <td><%= itemName %></td>
+          <td class="right"><%= Number(price).toFixed(2) %></td>
+          <td class="right"><%= qty %></td>
+          <td class="right"><%= Number(itemTotal).toFixed(2) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p><strong>ยอดสุทธิ:</strong> <%= total.toFixed(2) %> บาท</p>
+    <p><strong><%- toBahtText(total.toFixed(2)) %></strong></p>
+  </div>
+
+  <div class="signatures">
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div>ผู้รับสินค้า</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div>ผู้ออกบิล</div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = () => window.print();
+  </script>
+</body>
+</html>

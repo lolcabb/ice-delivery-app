@@ -1,0 +1,5 @@
+node_modules/
+ice.db
+ice-order-ui/node_modules/
+ice-order-ui/build/
+.env
