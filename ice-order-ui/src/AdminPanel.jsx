@@ -2,9 +2,11 @@
 // Refactored for Tailwind v4 principles, clarity, and UI improvements
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { apiService } from './apiService';
+
+import { getCurrentLocalDateISO, getCurrentLocalMonthISO } from './utils/dateUtils'; // Adjust path
 
 // Define API Base URL - No change needed
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 const PAYMENT_TYPES = ['Cash', 'Debit', 'Credit'];
 
 // Mapping for display names - No change needed
@@ -32,7 +34,7 @@ const formatDateTime = (dt) => {
         return 'Invalid Date/Time';
     }
 };
-const getTodayDateString = () => new Date().toLocaleDateString('en-CA');
+//const getTodayDateString = () => new Date().toLocaleDateString('en-CA');
 
 const formatDuration = (ms) => {
     if (isNaN(ms) || ms < 0) return 'N/A';
@@ -526,12 +528,11 @@ const DetailItem = ({ label, value }) => (
 
 // --- Main AdminPanel Component (Refactored) ---
 export default function AdminPanel() {
-    // State variables - No change needed in declaration
     const [orders, setOrders] = useState([]);
-    const [selectedDate, setSelectedDate] = useState(getTodayDateString());
-    const [dailyDate, setDailyDate] = useState(getTodayDateString());
+    const [selectedDate, setSelectedDate] = useState(getCurrentLocalDateISO());
+    const [dailyDate, setDailyDate] = useState(getCurrentLocalDateISO());
     const [dailyReport, setDailyReport] = useState(null);
-    const [monthlyMonth, setMonthlyMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format
+    const [monthlyMonth, setMonthlyMonth] = useState(getCurrentLocalMonthISO());
     const [monthlyReport, setMonthlyReport] = useState(null);
     const [loadingOrders, setLoadingOrders] = useState(false);
     const [loadingDaily, setLoadingDaily] = useState(false);
@@ -539,80 +540,140 @@ export default function AdminPanel() {
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [orderSearchTerm, setOrderSearchTerm] = useState('');
-    const [expandedOrderId, setExpandedOrderId] = useState(null); // Store single expanded ID
+    const [expandedOrderId, setExpandedOrderId] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingOrder, setEditingOrder] = useState(null); // Store the whole order object
+    const [editingOrder, setEditingOrder] = useState(null);
 
-    // Clear success/error messages automatically
     useEffect(() => {
         let timer;
         if (successMessage) {
             timer = setTimeout(() => setSuccessMessage(''), 4000);
         } else if (error) {
-            // Optionally auto-clear errors too, or leave them until manually dismissed
-            // timer = setTimeout(() => setError(''), 7000);
+            // timer = setTimeout(() => setError(''), 7000); // Optional: auto-clear errors
         }
         return () => clearTimeout(timer);
     }, [successMessage, error]);
 
-    // --- Data Fetching Callbacks ---
+    const handleAuthError = useCallback((err) => {
+        if (err.status === 401) {
+            console.warn('Authentication error detected in AdminPanel:', err.message);
+            setError(''); // Clear local error before redirect
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('authUser');
+            window.location.href = '/login'; // Redirect to login
+            return true; // Error was handled (auth-related)
+        } else if (err.status === 403) {
+            setError('Forbidden: You do not have permission for this action.');
+            return true; // Error was handled (auth-related)
+        }
+        // For other errors, let the caller handle setting a more specific message
+        return false; // Error was not an auth/permission error handled here
+    }, [setError]); // setError is stable
+
     const fetchOrders = useCallback(async (showLoading = true) => {
-        if(showLoading) setLoadingOrders(true);
-        setError(''); // Clear previous errors
+        if (showLoading) setLoadingOrders(true);
+        setError('');
         try {
-            const response = await fetch(`${API_BASE_URL}/orders?date=${selectedDate}`);
-            if (!response.ok) {
-                 const errorData = await response.json().catch(() => ({})); // Try to get error message
-                 throw new Error(errorData.message || `Failed to fetch orders (${response.status})`);
-            }
-            const data = await response.json();
-            // Ensure data is an array and items within orders is also an array
+            console.log(`Workspaceing orders for date: ${selectedDate}`);
+            const data = await apiService.get(`/orders?date=${selectedDate}`);
             const processedOrders = (Array.isArray(data) ? data : []).map(o => ({
                 ...o,
                 items: Array.isArray(o.items) ? o.items : [],
             }));
             setOrders(processedOrders);
         } catch (err) {
-            console.error("Fetch orders error:", err);
-            setError(`Failed to fetch orders for ${selectedDate}: ${err.message}`);
-            setOrders([]); // Clear orders on error
+            console.error("Fetch orders error in AdminPanel:", err);
+            if (!handleAuthError(err)) {
+                setError(`Failed to fetch orders: ${err.message || 'Unknown error'}`);
+            }
+            setOrders([]);
         } finally {
-            if(showLoading) setLoadingOrders(false);
+            if (showLoading) setLoadingOrders(false);
         }
-    }, [selectedDate]); // Dependency: selectedDate
+    }, [selectedDate, handleAuthError, setLoadingOrders, setError, setOrders]);
 
-    // Initial fetch and fetch on date change
     useEffect(() => {
+        console.log("AdminPanel: useEffect a_sync_with_selectedDate triggered, calling fetchOrders.");
         fetchOrders();
-    }, [fetchOrders]); // fetchOrders dependency includes selectedDate
+    }, [fetchOrders]); // Correct: depends on the memoized fetchOrders
 
-
-    // --- Action Handlers ---
-    const deleteOrder = async (id) => {
-        // Use a more modern confirmation dialog if available, otherwise window.confirm
+    const deleteOrder = useCallback(async (id) => {
         if (!window.confirm(`Are you sure you want to permanently delete order #${id}? This cannot be undone.`)) return;
-
         setError('');
         setSuccessMessage('');
         try {
-            const response = await fetch(`${API_BASE_URL}/orders/${id}`, { method: 'DELETE' });
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || `Delete failed (${response.status})`);
-            }
-             // Optionally get confirmation message from API if available
-             // const result = await response.json();
-             // setSuccessMessage(result.message || `Order #${id} deleted successfully.`);
+            await apiService.delete(`/orders/${id}`);
             setSuccessMessage(`Order #${id} deleted successfully.`);
-            setExpandedOrderId(null); // Close details if open
-            fetchOrders(false); // Refetch orders without showing main loading indicator
+            setExpandedOrderId(null);
+            fetchOrders(false); // Refetch
         } catch (err) {
-            console.error("Delete order error:", err);
-            setError(`Failed to delete order #${id}: ${err.message}`);
+            console.error("Delete order error in AdminPanel:", err);
+            if (!handleAuthError(err)) {
+                setError(`Failed to delete order #${id}: ${err.message || 'Unknown error'}`);
+            }
         }
-    };
+    }, [handleAuthError, fetchOrders, setError, setSuccessMessage, setExpandedOrderId]);
 
-    const handleOpenEditModal = (orderId) => {
+    const handleSaveOrder = useCallback(async (orderId, updatedData) => {
+        setError('');
+        setSuccessMessage('');
+        try {
+            const result = await apiService.put(`/orders/${orderId}`, updatedData);
+            setSuccessMessage(result?.message || `Order #${orderId} updated successfully.`);
+            fetchOrders(false); // Refetch
+            // No need to return Promise.resolve(), modal can close based on no error
+        } catch (err) {
+            console.error(`Save order #${orderId} error in AdminPanel:`, err);
+            if (!handleAuthError(err)) {
+                setError(`Failed to save order #${orderId}: ${err.message || 'Unknown error'}`);
+            }
+            throw err; // Re-throw for the modal to know save failed
+        }
+    }, [handleAuthError, fetchOrders, setError, setSuccessMessage]);
+
+    const getDailyReport = useCallback(async () => {
+        if (!dailyDate) { setError("Please select a date for the daily report."); return; }
+        setLoadingDaily(true);
+        setDailyReport(null);
+        setError('');
+        setSuccessMessage('');
+        try {
+            const data = await apiService.get(`/reports/daily?date=${dailyDate}`);
+            setDailyReport(data);
+        } catch (err) {
+            console.error("Daily report fetch error in AdminPanel:", err);
+            if (!handleAuthError(err)) {
+                setError(`Failed to fetch daily report: ${err.message || 'Unknown error'}`);
+            }
+        } finally {
+            setLoadingDaily(false);
+        }
+    }, [dailyDate, handleAuthError, setLoadingDaily, setDailyReport, setError, setSuccessMessage]);
+
+    const getMonthlyReport = useCallback(async () => {
+        if (!monthlyMonth) { setError("Please select a month for the monthly report."); return; }
+        setLoadingMonthly(true);
+        setMonthlyReport(null);
+        setError('');
+        setSuccessMessage('');
+        try {
+            const data = await apiService.get(`/reports/monthly?month=${monthlyMonth}`);
+            setMonthlyReport(data);
+        } catch (err) {
+            console.error("Monthly report fetch error in AdminPanel:", err);
+            if (!handleAuthError(err)) {
+                setError(`Failed to fetch monthly report: ${err.message || 'Unknown error'}`);
+            }
+        } finally {
+            setLoadingMonthly(false);
+        }
+    }, [monthlyMonth, handleAuthError, setLoadingMonthly, setMonthlyReport, setError, setSuccessMessage]);
+
+
+    // Other handlers like handleOpenEditModal, handleCloseEditModal, handleToggleExpand, handlePrintOrder
+    // seem less likely to cause TDZ unless they access uninitialized state in a strange way.
+    // Their dependencies also need to be checked if they use component scope variables.
+     const handleOpenEditModal = useCallback((orderId) => {
         setError('');
         setSuccessMessage('');
         const orderToEdit = orders.find(o => o.id === orderId);
@@ -620,61 +681,25 @@ export default function AdminPanel() {
             setEditingOrder(orderToEdit);
             setIsEditModalOpen(true);
         } else {
-            // Should not happen if the UI is synced, but good to handle
             setError(`Error: Could not find order data for ID ${orderId}. Please refresh.`);
         }
-    };
+    }, [orders, setEditingOrder, setIsEditModalOpen, setError, setSuccessMessage]);
 
-    const handleCloseEditModal = () => {
+    const handleCloseEditModal = useCallback(() => {
         setIsEditModalOpen(false);
-        setEditingOrder(null); // Clear editing state
-    };
+        setEditingOrder(null);
+    }, [setIsEditModalOpen, setEditingOrder]);
 
-    // This function is passed to the modal, modal calls it, handles success/error display here
-    const handleSaveOrder = async (orderId, updatedData) => {
-        setError('');
-        setSuccessMessage('');
-        // The modal handles its own 'isSaving' state
-        try {
-            const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedData),
-            });
-            const result = await response.json(); // Attempt to parse JSON regardless of status
-            if (!response.ok) {
-                throw new Error(result.message || `Update failed (${response.status})`);
-            }
-            setSuccessMessage(result.message || `Order #${orderId} updated successfully.`);
-            fetchOrders(false); // Refetch orders without main loading indicator
-            return Promise.resolve(); // Indicate success to modal if needed
-        } catch (err) {
-            console.error(`Save order #${orderId} error:`, err);
-            // Set error here so it shows on the main page after modal closes
-            setError(`Failed to save order #${orderId}: ${err.message}`);
-            // Re-throw the error so the modal knows the save failed
-            throw err;
-        }
-    };
+    const handleToggleExpand = useCallback((orderId) => {
+        setExpandedOrderId(prevId => (prevId === orderId ? null : prevId));
+    }, [setExpandedOrderId]);
 
-    // Toggle single order expansion
-    const handleToggleExpand = (orderId) => {
-        setExpandedOrderId(prevId => (prevId === orderId ? null : orderId));
-    };
-
-    // Print Order Handler - More robust URL handling
-    const handlePrintOrder = (orderId) => {
+    const handlePrintOrder = useCallback((orderId) => {
         setError('');
         setSuccessMessage('');
         try {
-             // Construct the print URL relative to the *frontend* host if needed,
-             // or use the API base URL if the print endpoint is served by the API.
-             // Assuming the print endpoint is on the same origin as the API:
-            const printUrl = `${API_BASE_URL}/print-bill/${orderId}`.replace('/api', ''); // Adjust if needed
-            // const url = new URL(API_BASE_URL); // Or parse API URL
-            // const printBaseUrl = `${url.protocol}//${url.host}`;
-            // const printUrl = `${printBaseUrl}/print-bill/${orderId}`;
-
+            const VITE_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+            const printUrl = `${VITE_API_BASE_URL}/print-bill/${orderId}`.replace('/api', '');
             const printWindow = window.open(printUrl, '_blank', 'noopener,noreferrer,width=800,height=600');
             if (!printWindow) {
                 throw new Error("Popup blocked? Please allow popups for this site.");
@@ -683,65 +708,17 @@ export default function AdminPanel() {
             console.error("Print URL error:", e);
             setError(`Could not open print window: ${e.message}`);
         }
-    };
+    }, [setError, setSuccessMessage]);
 
-    // Fetch daily report
-    const getDailyReport = async () => {
-        if (!dailyDate) { setError("Please select a date for the daily report."); return; }
-        setLoadingDaily(true);
-        setDailyReport(null);
-        setError('');
-        setSuccessMessage(''); // Clear messages for new request
-        try {
-            const response = await fetch(`${API_BASE_URL}/reports/daily?date=${dailyDate}`);
-            if (!response.ok) {
-                const errorData = await response.json().catch(()=>({}));
-                throw new Error(errorData.message || `Workspace failed (${response.status})`);
-            }
-            const data = await response.json();
-            setDailyReport(data);
-        } catch (err) {
-            console.error("Daily report fetch error:", err);
-            setError(`Failed to fetch daily report: ${err.message}`);
-        } finally {
-            setLoadingDaily(false);
-        }
-    };
 
-    // Fetch monthly report
-    const getMonthlyReport = async () => {
-        if (!monthlyMonth) { setError("Please select a month for the monthly report."); return; }
-        setLoadingMonthly(true);
-        setMonthlyReport(null);
-        setError('');
-        setSuccessMessage(''); // Clear messages
-        try {
-            const response = await fetch(`${API_BASE_URL}/reports/monthly?month=${monthlyMonth}`);
-            if (!response.ok) {
-                const errorData = await response.json().catch(()=>({}));
-                throw new Error(errorData.message || `Workspace failed (${response.status})`);
-            }
-            const data = await response.json();
-            setMonthlyReport(data);
-        } catch (err) {
-            console.error("Monthly report fetch error:", err);
-            setError(`Failed to fetch monthly report: ${err.message}`);
-        } finally {
-            setLoadingMonthly(false);
-        }
-    };
-
-    // --- Memoized Filtered Orders ---
     const filteredOrders = useMemo(() => {
         const term = orderSearchTerm.toLowerCase().trim();
         if (!term) return orders;
         return orders.filter(o =>
-            String(o.id).includes(term) || // Search by ID (as string)
-            o.customerName?.toLowerCase().includes(term) // Search by customer name
-            // Add more fields to search if needed (e.g., o.status?.toLowerCase().includes(term))
+            String(o.id).includes(term) ||
+            o.customerName?.toLowerCase().includes(term)
         );
     }, [orders, orderSearchTerm]);
-
 
     // --- Render JSX ---
     return (

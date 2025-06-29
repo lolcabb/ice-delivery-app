@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 // Ensure you have the correct path to your PostgreSQL connection pool module
 const db = require('../db/postgres');
+const { authMiddleware, requireRole } = require('../middleware/auth');
 // date-fns is not strictly required by this version but might be useful elsewhere
 // const { format, startOfMonth, endOfMonth } = require('date-fns');
 
@@ -26,7 +27,7 @@ function getCurrentMonthString() {
 
 // --- Daily Financial Report ---
 // GET /api/reports/daily?date=YYYY-MM-DD
-router.get('/daily', async (req, res) => {
+router.get('/daily', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => {
     const dateParam = req.query.date || getTodayDateString();
     console.log(`Received GET /api/reports/daily request for date: ${dateParam}`);
 
@@ -100,7 +101,7 @@ router.get('/daily', async (req, res) => {
 
 // --- Monthly Financial Report ---
 // GET /api/reports/monthly?month=YYYY-MM
-router.get('/monthly', async (req, res) => {
+router.get('/monthly', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => {
     const monthParam = req.query.month || getCurrentMonthString();
     console.log(`Received GET /api/reports/monthly request for month: ${monthParam}`);
 

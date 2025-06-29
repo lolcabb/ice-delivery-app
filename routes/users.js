@@ -6,8 +6,8 @@ const db = require('../db/postgres');
 // Assuming authMiddleware works without modification for now
 const { authMiddleware, requireRole } = require('../middleware/auth');
 // IMPORTANT: You need a library for password hashing! Install with: npm install bcrypt
-// const bcrypt = require('bcrypt');
-// const saltRounds = 10; // Example salt rounds for bcrypt
+ const bcrypt = require('bcryptjs');
+ const saltRounds = 12; // Example salt rounds for bcryptjs
 
 // GET /api/users
 router.get('/', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => { // Use async handler
@@ -37,17 +37,17 @@ router.post('/', authMiddleware, requireRole(['admin', 'manager']), async (req, 
 
     try {
         // --- HASH THE PASSWORD ---
-        // const passwordHash = await bcrypt.hash(password, saltRounds);
+         const passwordHash = await bcrypt.hash(password, saltRounds);
         // --- END HASHING ---
 
         // IMPORTANT: Store password_hash, not plain password! Use lowercase column names.
         const sql = 'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id';
         // Use the hashed password here:
-        // const params = [username, passwordHash, role];
+        const params = [username, passwordHash, role];
 
         // *** TEMPORARY INSECURE INSERT (Replace with Hashing!) ***
-        const params = [username, password /* REPLACE THIS with passwordHash */, role];
-        console.warn(`WARN: Storing plain text password for user '${username}'. IMPLEMENT PASSWORD HASHING!`);
+        // const params = [username, password /* REPLACE THIS with passwordHash */, role];
+        // console.warn(`WARN: Storing plain text password for user '${username}'. IMPLEMENT PASSWORD HASHING!`);
         // *** END TEMPORARY INSECURE INSERT ***
 
         const result = await db.query(sql, params);
@@ -89,19 +89,19 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'manager']), async (req
         const updates = []; const params = []; let paramIndex = 1;
 
         // --- HASH PASSWORD if provided ---
-        // if (password) {
-        //   const passwordHash = await bcrypt.hash(password, saltRounds);
-        //   updates.push(`password_hash = $${paramIndex++}`); // Update hash column
-        //   params.push(passwordHash);
-        // }
+         if (password) {
+           const passwordHash = await bcrypt.hash(password, saltRounds);
+           updates.push(`password_hash = $${paramIndex++}`); // Update hash column
+           params.push(passwordHash);
+         }
         // --- END HASHING ---
 
         // *** TEMPORARY INSECURE UPDATE (Replace with Hashing!) ***
-         if (password) {
-             updates.push(`password_hash = $${paramIndex++}`); // Assuming column name is password_hash
-             params.push(password); // Storing plain text - BAD!
-             console.warn(`WARN: Storing plain text password for user ID '${id}'. IMPLEMENT PASSWORD HASHING!`);
-         }
+        // if (password) {
+        //     updates.push(`password_hash = $${paramIndex++}`); // Assuming column name is password_hash
+        //     params.push(password); // Storing plain text - BAD!
+        //     console.warn(`WARN: Storing plain text password for user ID '${id}'. IMPLEMENT PASSWORD HASHING!`);
+        // }
         // *** END TEMPORARY INSECURE UPDATE ***
 
         if (role !== undefined) { updates.push(`role = $${paramIndex++}`); params.push(role); }

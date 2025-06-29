@@ -1,5 +1,6 @@
 // 📁 File: NewOrder.js (Corrected CSS Grid for Product Alignment)
 import React, { useState, useRef, useEffect } from 'react';
+import { apiService } from './apiService'; // Adjust the import based on your project structure
 
 // Define the product names mapping
 const productNames = {
@@ -151,36 +152,8 @@ export default function NewOrder({ onOrderCreated }) {
 
     // --- API Call & Post-Submit Actions ---
     try {
-       const res = await fetch(`${API_BASE_URL}/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+       const createdOrderData = await apiService.post('/orders', payload);
 
-       if (!res.ok) {
-           let errorMsg = `การส่งข้อมูลคำสั่งซื้อล้มเหลว (${res.status} ${res.statusText})`;
-           try {
-               const errorBody = await res.text();
-               if (errorBody) {
-                   if (errorBody.trim().startsWith('{') || errorBody.trim().startsWith('[')) {
-                       try {
-                           const errorJson = JSON.parse(errorBody);
-                           errorMsg = errorJson.message || errorBody;
-                       } catch (jsonParseError) {
-                           console.warn("Could not parse error body as JSON, using raw text:", jsonParseError);
-                           errorMsg = errorBody;
-                       }
-                   } else {
-                      errorMsg = errorBody;
-                   }
-               }
-           } catch (textError) {
-               console.warn("Could not read error response body:", textError);
-           }
-           throw new Error(errorMsg);
-       }
-
-       const createdOrderData = await res.json();
        if (!createdOrderData || !createdOrderData.id || !createdOrderData.status) {
            throw new Error('สร้างคำสั่งซื้อแล้ว แต่ข้อมูลที่ได้รับกลับมาจากเซิร์ฟเวอร์ไม่สมบูรณ์หรือไม่ถูกต้อง');
        }

@@ -7,6 +7,7 @@ const router = express.Router();
 // Use the PostgreSQL connection pool module
 const db = require('../db/postgres');
 const crypto = require('crypto'); // Required for ETag generation
+const { authMiddleware, requireRole } = require('../middleware/auth'); // <-- Import auth middleware
 
 // Helper function to create SELECT clause with aliases
 const getOrderSelectClause = (aliasPrefix = 'o.') => {
@@ -28,7 +29,7 @@ const getItemSelectClause = (aliasPrefix = 'oi.') => {
 
 
 // --- POST / (Create Order) ---
-router.post('/', async (req, res) => { // Use async handler
+router.post('/', authMiddleware, async (req, res) => { // Use async handler
     console.log("Received POST /api/orders request");
     const { customerName, address, phone, driverName, status, issuer, orderItems, paymentType } = req.body;
 
@@ -100,7 +101,7 @@ router.post('/', async (req, res) => { // Use async handler
 
 
 // --- GET / (All Orders - with date/driver filter) --- CORRECTIONS APPLIED ---
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
     console.log("Received GET /api/orders request with query:", req.query);
     const { date, driverName } = req.query;
     const TARGET_TIMEZONE = 'Asia/Bangkok'; // Define target timezone
@@ -191,7 +192,7 @@ router.get('/', async (req, res) => {
  * - `getItemSelectClause`: Helper function returning SQL select fragment for items.
  * - `crypto`: Node.js crypto module for ETag generation.
  */
-router.get('/today', async (req, res) => {
+router.get('/today', authMiddleware, async (req, res) => {
     console.log("Received GET /api/orders/today request");
     const targetTimezone = 'Asia/Bangkok'; // Define the target timezone for "today"
 
@@ -229,6 +230,7 @@ router.get('/today', async (req, res) => {
         const ordersResult = await db.query(ordersQuery, [targetTimezone]);
         const orders = ordersResult.rows; // Assuming helpers provide camelCase aliases
 
+        console.log(`/today raw orders from DB length: ${orders.length}`);
         // --- Step 2: Fetch Associated Items (if any orders were found) ---
 
         let ordersWithItems = [];
@@ -257,7 +259,7 @@ router.get('/today', async (req, res) => {
             }));
         }
         // If orders.length === 0, ordersWithItems remains []
-
+        console.log(`/today final ordersWithItems length: ${ordersWithItems.length}`);
         // --- Step 3: ETag Cache Handling ---
 
         const dataString = JSON.stringify(ordersWithItems);
@@ -295,7 +297,7 @@ router.get('/today', async (req, res) => {
 
 
 // --- GET /:id (Single Order) ---
-router.get('/:id', async (req, res) => {
+router.get('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     console.log(`Received GET /api/orders/${id} request`);
     if (!/^\d+$/.test(id)) { return res.status(400).json({ message: 'Invalid order ID format. Must be an integer.' }); }
@@ -320,7 +322,7 @@ router.get('/:id', async (req, res) => {
 
 
 // --- PUT /:id (Update Order - Flexible) ---
-router.put('/:id', async (req, res) => {
+router.put('/:id', authMiddleware, async (req, res) => {
     const { id } = req.params;
     console.log(`Received PUT /api/orders/${id} request with body:`, req.body);
     if (!/^\d+$/.test(id)) { return res.status(400).json({ message: 'Invalid order ID format. Must be an integer.' }); }
@@ -396,7 +398,7 @@ router.put('/:id', async (req, res) => {
 
 // --- DELETE Order ---
 // (No SELECT statement here, so no aliases needed for delete logic)
-router.delete('/:id', async (req, res) => { // Use async handler
+router.delete('/:id', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => { // Use async handler
     const orderIdStr = req.params.id;
     console.log(`Received DELETE /api/orders/${orderIdStr}`);
 

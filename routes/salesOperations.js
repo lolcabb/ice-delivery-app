@@ -1,0 +1,1462 @@
+// ice-delivery-app/routes/salesOperations.js
+const express = require('express');
+const router = express.Router();
+const { query, getClient } = require('../db/postgres');
+const { authMiddleware, requireRole } = require('../middleware/auth');
+const { v4: uuidv4 } = require('uuid'); 
+
+// --- Helper function for error handling ---
+const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
+    console.error(message, error);
+    const errorMessage = process.env.NODE_ENV === 'production' && statusCode === 500
+        ? "An unexpected error occurred on the server."
+        : `${message}: ${error.message || error}`;
+    res.status(statusCode).json({ error: errorMessage });
+};
+
+// Helper for uuid validation (example, if not using a library that provides it)
+// This is a simple regex, for robust validation use a library or PostgreSQL's own type checking
+const uuidValidate = (uuid) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+}
+
+// --- Helper function to update financial totals on driver_daily_summary ---
+const updateDriverDailySummaryTotals = async (client, driverDailySummaryId) => {
+    console.log(`[SalesOps Helper] Updating totals for driver_daily_summary_id: ${driverDailySummaryId}`);
+    if (!driverDailySummaryId) {
+        console.error("[SalesOps Helper] Error: driverDailySummaryId is undefined or null.");
+        throw new Error("Cannot update summary totals without a valid driverDailySummaryId.");
+    }
+    const salesValuesSql = `
+        SELECT 
+            COALESCE(SUM(CASE WHEN ds.payment_type = 'Cash' THEN ds.total_sale_amount ELSE 0 END), 0) AS total_cash_sales,
+            COALESCE(SUM(CASE WHEN ds.payment_type = 'Credit' THEN ds.total_sale_amount ELSE 0 END), 0) AS total_credit_sales,
+            COALESCE(SUM(CASE WHEN ds.payment_type NOT IN ('Cash', 'Credit') OR ds.payment_type IS NULL THEN ds.total_sale_amount ELSE 0 END), 0) AS total_other_sales
+        FROM driver_sales ds
+        WHERE ds.driver_daily_summary_id = $1;
+    `;
+    const salesValuesResult = await client.query(salesValuesSql, [driverDailySummaryId]);
+    const { 
+        total_cash_sales, 
+        total_credit_sales,
+        total_other_sales
+    } = salesValuesResult.rows[0] || { total_cash_sales: 0, total_credit_sales: 0, total_other_sales: 0 };
+
+    const updateSummarySql = `
+        UPDATE driver_daily_summaries SET
+            total_cash_sales_value = $1,
+            total_new_credit_sales_value = $2,
+            total_other_payment_sales_value = $3,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE summary_id = $4
+        RETURNING *; 
+    `;
+    const updatedSummaryResult = await client.query(updateSummarySql, [
+        parseFloat(total_cash_sales),
+        parseFloat(total_credit_sales),
+        parseFloat(total_other_sales),
+        driverDailySummaryId
+    ]);
+    console.log(`[SalesOps Helper] Totals updated for summary_id: ${driverDailySummaryId}. Cash: ${total_cash_sales}, Credit: ${total_credit_sales}, Other: ${total_other_sales}`);
+    if (updatedSummaryResult.rows.length === 0) {
+        console.warn(`[SalesOps Helper] No summary found for summary_id: ${driverDailySummaryId} during total update.`);
+    }
+    return updatedSummaryResult.rows[0];
+};
+
+//POST batch entries
+router.post('/sales-entry/batch', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const { driver_daily_summary_id, sales_data } = req.body;
+    const area_manager_id = req.user.id;
+
+    if (!driver_daily_summary_id || !Array.isArray(sales_data)) {
+        return res.status(400).json({ error: 'Missing summary ID or sales data.' });
+    }
+
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+
+        // First, clear any existing sales for this summary to prevent duplicates on re-submission
+        await client.query('DELETE FROM driver_sales WHERE driver_daily_summary_id = $1', [driver_daily_summary_id]);
+
+        for (const sale of sales_data) {
+            if (!sale.customer_id && !sale.customer_name_override) continue; // Skip rows with no customer info
+            if (!sale.items || sale.items.length === 0) continue; // Skip customers with no items sold
+
+            // Create the main driver_sales record
+            const saleInsertSql = `
+                INSERT INTO driver_sales 
+                (driver_daily_summary_id, customer_id, customer_name_override, payment_type, total_sale_amount, area_manager_logged_by_id, notes)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING sale_id;
+            `;
+            const saleValues = [
+                driver_daily_summary_id,
+                sale.customer_id || null,
+                sale.customer_name_override || null,
+                sale.payment_type || 'Cash',
+                sale.items.reduce((acc, item) => acc + (parseFloat(item.quantity_sold || 0) * parseFloat(item.unit_price || 0)), 0),
+                area_manager_id,
+                sale.notes || null
+            ];
+            const saleResult = await client.query(saleInsertSql, saleValues);
+            const sale_id = saleResult.rows[0].sale_id;
+
+            // Insert each item for that sale
+            for (const item of sale.items) {
+                if (parseFloat(item.quantity_sold || 0) <= 0) continue; // Skip items with no quantity
+
+                const itemInsertSql = `
+                    INSERT INTO driver_sale_items
+                    (driver_sale_id, product_id, quantity_sold, unit_price, transaction_type)
+                    VALUES ($1, $2, $3, $4, $5);
+                `;
+                const itemValues = [
+                    sale_id,
+                    item.product_id,
+                    parseFloat(item.quantity_sold),
+                    parseFloat(item.unit_price),
+                    item.transaction_type || 'Sale' // Use the transaction type from the grid
+                ];
+                await client.query(itemInsertSql, itemValues);
+            }
+        }
+        
+        // After inserting all sales, update the summary totals
+        await updateDriverDailySummaryTotals(client, driver_daily_summary_id);
+
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'Sales data saved successfully.' });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        handleError(res, err, 'Failed to save batch sales data');
+    } finally {
+        client.release();
+    }
+});
+
+// POST /api/sales-ops/batch-returns - New transactional endpoint
+router.post('/batch-returns', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const { driver_id, return_date, product_items, packaging_items, driver_daily_summary_id } = req.body;
+    const area_manager_id = req.user.id;
+
+    // --- Basic Validation ---
+    if (!driver_id || !return_date || !driver_daily_summary_id) {
+        return res.status(400).json({ error: 'Driver ID, Return Date, and Summary ID are required.' });
+    }
+
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+
+        // --- Process Product Returns ---
+        // First, clear out old product returns for this day for this driver to prevent duplicates
+        await client.query('DELETE FROM product_returns WHERE driver_id = $1 AND return_date = $2', [driver_id, return_date]);
+        
+        if (Array.isArray(product_items) && product_items.length > 0) {
+            const productInsertPromises = product_items.map(item => {
+                const sql = `
+                    INSERT INTO product_returns
+                    (driver_id, return_date, product_id, quantity_returned, loss_reason_id, custom_reason_for_loss, area_manager_id, notes, driver_daily_summary_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                `;
+                return client.query(sql, [
+                    driver_id, return_date, item.product_id, item.quantity_returned,
+                    item.loss_reason_id, item.custom_reason_for_loss, area_manager_id,
+                    item.notes, driver_daily_summary_id
+                ]);
+            });
+            await Promise.all(productInsertPromises);
+        }
+
+        // --- Process Packaging Logs ---
+        // Clear out old packaging logs for this day for this driver
+        await client.query('DELETE FROM packaging_logs WHERE driver_id = $1 AND log_date = $2', [driver_id, return_date]);
+
+        if (Array.isArray(packaging_items) && packaging_items.length > 0) {
+            const packagingInsertPromises = packaging_items.map(item => {
+                const sql = `
+                    INSERT INTO packaging_logs
+                    (driver_id, log_date, packaging_type_id, quantity_out, quantity_returned, area_manager_id, notes, driver_daily_summary_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `;
+                return client.query(sql, [
+                    driver_id, return_date, item.packaging_type_id, item.quantity_out,
+                    item.quantity_returned, area_manager_id, item.notes, driver_daily_summary_id
+                ]);
+            });
+            await Promise.all(packagingInsertPromises);
+        }
+
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'All returns and packaging logs saved successfully.' });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        handleError(res, err, "Failed to save batch returns");
+    } finally {
+        client.release();
+    }
+});
+
+// GET /api/sales-ops/reconciliation-summary?driver_id=X&date=YYYY-MM-DD
+router.get('/reconciliation-summary', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    const { driver_id, date } = req.query;
+
+    if (!driver_id || !date) {
+        return res.status(400).json({ error: 'Driver ID and Date are required.' });
+    }
+
+    try {
+        // This single, powerful query aggregates all data needed for the reconciliation screen.
+        const reconciliationQuery = `
+            WITH loaded_quantities AS (
+                SELECT product_id, SUM(quantity_loaded) as total_loaded
+                FROM loading_logs
+                WHERE driver_id = $1 AND DATE(load_timestamp AT TIME ZONE 'Asia/Bangkok') = $2
+                GROUP BY product_id
+            ),
+            sold_quantities AS (
+                SELECT dsi.product_id, SUM(dsi.quantity_sold) as total_sold
+                FROM driver_sale_items dsi
+                JOIN driver_sales ds ON dsi.driver_sale_id = ds.sale_id
+                JOIN driver_daily_summaries dds ON ds.driver_daily_summary_id = dds.summary_id
+                WHERE dds.driver_id = $1 AND dds.sale_date = $2
+                GROUP BY dsi.product_id
+            ),
+            returned_quantities AS (
+                SELECT product_id, SUM(quantity_returned) as total_returned
+                FROM product_returns
+                WHERE driver_id = $1 AND return_date = $2
+                GROUP BY product_id
+            )
+            SELECT 
+                p.product_id,
+                p.product_name,
+                COALESCE(lq.total_loaded, 0) AS loaded,
+                COALESCE(sq.total_sold, 0) AS sold,
+                COALESCE(rq.total_returned, 0) AS returned,
+                (COALESCE(lq.total_loaded, 0) - COALESCE(sq.total_sold, 0) - COALESCE(rq.total_returned, 0)) as loss
+            FROM products p
+            LEFT JOIN loaded_quantities lq ON p.product_id = lq.product_id
+            LEFT JOIN sold_quantities sq ON p.product_id = sq.product_id
+            LEFT JOIN returned_quantities rq ON p.product_id = rq.product_id
+            WHERE COALESCE(lq.total_loaded, 0) > 0 OR COALESCE(sq.total_sold, 0) > 0 OR COALESCE(rq.total_returned, 0) > 0
+            ORDER BY p.product_id;
+        `;
+
+        // We also need to fetch the summary separately to get cash details etc.
+        const summaryQuery = `
+            SELECT 
+                dds.*,
+                r.route_name,
+                (SELECT SUM(quantity_loaded) 
+                 FROM loading_logs ll 
+                 WHERE ll.driver_id = dds.driver_id 
+                   AND DATE(ll.load_timestamp AT TIME ZONE 'Asia/Bangkok') = dds.sale_date
+                ) as total_products_loaded
+            FROM driver_daily_summaries dds
+            LEFT JOIN delivery_routes r ON dds.route_id = r.route_id
+            WHERE dds.driver_id = $1 AND dds.sale_date = $2 
+            LIMIT 1
+        `;
+        
+        const [reconciliationResult, summaryResult] = await Promise.all([
+            query(reconciliationQuery, [driver_id, date]),
+            query(summaryQuery, [driver_id, date])
+        ]);
+        
+        if (summaryResult.rows.length === 0) {
+             return res.status(404).json({ error: 'No sales summary found for this driver on this date. Please complete sales or returns entry first.' });
+        }
+
+        res.json({
+            summary: summaryResult.rows[0],
+            product_reconciliation: reconciliationResult.rows
+        });
+
+    } catch (err) {
+        handleError(res, err, "Failed to generate reconciliation summary");
+    }
+});
+
+// === PRODUCTS ===
+router.get('/products', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    console.log(`[SalesOps API] GET /products - User: ${req.user.id} (${req.user.role})`);
+    try {
+        const result = await query('SELECT product_id, product_name, default_unit_price, unit_of_measure FROM products WHERE is_active = TRUE ORDER BY product_id ASC');
+        res.json(result.rows);
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve sales products");
+    }
+});
+
+// === LOADING LOGS ===
+router.post('/loading-logs', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const { driver_id, route_id, load_type = 'initial', load_timestamp, notes, items } = req.body;
+    const area_manager_id = req.user.id;
+
+    console.log(`[SalesOps API] POST /loading-logs (batch) - User: ${area_manager_id}, Received Driver ID: ${driver_id}`);
+
+    if (!driver_id || isNaN(parseInt(driver_id))) {
+        return res.status(400).json({ error: 'Valid Driver ID is required.' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'At least one product item is required in the "items" array.' });
+    }
+    if (route_id && isNaN(parseInt(route_id))) {
+        return res.status(400).json({ error: 'Invalid Route ID.' });
+    }
+    const finalLoadTimestamp = load_timestamp ? new Date(load_timestamp) : new Date();
+    if (isNaN(finalLoadTimestamp.getTime())) {
+        return res.status(400).json({ error: 'Invalid load_timestamp format.' });
+    }
+
+    for (const item of items) {
+        if (!item.product_id || isNaN(parseInt(item.product_id))) {
+            return res.status(400).json({ error: 'Each item must have a valid Product ID.' });
+        }
+        if (item.quantity_loaded === undefined || isNaN(parseFloat(item.quantity_loaded)) || parseFloat(item.quantity_loaded) <= 0) {
+            return res.status(400).json({ error: `Quantity Loaded for product ID ${item.product_id} must be a positive number.` });
+        }
+    }
+
+    const client = await getClient();
+    const batchUUID = uuidv4(); 
+
+    try {
+        await client.query('BEGIN');
+        console.log(`[SalesOps API] Transaction BEGIN for batch loading log (UUID: ${batchUUID}) for driver ${driver_id}`);
+
+        // *** START OF FIX ***
+        // Add a definitive check to verify the driver_id exists before attempting to insert.
+        const driverCheckResult = await client.query('SELECT driver_id FROM drivers WHERE driver_id = $1', [parseInt(driver_id)]);
+        if (driverCheckResult.rows.length === 0) {
+            // If the driver doesn't exist, we can give a very specific error and stop.
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: `Operation failed: The provided Driver ID (${driver_id}) does not exist in the database.` });
+        }
+        // *** END OF FIX ***
+
+        const insertPromises = items.map(item => {
+            const sql = `
+                INSERT INTO loading_logs 
+                (driver_id, route_id, product_id, quantity_loaded, load_type, load_timestamp, area_manager_id, notes, load_batch_uuid)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING *; 
+            `;
+            const values = [
+                parseInt(driver_id),
+                route_id ? parseInt(route_id) : null,
+                parseInt(item.product_id),
+                parseFloat(item.quantity_loaded),
+                load_type,
+                finalLoadTimestamp, 
+                area_manager_id,
+                notes || null,
+                batchUUID 
+            ];
+            return client.query(sql, values);
+        });
+
+        const results = await Promise.all(insertPromises);
+        
+        const commonData = results[0]?.rows[0] ? {
+            driver_id: results[0].rows[0].driver_id,
+            route_id: results[0].rows[0].route_id,
+            load_type: results[0].rows[0].load_type,
+            load_timestamp: results[0].rows[0].load_timestamp,
+            area_manager_id: results[0].rows[0].area_manager_id,
+            notes: results[0].rows[0].notes,
+            load_batch_uuid: batchUUID
+        } : {};
+
+        const createdItems = results.map(r => ({
+            loading_log_id: r.rows[0].loading_log_id,
+            product_id: r.rows[0].product_id,
+            quantity_loaded: r.rows[0].quantity_loaded
+        }));
+
+        let driverNameResult, areaManagerNameResult, routeNameResult;
+        if (commonData.driver_id) {
+            driverNameResult = await client.query('SELECT first_name, last_name FROM drivers WHERE driver_id = $1', [commonData.driver_id]);
+        }
+        if (commonData.area_manager_id) {
+            areaManagerNameResult = await client.query('SELECT username FROM users WHERE id = $1', [commonData.area_manager_id]);
+        }
+        if (commonData.route_id) {
+            routeNameResult = await client.query('SELECT route_name FROM delivery_routes WHERE route_id = $1', [commonData.route_id]);
+        }
+        
+        await client.query('COMMIT');
+        console.log(`[SalesOps API] Transaction COMMIT. ${createdItems.length} loading logs created with batch UUID: ${batchUUID}.`);
+        
+        res.status(201).json({
+            ...commonData,
+            items: createdItems,
+            driver_name: driverNameResult?.rows[0] ? `${driverNameResult.rows[0].first_name} ${driverNameResult.rows[0].last_name || ''}`.trim() : null,
+            area_manager_name: areaManagerNameResult?.rows[0]?.username || null,
+            route_name: routeNameResult?.rows[0]?.route_name || null,
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(`[SalesOps API] Transaction ROLLBACK for batch loading log. Error: ${err.message}`);
+        if (err.code === '23503') { 
+            return handleError(res, err, 'Invalid reference ID provided (Driver, Product, or Route).', 400);
+        }
+        handleError(res, err, "Failed to create loading log entries");
+    } finally {
+        client.release();
+    }
+});
+
+// GET /api/sales-ops/loading-logs?driver_id=X&date=YYYY-MM-DD (Corrected Joins)
+router.get('/loading-logs', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    const { driver_id, date, driver_name } = req.query;
+    const requesting_user_id = req.user.id;
+
+    console.log(`[SalesOps API] GET /loading-logs - User: ${requesting_user_id}, Query: ${JSON.stringify(req.query)}`);
+    
+    const TARGET_TIMEZONE = 'Asia/Bangkok'; 
+
+    let sql = `
+        SELECT ll.loading_log_id, ll.driver_id, ll.route_id, ll.product_id, ll.quantity_loaded, 
+               ll.load_type, ll.load_timestamp, ll.area_manager_id, ll.notes, ll.load_batch_uuid,
+               d.first_name AS driver_first_name, d.last_name AS driver_last_name, -- Get from drivers table
+               p.product_name, 
+               r.route_name, 
+               am.username AS area_manager_name -- This is the user who logged it
+        FROM loading_logs ll
+        JOIN drivers d ON ll.driver_id = d.driver_id -- Corrected join for driver
+        JOIN products p ON ll.product_id = p.product_id
+        LEFT JOIN delivery_routes r ON ll.route_id = r.route_id
+        JOIN users am ON ll.area_manager_id = am.id -- User who created the log
+    `; 
+    const conditions = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (driver_id) {
+        if (!/^\d+$/.test(driver_id)) return res.status(400).json({error: "Invalid driver_id format."});
+        conditions.push(`ll.driver_id = $${paramIndex++}`);
+        values.push(parseInt(driver_id));
+    }
+
+    //SEARCH BY DRIVER NAME
+    if (driver_name) {
+        conditions.push(`d.first_name ILIKE $${paramIndex++}`);
+        values.push(`%${driver_name}%`);
+    }
+
+    if (date) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+        }
+        conditions.push(`ll.load_timestamp >= (($${paramIndex})::date)::timestamp AT TIME ZONE $${paramIndex + 1}`);
+        conditions.push(`ll.load_timestamp < (($${paramIndex}::date + INTERVAL '1 day')::timestamp AT TIME ZONE $${paramIndex + 1})`);
+        values.push(date); 
+        values.push(TARGET_TIMEZONE); 
+        paramIndex += 2;
+    }
+
+    if (conditions.length > 0) {
+        sql += " WHERE " + conditions.join(" AND ");
+    }
+
+    sql += " ORDER BY ll.load_timestamp DESC, ll.load_batch_uuid DESC, ll.loading_log_id ASC;"; 
+
+    try {
+        const result = await query(sql, values);
+        // Combine first_name and last_name for driver_name before sending
+        const logsWithFullName = result.rows.map(log => ({
+            ...log,
+            driver_name: `${log.driver_first_name} ${log.driver_last_name || ''}`.trim()
+        }));
+        res.json(logsWithFullName); 
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve loading logs");
+    }
+});
+
+// === PUT /api/sales-ops/loading-logs/batch/:batchUUID - Edit an entire loading log batch ===
+router.put('/loading-logs/batch/:batchUUID', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const { batchUUID } = req.params;
+    const { driver_id, route_id, load_type, load_timestamp, notes, items } = req.body;
+    const area_manager_id = req.user.id; // User performing the update
+
+    console.log(`[SalesOps API] PUT /loading-logs/batch/${batchUUID} - User: ${area_manager_id}`);
+
+    // --- Validations ---
+    if (!uuidValidate(batchUUID)) { // Assuming uuidValidate is a helper or from uuid package
+        return res.status(400).json({ error: 'Invalid Batch UUID format.' });
+    }
+    if (!driver_id || isNaN(parseInt(driver_id))) {
+        return res.status(400).json({ error: 'Valid Driver ID is required.' });
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'At least one product item is required.' });
+    }
+    // Add other common field validations as in POST
+    const finalLoadTimestamp = load_timestamp ? new Date(load_timestamp) : new Date();
+    if (isNaN(finalLoadTimestamp.getTime())) {
+        return res.status(400).json({ error: 'Invalid load_timestamp format.' });
+    }
+     for (const item of items) {
+        if (!item.product_id || isNaN(parseInt(item.product_id)) || item.quantity_loaded === undefined || isNaN(parseFloat(item.quantity_loaded)) || parseFloat(item.quantity_loaded) <= 0) {
+            return res.status(400).json({ error: 'Each item must have valid Product ID and positive Quantity Loaded.' });
+        }
+    }
+
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Delete existing logs for this batchUUID
+        const deleteResult = await client.query('DELETE FROM loading_logs WHERE load_batch_uuid = $1 RETURNING driver_id', [batchUUID]);
+        if (deleteResult.rowCount === 0) {
+            // Optional: If no rows were deleted, it means the batchUUID didn't exist.
+            // This could be an error, or you might allow creating it as a new batch if that's the desired UX.
+            // For an edit, it usually implies the batch should exist.
+            console.warn(`[SalesOps API] No logs found for batchUUID ${batchUUID} during edit. Proceeding to create as new batch logic.`);
+            // If strictly an edit, you might throw an error here:
+            // await client.query('ROLLBACK');
+            // return res.status(404).json({ error: `Loading log batch ${batchUUID} not found for update.` });
+        }
+
+        // 2. Insert new logs with the updated data and the same batchUUID
+        const insertPromises = items.map(item => {
+            const sql = `
+                INSERT INTO loading_logs 
+                (driver_id, route_id, product_id, quantity_loaded, load_type, load_timestamp, area_manager_id, notes, load_batch_uuid)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                RETURNING *; 
+            `;
+            const values = [
+                parseInt(driver_id),
+                route_id ? parseInt(route_id) : null,
+                parseInt(item.product_id),
+                parseFloat(item.quantity_loaded),
+                load_type || 'initial', // Default if not provided
+                finalLoadTimestamp,
+                area_manager_id,
+                notes || null,
+                batchUUID 
+            ];
+            return client.query(sql, values);
+        });
+
+        const results = await Promise.all(insertPromises);
+        const updatedLogs = results.map(result => result.rows[0]);
+        
+        const commonData = updatedLogs[0] ? {
+            driver_id: updatedLogs[0].driver_id,
+            route_id: updatedLogs[0].route_id,
+            load_type: updatedLogs[0].load_type,
+            load_timestamp: updatedLogs[0].load_timestamp,
+            area_manager_id: updatedLogs[0].area_manager_id,
+            notes: updatedLogs[0].notes,
+            load_batch_uuid: batchUUID
+        } : {};
+
+        const updatedItems = updatedLogs.map(r => ({
+            loading_log_id: r.loading_log_id,
+            product_id: r.product_id,
+            quantity_loaded: r.quantity_loaded
+        }));
+        
+        let driverNameResult, areaManagerNameResult, routeNameResult;
+        if (commonData.driver_id) driverNameResult = await client.query('SELECT first_name, last_name FROM drivers WHERE driver_id = $1', [commonData.driver_id]);
+        if (commonData.area_manager_id) areaManagerNameResult = await client.query('SELECT username FROM users WHERE id = $1', [commonData.area_manager_id]);
+        if (commonData.route_id) routeNameResult = await client.query('SELECT route_name FROM delivery_routes WHERE route_id = $1', [commonData.route_id]);
+
+        await client.query('COMMIT');
+        console.log(`[SalesOps API] Transaction COMMIT. Batch ${batchUUID} updated. ${updatedItems.length} logs processed.`);
+        
+        res.status(200).json({
+            ...commonData,
+            items: updatedItems,
+            driver_name: driverNameResult?.rows[0] ? `${driverNameResult.rows[0].first_name} ${driverNameResult.rows[0].last_name || ''}`.trim() : null,
+            area_manager_name: areaManagerNameResult?.rows[0]?.username || null,
+            route_name: routeNameResult?.rows[0]?.route_name || null,
+        });
+
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(`[SalesOps API] Transaction ROLLBACK for batch loading log update. Error: ${err.message}`);
+        handleError(res, err, "Failed to update loading log batch");
+    } finally {
+        client.release();
+    }
+});
+
+// === DRIVER DAILY SUMMARIES ===
+// POST /api/sales-ops/driver-daily-summaries
+router.post('/driver-daily-summaries', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const { driver_id, route_id, sale_date } = req.body;
+    const area_manager_id = req.user.id;
+
+    console.log(`[SalesOps API] POST /driver-daily-summaries - User: ${area_manager_id}, Driver: ${driver_id}, Date: ${sale_date}`);
+
+    if (!driver_id || !sale_date) {
+        return res.status(400).json({ error: 'Driver ID and Sale Date are required.' });
+    }
+    if (isNaN(parseInt(driver_id))) {
+        return res.status(400).json({ error: 'Invalid Driver ID.' });
+    }
+    if (route_id && isNaN(parseInt(route_id))) {
+        return res.status(400).json({ error: 'Invalid Route ID.' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(sale_date)) {
+        return res.status(400).json({ error: 'Invalid Sale Date format. Use YYYY-MM-DD.' });
+    }
+
+    try {
+        const sql = `
+            INSERT INTO driver_daily_summaries
+            (driver_id, route_id, sale_date, area_manager_id)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *;
+        `;
+        const values = [
+            parseInt(driver_id),
+            route_id ? parseInt(route_id) : null,
+            sale_date,
+            area_manager_id
+        ];
+        const result = await query(sql, values);
+
+        const newSummary = result.rows[0];
+        if (newSummary) {
+            const driverResult = await query('SELECT first_name FROM drivers WHERE driver_id = $1', [newSummary.driver_id]);
+            newSummary.driver_name = driverResult.rows[0]?.first_name || null;
+        }
+
+        res.status(201).json(newSummary);
+    } catch (err) {
+        if (err.code === '23505' && err.constraint === 'driver_daily_summaries_driver_id_sale_date_key') {
+            return handleError(res, err, 'A daily summary already exists for this driver on this date.', 409);
+        }
+        if (err.code === '23503') { 
+             if (err.constraint && err.constraint.includes('driver_id')) {
+                return handleError(res, err, 'Invalid Driver ID provided.', 400);
+            }
+            if (err.constraint && err.constraint.includes('route_id')) {
+                return handleError(res, err, 'Invalid Route ID provided.', 400);
+            }
+        }
+        handleError(res, err, "Failed to create driver daily summary");
+    }
+});
+
+// GET /api/sales-ops/driver-daily-summaries?driver_id=X&sale_date=YYYY-MM-DD
+// GET /api/sales-ops/driver-daily-summaries?sale_date=YYYY-MM-DD&reconciliation_status=Pending
+router.get('/driver-daily-summaries', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    const { driver_id, sale_date, reconciliation_status, summary_id } = req.query;
+    const requesting_user_id = req.user.id;
+
+    console.log(`[SalesOps API] GET /driver-daily-summaries - User: ${requesting_user_id}, Query: ${JSON.stringify(req.query)}`);
+
+    let sql = `
+        SELECT dds.*, 
+               d.first_name AS driver_name,
+               r.route_name, 
+               u_am.username AS area_manager_name
+        FROM driver_daily_summaries dds
+        JOIN drivers d ON dds.driver_id = d.driver_id
+        LEFT JOIN delivery_routes r ON dds.route_id = r.route_id
+        JOIN users u_am ON dds.area_manager_id = u_am.id
+    `;
+    const conditions = [];
+    const values = [];
+    let paramIndex = 1;
+
+    // --- FIX: Added the missing logic to handle the summary_id parameter ---
+    if (summary_id) {
+        if (!/^\d+$/.test(summary_id)) return res.status(400).json({error: "Invalid summary_id format."});
+        conditions.push(`dds.summary_id = $${paramIndex++}`);
+        values.push(parseInt(summary_id));
+    }
+    // --- END OF FIX ---
+
+    if (driver_id) {
+        if (!/^\d+$/.test(driver_id)) return res.status(400).json({error: "Invalid driver_id format."});
+        conditions.push(`dds.driver_id = $${paramIndex++}`);
+        values.push(parseInt(driver_id));
+    }
+    if (sale_date) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(sale_date)) {
+            return res.status(400).json({ error: 'Invalid sale_date format. Use YYYY-MM-DD.' });
+        }
+        conditions.push(`dds.sale_date = $${paramIndex++}`);
+        values.push(sale_date);
+    }
+    if (reconciliation_status) {
+        conditions.push(`dds.reconciliation_status = $${paramIndex++}`);
+        values.push(reconciliation_status);
+    }
+
+    if (conditions.length > 0) {
+        sql += " WHERE " + conditions.join(" AND ");
+    }
+
+    sql += " ORDER BY dds.sale_date DESC, d.first_name ASC;";
+
+    try {
+        const result = await query(sql, values);
+        const summariesWithFullName = result.rows.map(summary => ({
+            ...summary,
+            name: summary.driver_name 
+        }));
+        if (summariesWithFullName.length === 0 && (summary_id || (driver_id && sale_date))) {
+            return res.status(404).json({ message: "Driver daily summary not found for the specified driver and date." });
+        }
+        res.json(summariesWithFullName);
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve driver daily summaries");
+    }
+});
+
+// PUT /api/sales-ops/driver-daily-summaries/:summaryId - Update a summary
+router.put('/driver-daily-summaries/:summaryId', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const summaryId = parseInt(req.params.summaryId);
+    const { route_id } = req.body;
+    const last_updated_by_user_id = req.user.id;
+
+    if (isNaN(summaryId)) {
+        return res.status(400).json({ error: 'Invalid Summary ID.' });
+    }
+    // This validation can be simplified as we only expect route_id
+    if (route_id !== undefined && route_id !== null && isNaN(parseInt(route_id))) {
+        return res.status(400).json({ error: 'Invalid Route ID provided.' });
+    }
+
+    try {
+        const updateQuery = `
+            UPDATE driver_daily_summaries 
+            SET route_id = $1, last_updated_by_user_id = $2, updated_at = NOW()
+            WHERE summary_id = $3;
+        `;
+        const updateValues = [route_id ? parseInt(route_id) : null, last_updated_by_user_id, summaryId];
+        
+        const updateResult = await query(updateQuery, updateValues);
+
+        if (updateResult.rowCount === 0) {
+            return res.status(404).json({ error: 'Daily summary not found.' });
+        }
+
+        // --- NEW: Re-fetch the full, joined data after the update ---
+        const selectQuery = `
+            SELECT dds.*, 
+                   d.first_name AS driver_name,
+                   r.route_name, 
+                   u_am.username AS area_manager_name
+            FROM driver_daily_summaries dds
+            JOIN drivers d ON dds.driver_id = d.driver_id
+            LEFT JOIN delivery_routes r ON dds.route_id = r.route_id
+            JOIN users u_am ON dds.area_manager_id = u_am.id
+            WHERE dds.summary_id = $1;
+        `;
+        const finalResult = await query(selectQuery, [summaryId]);
+        
+        // Return the complete object to the frontend
+        res.json(finalResult.rows[0]);
+
+    } catch (err) {
+        handleError(res, err, "Failed to update driver daily summary");
+    }
+});
+
+// PUT /api/sales-ops/driver-daily-summaries/:summaryId/reconcile
+router.put('/driver-daily-summaries/:summaryId/reconcile', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const summaryId = parseInt(req.params.summaryId);
+    const { total_cash_collected_from_driver, reconciliation_status, reconciliation_notes } = req.body;
+    const area_manager_id = req.user.id;
+
+    console.log(`[SalesOps API] PUT /driver-daily-summaries/${summaryId}/reconcile - User: ${area_manager_id}`);
+
+    if (isNaN(summaryId)) {
+        return res.status(400).json({ error: 'Invalid Summary ID.' });
+    }
+    if (total_cash_collected_from_driver === undefined || isNaN(parseFloat(total_cash_collected_from_driver))) {
+        return res.status(400).json({ error: 'Total cash collected from driver is required and must be a number.' });
+    }
+    if (!reconciliation_status || !['Reconciled', 'Cash Short', 'Cash Over', 'Pending Adjustment', 'Pending'].includes(reconciliation_status)) {
+        return res.status(400).json({ error: 'Invalid reconciliation status.' });
+    }
+    
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+        const summaryCheck = await client.query('SELECT summary_id FROM driver_daily_summaries WHERE summary_id = $1 FOR UPDATE', [summaryId]);
+        if (summaryCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Daily summary not found.' });
+        }
+
+        const updatedSummaryAfterTotals = await updateDriverDailySummaryTotals(client, summaryId);
+        if (!updatedSummaryAfterTotals) {
+            await client.query('ROLLBACK');
+            return handleError(res, new Error("Failed to recalculate summary totals before reconciliation."), "Reconciliation error");
+        }
+
+        const finalUpdateSql = `
+            UPDATE driver_daily_summaries SET
+                total_cash_collected_from_driver = $1,
+                reconciliation_status = $2,
+                reconciliation_notes = $3,
+                area_manager_id = $4, 
+                updated_at = CURRENT_TIMESTAMP
+            WHERE summary_id = $5
+            RETURNING *;
+        `;
+        const finalUpdateValues = [
+            parseFloat(total_cash_collected_from_driver),
+            reconciliation_status,
+            reconciliation_notes || null,
+            area_manager_id, 
+            summaryId
+        ];
+
+        const result = await client.query(finalUpdateSql, finalUpdateValues);
+        
+        await client.query('COMMIT');
+        res.json(result.rows[0]);
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        handleError(res, err, "Failed to reconcile driver daily summary");
+    } finally {
+        client.release();
+    }
+});
+
+// === DRIVER SALES & SALE ITEMS ===
+// POST /api/sales-ops/driver-sales
+router.post('/driver-sales', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const {
+        driver_daily_summary_id,
+        customer_id,
+        customer_name_override,
+        payment_type,
+        notes,
+        sale_items 
+    } = req.body;
+    const area_manager_logged_by_id = req.user.id;
+
+    console.log(`[SalesOps API] POST /driver-sales for summary_id: ${driver_daily_summary_id} - User: ${area_manager_logged_by_id}`);
+
+    // --- Validations ---
+    if (!driver_daily_summary_id || isNaN(parseInt(driver_daily_summary_id))) {
+        return res.status(400).json({ error: 'Valid Driver Daily Summary ID is required.' });
+    }
+    if (customer_id && isNaN(parseInt(customer_id))) {
+        return res.status(400).json({ error: 'Invalid Customer ID.' });
+    }
+    if (!payment_type || !['Cash', 'Credit', 'Debit'].includes(payment_type)) {
+        return res.status(400).json({ error: 'Valid Payment Type (Cash, Credit, Debit) is required.' });
+    }
+    if (!Array.isArray(sale_items) || sale_items.length === 0) {
+        return res.status(400).json({ error: 'At least one sale item is required.' });
+    }
+    for (const item of sale_items) {
+        if (!item.product_id || isNaN(parseInt(item.product_id)) ||
+            item.quantity_sold === undefined || isNaN(parseFloat(item.quantity_sold)) || parseFloat(item.quantity_sold) <= 0 ||
+            item.unit_price === undefined || isNaN(parseFloat(item.unit_price)) || parseFloat(item.unit_price) < 0) {
+            return res.status(400).json({ error: 'Each sale item must have valid Product ID, positive Quantity Sold, and non-negative Unit Price.' });
+        }
+    }
+
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+
+        const summaryCheck = await client.query('SELECT reconciliation_status FROM driver_daily_summaries WHERE summary_id = $1 FOR UPDATE', [parseInt(driver_daily_summary_id)]);
+        if (summaryCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Driver daily summary not found.' });
+        }
+        if (summaryCheck.rows[0].reconciliation_status === 'Reconciled' && !['admin', 'manager'].includes(req.user.role)) {
+           await client.query('ROLLBACK');
+           return res.status(403).json({ error: 'Cannot add sales to an already reconciled summary. Contact manager/admin for adjustments.' });
+        }
+
+
+        const total_sale_amount = sale_items.reduce((sum, item) => {
+            return sum + (parseFloat(item.quantity_sold) * parseFloat(item.unit_price));
+        }, 0);
+
+        const driverSaleSql = `
+            INSERT INTO driver_sales
+            (driver_daily_summary_id, customer_id, customer_name_override, payment_type, total_sale_amount, area_manager_logged_by_id, notes, sale_timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+            RETURNING sale_id, created_at AS sale_timestamp; 
+        `;
+        const driverSaleValues = [
+            parseInt(driver_daily_summary_id),
+            customer_id ? parseInt(customer_id) : null,
+            customer_name_override || null,
+            payment_type,
+            total_sale_amount,
+            area_manager_logged_by_id,
+            notes || null
+        ];
+        const driverSaleResult = await client.query(driverSaleSql, driverSaleValues);
+        const newSaleId = driverSaleResult.rows[0].sale_id;
+        const actualSaleTimestamp = driverSaleResult.rows[0].sale_timestamp;
+
+        const itemInsertPromises = sale_items.map(item => {
+            const itemSql = `
+                INSERT INTO driver_sale_items
+                (driver_sale_id, product_id, quantity_sold, unit_price) 
+                VALUES ($1, $2, $3, $4); 
+            `;
+            return client.query(itemSql, [newSaleId, parseInt(item.product_id), parseFloat(item.quantity_sold), parseFloat(item.unit_price)]);
+        });
+        await Promise.all(itemInsertPromises);
+
+        await updateDriverDailySummaryTotals(client, parseInt(driver_daily_summary_id));
+        
+        await client.query('COMMIT');
+
+        const createdSaleQuery = `
+            SELECT ds.*, 
+                   c.customer_name AS actual_customer_name, 
+                   u.username AS logged_by_username
+            FROM driver_sales ds
+            LEFT JOIN customers c ON ds.customer_id = c.customer_id
+            JOIN users u ON ds.area_manager_logged_by_id = u.id
+            WHERE ds.sale_id = $1;
+        `;
+        const saleDetailsResult = await query(createdSaleQuery, [newSaleId]); 
+        const finalSaleData = saleDetailsResult.rows[0];
+        finalSaleData.sale_timestamp = actualSaleTimestamp; 
+
+        const itemsResult = await query('SELECT dsi.*, p.product_name FROM driver_sale_items dsi JOIN products p ON dsi.product_id = p.product_id WHERE dsi.driver_sale_id = $1 ORDER BY dsi.item_id ASC', [newSaleId]);
+        finalSaleData.sale_items = itemsResult.rows;
+
+        res.status(201).json(finalSaleData);
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        if (err.code === '23503') { 
+             if (err.constraint && err.constraint.includes('driver_daily_summary_id')) {
+                return handleError(res, err, 'Invalid Driver Daily Summary ID provided.', 400);
+            }
+            if (err.constraint && err.constraint.includes('customer_id')) {
+                return handleError(res, err, 'Invalid Customer ID provided.', 400);
+            }
+             if (err.constraint && err.constraint.includes('product_id')) {
+                return handleError(res, err, 'Invalid Product ID in sale items.', 400);
+            }
+        }
+        handleError(res, err, "Failed to create driver sale");
+    } finally {
+        client.release();
+    }
+});
+
+// GET /api/sales-ops/driver-sales?driver_daily_summary_id=X
+router.get('/driver-sales', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    const { driver_daily_summary_id } = req.query;
+    const requesting_user_id = req.user.id;
+
+    console.log(`[SalesOps API] GET /driver-sales for summary_id: ${driver_daily_summary_id} - User: ${requesting_user_id}`);
+
+    if (!driver_daily_summary_id || isNaN(parseInt(driver_daily_summary_id))) {
+        return res.status(400).json({ error: 'Valid Driver Daily Summary ID is required.' });
+    }
+
+    try {
+        const salesSql = `
+            SELECT ds.*, 
+                   c.customer_name AS actual_customer_name, 
+                   u.username AS logged_by_username
+            FROM driver_sales ds
+            LEFT JOIN customers c ON ds.customer_id = c.customer_id
+            JOIN users u ON ds.area_manager_logged_by_id = u.id
+            WHERE ds.driver_daily_summary_id = $1
+            ORDER BY ds.sale_timestamp DESC, ds.sale_id DESC;
+        `;
+        const salesResult = await query(salesSql, [parseInt(driver_daily_summary_id)]);
+        const sales = salesResult.rows;
+
+        if (sales.length > 0) {
+            const saleIds = sales.map(s => s.sale_id);
+            const itemsSql = `
+                SELECT dsi.*, p.product_name
+                FROM driver_sale_items dsi
+                JOIN products p ON dsi.product_id = p.product_id
+                WHERE dsi.driver_sale_id = ANY($1::int[]) 
+                ORDER BY dsi.item_id ASC; 
+            `; 
+            const itemsResult = await query(itemsSql, [saleIds]);
+            const itemsBySaleId = itemsResult.rows.reduce((acc, item) => {
+                (acc[item.driver_sale_id] = acc[item.driver_sale_id] || []).push(item);
+                return acc;
+            }, {});
+
+            sales.forEach(sale => {
+                sale.sale_items = itemsBySaleId[sale.sale_id] || [];
+            });
+        }
+        res.json(sales);
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve driver sales");
+    }
+});
+
+// PUT /api/sales-ops/driver-sales/:saleId
+router.put('/driver-sales/:saleId', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const saleId = parseInt(req.params.saleId);
+    const {
+        customer_id,
+        customer_name_override,
+        payment_type,
+        notes,
+        sale_items 
+    } = req.body;
+    const area_manager_logged_by_id = req.user.id;
+
+    console.log(`[SalesOps API] PUT /driver-sales/${saleId} - User: ${area_manager_logged_by_id}`);
+
+    // --- Validations ---
+    if (isNaN(saleId)) {
+        return res.status(400).json({ error: 'Invalid Sale ID.' });
+    }
+    if (customer_id && isNaN(parseInt(customer_id))) {
+        return res.status(400).json({ error: 'Invalid Customer ID.' });
+    }
+    if (payment_type && !['Cash', 'Credit', 'Debit'].includes(payment_type)) {
+        return res.status(400).json({ error: 'Invalid Payment Type.' });
+    }
+    if (sale_items !== undefined) { // Items are optional for update, only update if provided
+        if (!Array.isArray(sale_items) || sale_items.length === 0) {
+            return res.status(400).json({ error: 'If sale_items are provided for update, it must be a non-empty array.' });
+        }
+        for (const item of sale_items) {
+            if (!item.product_id || isNaN(parseInt(item.product_id)) ||
+                item.quantity_sold === undefined || isNaN(parseFloat(item.quantity_sold)) || parseFloat(item.quantity_sold) <= 0 ||
+                item.unit_price === undefined || isNaN(parseFloat(item.unit_price)) || parseFloat(item.unit_price) < 0) {
+                return res.status(400).json({ error: 'Each updated sale item must have valid Product ID, positive Quantity Sold, and non-negative Unit Price.' });
+            }
+        }
+    }
+
+
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+
+        const saleCheckResult = await client.query('SELECT driver_daily_summary_id, reconciliation_status FROM driver_sales ds JOIN driver_daily_summaries dds ON ds.driver_daily_summary_id = dds.summary_id WHERE sale_id = $1 FOR UPDATE', [saleId]);
+        if (saleCheckResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Sale not found.' });
+        }
+        const driverDailySummaryId = saleCheckResult.rows[0].driver_daily_summary_id;
+        const currentReconciliationStatus = saleCheckResult.rows[0].reconciliation_status;
+
+        if (currentReconciliationStatus === 'Reconciled' && !['admin', 'manager'].includes(req.user.role)) {
+           await client.query('ROLLBACK');
+           return res.status(403).json({ error: 'Cannot edit sales within an already reconciled summary. Contact manager/admin for adjustments.' });
+        }
+
+
+        // --- Update main sale details ---
+        const updateFields = [];
+        const updateValues = [];
+        let paramIdx = 1;
+
+        // Only add fields to update if they are present in the request body
+        if (customer_id !== undefined) { updateFields.push(`customer_id = $${paramIdx++}`); updateValues.push(customer_id ? parseInt(customer_id) : null); }
+        if (customer_name_override !== undefined) { updateFields.push(`customer_name_override = $${paramIdx++}`); updateValues.push(customer_name_override || null); }
+        if (payment_type !== undefined) { updateFields.push(`payment_type = $${paramIdx++}`); updateValues.push(payment_type); }
+        if (notes !== undefined) { updateFields.push(`notes = $${paramIdx++}`); updateValues.push(notes || null); }
+        
+        let newTotalSaleAmount;
+        if (sale_items !== undefined) { 
+            newTotalSaleAmount = sale_items.reduce((sum, item) => sum + (parseFloat(item.quantity_sold) * parseFloat(item.unit_price)), 0);
+            updateFields.push(`total_sale_amount = $${paramIdx++}`);
+            updateValues.push(newTotalSaleAmount);
+        }
+        
+        // Always update who logged it and the timestamp if any other field is updated
+        if (updateFields.length > 0 || sale_items !== undefined) { // Ensure some update is happening
+            updateFields.push(`area_manager_logged_by_id = $${paramIdx++}`); updateValues.push(area_manager_logged_by_id);
+            updateFields.push(`updated_at = CURRENT_TIMESTAMP`);
+        
+            updateValues.push(saleId);
+            const updateSaleSql = `UPDATE driver_sales SET ${updateFields.join(', ')} WHERE sale_id = $${paramIdx} RETURNING *;`;
+            await client.query(updateSaleSql, updateValues);
+        }
+
+
+        // --- Replace sale items if provided ---
+        if (sale_items !== undefined) {
+            await client.query('DELETE FROM driver_sale_items WHERE driver_sale_id = $1', [saleId]);
+            const itemInsertPromises = sale_items.map(item => {
+                const itemSql = `
+                    INSERT INTO driver_sale_items (driver_sale_id, product_id, quantity_sold, unit_price)
+                    VALUES ($1, $2, $3, $4);`;
+                return client.query(itemSql, [saleId, parseInt(item.product_id), parseFloat(item.quantity_sold), parseFloat(item.unit_price)]);
+            });
+            await Promise.all(itemInsertPromises);
+        }
+
+        // Update the parent driver_daily_summary totals
+        await updateDriverDailySummaryTotals(client, driverDailySummaryId);
+
+        await client.query('COMMIT');
+
+        // Fetch the complete updated sale with items to return to client
+        const updatedSaleQuery = `
+            SELECT ds.*, c.customer_name AS actual_customer_name, u.username AS logged_by_username
+            FROM driver_sales ds
+            LEFT JOIN customers c ON ds.customer_id = c.customer_id
+            JOIN users u ON ds.area_manager_logged_by_id = u.id
+            WHERE ds.sale_id = $1;
+        `;
+        const saleDetailsResult = await query(updatedSaleQuery, [saleId]);
+        const finalSaleData = saleDetailsResult.rows[0];
+
+        // Fetch items again to ensure they are fresh, especially if not updated
+        const itemsResultAfterUpdate = await query('SELECT dsi.*, p.product_name FROM driver_sale_items dsi JOIN products p ON dsi.product_id = p.product_id WHERE dsi.driver_sale_id = $1 ORDER BY dsi.item_id ASC', [saleId]);
+        finalSaleData.sale_items = itemsResultAfterUpdate.rows;
+        
+        res.json(finalSaleData);
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        handleError(res, err, "Failed to update driver sale");
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE /api/sales-ops/driver-sales/:saleId
+router.delete('/driver-sales/:saleId', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const saleId = parseInt(req.params.saleId);
+    const area_manager_logged_by_id = req.user.id; 
+
+    console.log(`[SalesOps API] DELETE /driver-sales/${saleId} - User: ${area_manager_logged_by_id}`);
+
+    if (isNaN(saleId)) {
+        return res.status(400).json({ error: 'Invalid Sale ID.' });
+    }
+
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+
+        const saleDataResult = await client.query('SELECT driver_daily_summary_id, reconciliation_status FROM driver_sales ds JOIN driver_daily_summaries dds ON ds.driver_daily_summary_id = dds.summary_id WHERE sale_id = $1 FOR UPDATE', [saleId]);
+        if (saleDataResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Sale not found.' });
+        }
+        const driverDailySummaryId = saleDataResult.rows[0].driver_daily_summary_id;
+        const currentReconciliationStatus = saleDataResult.rows[0].reconciliation_status;
+
+        if (currentReconciliationStatus === 'Reconciled' && !['admin', 'manager'].includes(req.user.role)) {
+           await client.query('ROLLBACK');
+           return res.status(403).json({ error: 'Cannot delete sales from an already reconciled summary. Contact manager/admin for adjustments.' });
+        }
+
+        await client.query('DELETE FROM driver_sale_items WHERE driver_sale_id = $1', [saleId]);
+        const deleteSaleResult = await client.query('DELETE FROM driver_sales WHERE sale_id = $1', [saleId]);
+
+        if (deleteSaleResult.rowCount === 0) {
+            await client.query('ROLLBACK'); // Should not happen if FOR UPDATE found it
+            return res.status(404).json({ error: 'Sale not found during delete operation.' });
+        }
+        
+        await updateDriverDailySummaryTotals(client, driverDailySummaryId);
+        await client.query('COMMIT');
+        res.status(200).json({ message: `Sale ID ${saleId} and its items deleted successfully.` });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        handleError(res, err, "Failed to delete driver sale");
+    } finally {
+        client.release();
+    }
+});
+
+// === PRODUCT RETURNS ===
+router.get('/loss-reasons', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    try {
+        const result = await query('SELECT loss_reason_id, reason_description FROM loss_reasons WHERE is_active = TRUE ORDER BY loss_reason_id');
+        res.json(result.rows);
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve loss reasons");
+    }
+});
+
+router.post('/product-returns', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const { driver_id, return_date, items, driver_daily_summary_id } = req.body;
+    const area_manager_id = req.user.id; 
+
+    console.log(`[SalesOps API] POST /product-returns (batch) - User: ${area_manager_id}, Driver: ${driver_id}`);
+
+    // --- Re-enabled and corrected validation ---
+    if (!driver_id || isNaN(parseInt(driver_id))) {
+        return res.status(400).json({ error: 'Valid Driver ID is required.' });
+    }
+    if (!return_date || !/^\d{4}-\d{2}-\d{2}$/.test(return_date)) {
+        return res.status(400).json({ error: 'Valid Return Date (YYYY-MM-DD) is required.' });
+    }
+    if (!Array.isArray(items)) {
+        return res.status(400).json({ error: 'Items must be an array.' });
+    }
+    
+    const client = await getClient();
+    try {
+        await client.query('BEGIN');
+
+        // This makes the "Save" action a complete replacement of the day's returns, which is simpler to manage.
+        await client.query('DELETE FROM product_returns WHERE driver_id = $1 AND return_date = $2', [parseInt(driver_id), return_date]);
+        
+        const itemsToLog = items.filter(item => parseFloat(item.quantity_returned) > 0);
+
+        if (itemsToLog.length > 0) {
+            // FIX: Define insertPromises outside the map so it's always available
+            const insertPromises = itemsToLog.map(item => {
+                // FIX: SQL statement now includes the loss_reason_id column
+                const sql = `
+                    INSERT INTO product_returns
+                    (driver_id, return_date, product_id, quantity_returned, loss_reason_id, custom_reason_for_loss, area_manager_id, notes, driver_daily_summary_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    RETURNING *;
+                `;
+
+                // FIX: Logic to handle which reason field gets populated
+                const reasonId = item.loss_reason_id ? parseInt(item.loss_reason_id) : null;
+                const customReason = item.loss_reason_id ? null : item.custom_reason_for_loss;
+
+                const values = [
+                    parseInt(driver_id),
+                    return_date,
+                    parseInt(item.product_id),
+                    parseFloat(item.quantity_returned),
+                    reasonId,
+                    customReason,
+                    area_manager_id,
+                    item.notes ? item.notes.trim() : null,
+                    driver_daily_summary_id ? parseInt(driver_daily_summary_id) : null
+                ];
+                return client.query(sql, values);
+            });
+
+            await Promise.all(insertPromises);
+        }
+        
+        await client.query('COMMIT');
+        // FIX: The response now correctly informs the user what was saved.
+        res.status(201).json({ message: `Successfully saved ${itemsToLog.length} return entries.` });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        if (err.code === '23503') {
+            return handleError(res, err, 'Invalid Driver ID or Product ID provided.', 400);
+        }
+        handleError(res, err, "Failed to log product returns");
+    } finally {
+        client.release();
+    }
+});
+
+// GET /api/sales-ops/product-returns?driver_id=X&date=YYYY-MM-DD
+router.get('/product-returns', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    const { driver_id, date, product_id } = req.query; 
+    const requesting_user_id = req.user.id;
+
+    console.log(`[SalesOps API] GET /product-returns - User: ${requesting_user_id}, Query: ${JSON.stringify(req.query)}`);
+
+    let sql = `
+        SELECT pr.*, 
+               d.first_name AS driver_first_name, d.last_name AS driver_last_name,
+               p.product_name, 
+               COALESCE(lr.reason_description, pr.custom_reason_for_loss) AS loss_reason_text, 
+               u_am.username AS area_manager_name
+        FROM product_returns pr
+        JOIN drivers d ON pr.driver_id = d.driver_id
+        JOIN products p ON pr.product_id = p.product_id
+        LEFT JOIN loss_reasons lr ON pr.loss_reason_id = lr.loss_reason_id
+        JOIN users u_am ON pr.area_manager_id = u_am.id
+    `; 
+    const conditions = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (driver_id) {
+        if (!/^\d+$/.test(driver_id)) return res.status(400).json({error: "Invalid driver_id format."});
+        conditions.push(`pr.driver_id = $${paramIndex++}`);
+        values.push(parseInt(driver_id));
+    }
+    if (date) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+        }
+        conditions.push(`pr.return_date = $${paramIndex++}`);
+        values.push(date);
+    }
+    if (product_id) {
+        if (!/^\d+$/.test(product_id)) return res.status(400).json({error: "Invalid product_id format."});
+        conditions.push(`pr.product_id = $${paramIndex++}`);
+        values.push(parseInt(product_id));
+    }
+   
+    if (conditions.length > 0) {
+        sql += " WHERE " + conditions.join(" AND ");
+    }
+
+    sql += " ORDER BY pr.return_date DESC, pr.created_at DESC;";
+
+    try {
+        const result = await query(sql, values);
+        const logsWithFullName = result.rows.map(log => ({
+            ...log,
+            driver_name: `${log.driver_first_name} ${log.driver_last_name || ''}`.trim()
+        }));
+        res.json(logsWithFullName);
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve product returns");
+    }
+});
+
+// === PACKAGING LOGS & TYPES ===
+router.get('/packaging-types', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    console.log(`[SalesOps API] GET /packaging-types - User: ${req.user.id}`);
+    try {
+        const result = await query('SELECT packaging_type_id, type_name, description FROM packaging_types WHERE is_active = TRUE ORDER BY type_name ASC');
+        res.json(result.rows);
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve packaging types");
+    }
+});
+
+router.post('/packaging-logs', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const {
+        driver_id,
+        driver_daily_summary_id, 
+        log_date,
+        packaging_type_id,
+        quantity_out,
+        quantity_returned,
+        shrinkage_override, 
+        notes
+    } = req.body;
+    const area_manager_id = req.user.id;
+
+    console.log(`[SalesOps API] POST /packaging-logs - User: ${area_manager_id}, Driver: ${driver_id}`);
+
+    if (!driver_id || isNaN(parseInt(driver_id))) {
+        return res.status(400).json({ error: 'Valid Driver ID is required.' });
+    }
+    if (!log_date || !/^\d{4}-\d{2}-\d{2}$/.test(log_date)) {
+        return res.status(400).json({ error: 'Valid Log Date (YYYY-MM-DD) is required.' });
+    }
+    if (!packaging_type_id || isNaN(parseInt(packaging_type_id))) {
+        return res.status(400).json({ error: 'Valid Packaging Type ID is required.' });
+    }
+    if (quantity_out !== undefined && quantity_out !== null && (isNaN(parseFloat(quantity_out)) || parseFloat(quantity_out) < 0)) {
+        return res.status(400).json({ error: 'Quantity Out must be a non-negative number if provided.' });
+    }
+    if (quantity_returned !== undefined && quantity_returned !== null && (isNaN(parseFloat(quantity_returned)) || parseFloat(quantity_returned) < 0)) {
+        return res.status(400).json({ error: 'Quantity Returned must be a non-negative number if provided.' });
+    }
+     if (driver_daily_summary_id && isNaN(parseInt(driver_daily_summary_id))) {
+        return res.status(400).json({ error: 'Invalid Driver Daily Summary ID.' });
+    }
+    if (shrinkage_override !== undefined && shrinkage_override !== null && isNaN(parseFloat(shrinkage_override))) {
+        return res.status(400).json({ error: 'Shrinkage Override must be a number if provided.' });
+    }
+
+    try {
+        const sql = `
+            INSERT INTO packaging_logs
+            (driver_id, driver_daily_summary_id, log_date, packaging_type_id, quantity_out, quantity_returned, shrinkage_override, area_manager_id, notes)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING *;
+        `;
+        const values = [
+            parseInt(driver_id),
+            driver_daily_summary_id ? parseInt(driver_daily_summary_id) : null,
+            log_date,
+            parseInt(packaging_type_id),
+            quantity_out ? parseFloat(quantity_out) : null,
+            quantity_returned ? parseFloat(quantity_returned) : null,
+            shrinkage_override ? parseFloat(shrinkage_override) : null,
+            area_manager_id,
+            notes || null
+        ];
+        const result = await query(sql, values);
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        if (err.code === '23503') { 
+            if (err.constraint && err.constraint.includes('packaging_type_id')) return handleError(res, err, 'Invalid Packaging Type ID.', 400);
+            return handleError(res, err, 'Invalid reference ID provided (Driver or Summary).', 400);
+        }
+        handleError(res, err, "Failed to log packaging data");
+    }
+});
+
+router.get('/packaging-logs', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+    const { driver_id, date, packaging_type_id } = req.query;
+    const requesting_user_id = req.user.id;
+
+    console.log(`[SalesOps API] GET /packaging-logs - User: ${requesting_user_id}, Query: ${JSON.stringify(req.query)}`);
+    
+    let sql = `
+        SELECT pl.*, 
+               d.first_name AS driver_first_name, d.last_name AS driver_last_name,
+               pt.type_name AS packaging_type_name,
+               u_am.username AS area_manager_name
+        FROM packaging_logs pl
+        JOIN drivers d ON pl.driver_id = d.driver_id
+        JOIN packaging_types pt ON pl.packaging_type_id = pt.packaging_type_id
+        JOIN users u_am ON pl.area_manager_id = u_am.id
+    `;
+    const conditions = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (driver_id) {
+        if (!/^\d+$/.test(driver_id)) return res.status(400).json({error: "Invalid driver_id format."});
+        conditions.push(`pl.driver_id = $${paramIndex++}`);
+        values.push(parseInt(driver_id));
+    }
+    if (date) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+        }
+        conditions.push(`pl.log_date = $${paramIndex++}`);
+        values.push(date);
+    }
+    if (packaging_type_id) {
+        if (!/^\d+$/.test(packaging_type_id)) return res.status(400).json({error: "Invalid packaging_type_id format."});
+        conditions.push(`pl.packaging_type_id = $${paramIndex++}`);
+        values.push(parseInt(packaging_type_id));
+    }
+
+    if (conditions.length > 0) {
+        sql += " WHERE " + conditions.join(" AND ");
+    }
+    sql += " ORDER BY pl.log_date DESC, pl.created_at DESC;";
+
+    try {
+        const result = await query(sql, values);
+        const logsWithFullName = result.rows.map(log => ({
+            ...log,
+            driver_name: `${log.driver_first_name} ${log.driver_last_name || ''}`.trim()
+        }));
+        res.json(logsWithFullName);
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve packaging logs");
+    }
+});
+
+module.exports = router;

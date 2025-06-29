@@ -1,5 +1,6 @@
 // 📁 File: BillsList.js (Optimized - Uses billsData Prop, Payment Deselect)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { apiService } from './apiService'; // Import the apiService
 
 // Constants
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'; // Use env var
@@ -58,9 +59,8 @@ export default function BillsList({ billsData = [] }) { // Default to empty arra
         } else {
             console.log(`Fetching details for bill #${bill.id}`);
             try {
-                const res = await fetch(`${API_BASE_URL}/orders/${bill.id}`);
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                const fullOrder = await res.json();
+                // These direct fetch calls don't include Authorization headers
+                const fullOrder = await apiService.get(`/orders/${bill.id}`);
                 setSelectedOrder(fullOrder); // Update selectedOrder with full details
             } catch (err) {
                 console.error('Failed to load full order details:', err);
@@ -78,78 +78,85 @@ export default function BillsList({ billsData = [] }) { // Default to empty arra
     }, []); // No dependencies needed if API_BASE_URL is stable
 
     // Update Field API Call (used for driver/payment updates within this component)
-    const updateOrderField = async (orderId, fieldUpdate) => {
+    const updateOrderField = useCallback(async (orderId, fieldUpdate) => {
         setError(''); // Clear previous errors
         try {
-            const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(fieldUpdate)
-            });
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(`API Error: ${response.status} ${response.statusText} - ${errorData.message || 'การอัปเดตล้มเหลว'}`);
-            }
+            // Assuming apiService.put returns the updated order or a success indicator
+            await apiService.put(`/orders/${orderId}`, fieldUpdate);
             console.log(`Successfully updated field for order ${orderId} via BillsList:`, fieldUpdate);
-
             // Re-fetch selected order details after successful update to show changes
             if (selectedOrder && selectedOrder.id === orderId) {
                  try {
-                    const res = await fetch(`${API_BASE_URL}/orders/${orderId}`);
-                    if (res.ok) {
-                        const freshData = await res.json();
-                        setSelectedOrder(freshData); // Update the expanded view
-                    } else { throw new Error("Refetch failed"); }
+                    const freshData = await apiService.get(`/orders/${orderId}`);
+                    setSelectedOrder(freshData); // Update the expanded view
                  } catch (fetchErr) { console.error("Failed to refetch order after update success:", fetchErr); }
             }
             return true;
         } catch (err) {
             console.error(`Failed to update field for order ${orderId} via BillsList:`, err);
-            setError(`การอัปเดตล้มเหลว: ${err.message}`);
+            const errorData = err.data || {}; // Safely access error data
+            setError(`การอัปเดตล้มเหลว: ${errorData.message || err.message || 'Unknown error'}`);
             // Attempt to revert optimistic update by re-fetching details on error
             if (selectedOrder && selectedOrder.id === orderId) {
                  try {
-                    const res = await fetch(`${API_BASE_URL}/orders/${orderId}`);
-                     if (res.ok) {
-                        const oldData = await res.json();
-                        setSelectedOrder(oldData); // Revert to original data
-                    } else { throw new Error("Refetch failed"); }
+                    const oldData = await apiService.get(`/orders/${orderId}`);
+                    setSelectedOrder(oldData);
                  } catch (fetchErr) { console.error("Failed to refetch order after update error:", fetchErr); }
             }
             return false;
         }
-    };
+    }, [selectedOrder]); // setError, setSelectedOrder are stable, apiService is a stable import
 
-
-    // Driver Edit Handlers (Call internal updateOrderField)
-    const handleBillDriverChange = (orderId, newDriverName) => {
+    const handleBillDriverChange = useCallback((orderId, newDriverName) => {
         if (!selectedOrder || selectedOrder.id !== orderId) return;
         const trimmedDriver = newDriverName.trim();
-        // Compare with current selectedOrder state
         if ((selectedOrder.driverName || '') !== trimmedDriver) {
             updateOrderField(orderId, { driverName: trimmedDriver });
         }
          setIsEditingDriver(false);
-    };
-     const startEditDriver = (e) => { e.stopPropagation(); if (selectedOrder) { setTempDriverName(selectedOrder.driverName || ''); setIsEditingDriver(true); } };
-    const handleDriverInputChange = (e) => { setTempDriverName(e.target.value); };
-    const handleDriverInputBlur = () => { if (isEditingDriver && selectedOrder) { handleBillDriverChange(selectedOrder.id, tempDriverName); } };
-    const handleDriverInputKeyDown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); if (selectedOrder) { handleBillDriverChange(selectedOrder.id, tempDriverName); } } else if (e.key === 'Escape') { setIsEditingDriver(false); setTempDriverName(''); } };
+    }, [selectedOrder, updateOrderField]); // setIsEditingDriver is stable
 
-    // Payment Type Handler (Call internal updateOrderField, includes deselect logic)
-    const handleBillPaymentTypeChange = (orderId, clickedType) => {
+     const startEditDriver = useCallback((e) => {
+        e.stopPropagation();
+        if (selectedOrder) {
+            setTempDriverName(selectedOrder.driverName || '');
+            setIsEditingDriver(true);
+        }
+    }, [selectedOrder]); // setTempDriverName, setIsEditingDriver are stable
+
+    const handleDriverInputChange = useCallback((e) => {
+        setTempDriverName(e.target.value);
+    }, []); // setTempDriverName is stable
+
+    const handleDriverInputBlur = useCallback(() => {
+        if (isEditingDriver && selectedOrder) {
+            handleBillDriverChange(selectedOrder.id, tempDriverName);
+        }
+    }, [isEditingDriver, selectedOrder, tempDriverName, handleBillDriverChange]);
+
+    const handleDriverInputKeyDown = useCallback((e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selectedOrder) {
+                handleBillDriverChange(selectedOrder.id, tempDriverName);
+            }
+        } else if (e.key === 'Escape') {
+            setIsEditingDriver(false);
+            setTempDriverName('');
+        }
+    }, [selectedOrder, tempDriverName, handleBillDriverChange]); // setIsEditingDriver, setTempDriverName are stable
+
+    const handleBillPaymentTypeChange = useCallback((orderId, clickedType) => {
         if (!selectedOrder || selectedOrder.id !== orderId) return;
-        // Use selectedOrder state for current type
         const currentPaymentType = selectedOrder.paymentType ?? null;
         const valueToSend = (currentPaymentType === clickedType) ? null : clickedType;
-        // Only call update if the value actually changes
-        if (currentPaymentType !== valueToSend) {
+        if (currentPaymentType !== valueToSend) { // Check if value actually changes
             updateOrderField(orderId, { paymentType: valueToSend });
         } else {
              console.log("Payment type already set to:", valueToSend, "- no change needed in BillsList.");
         }
-    };
-
+    }, [selectedOrder, updateOrderField]);
 
     // --- JSX Structure (Uses filteredBills derived from props) ---
     return (

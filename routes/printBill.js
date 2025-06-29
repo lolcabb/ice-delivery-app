@@ -4,8 +4,9 @@ const router = express.Router();
 const path = require('path');
 // Use the PostgreSQL connection pool module
 const db = require('../db/postgres');
+// const { authMiddleware } = require('../middleware/auth'); // Import auth middleware
 
-router.get('/:id', async (req, res) => { // Use async handler
+router.get('/:id', async (req, res) => { // No authMiddleware
     const orderIdStr = req.params.id;
     console.log(`Received GET /print-bill/${orderIdStr} request`);
 
