@@ -132,6 +132,31 @@ export const apiService = {
         return apiService.get(`/users?${queryParams}`);
     },
 
+
+    // --- Sales Operations API Functions ---
+    // Add to apiService object
+    getRouteCustomers: (routeId) => apiService.get(`/routes/${routeId}/customers`),
+    addCustomerToRoute: (routeId, customerId) => apiService.post(`/routes/${routeId}/customers`, { customer_id: customerId }),
+    removeCustomerFromRoute: (routeId, customerId) => apiService.delete(`/routes/${routeId}/customers/${customerId}`),
+    saveCustomerOrder: (routeId, customerIds) => apiService.put(`/routes/${routeId}/customer-order`, { customer_ids: customerIds }),
+
+    // Customer pricing
+    getCustomerPrices: (customerId) => apiService.get(`/customers/${customerId}/prices`),
+    updateCustomerPrice: (customerId, productId, unitPrice, reason) => apiService.put(`/customers/${customerId}/prices/${productId}`, { unit_price: unitPrice, reason }),
+
+    // Sales editing
+    getDriverSalesForEdit: (summaryId) => apiService.get(`/sales-ops/driver-sales/edit/${summaryId}`),
+    updateDriverSale: (saleId, saleData) => apiService.put(`/sales-ops/driver-sales/${saleId}`, saleData),
+    deleteDriverSale: (saleId, reason) => apiService.delete(`/sales-ops/driver-sales/${saleId}`, { reason }),
+
+    // Customer search
+    searchCustomers: (search, excludeRouteId) => {
+        const params = new URLSearchParams({ search, limit: 10 });
+        if (excludeRouteId) params.append('exclude_route_id', excludeRouteId);
+        return apiService.get(`/customers/search?${params}`);
+    },
+
+
     // --- Driver Management API Functions ---
     addDriver: (driverData) => apiService.post('/drivers', driverData),
     getDrivers: (params = {}) => { 
@@ -176,8 +201,6 @@ export const apiService = {
     
     addDriverSale: (saleData) => apiService.post('/sales-ops/driver-sales', saleData),
     getDriverSales: (driverDailySummaryId) => apiService.get(`/sales-ops/driver-sales?driver_daily_summary_id=${driverDailySummaryId}`),
-    updateDriverSale: (saleId, saleData) => apiService.put(`/sales-ops/driver-sales/${saleId}`, saleData),
-    deleteDriverSale: (saleId) => apiService.delete(`/sales-ops/driver-sales/${saleId}`),
 
     saveBatchSales: (batchPayload) => apiService.post('/sales-ops/sales-entry/batch', batchPayload),
 

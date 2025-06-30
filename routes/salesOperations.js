@@ -65,74 +65,392 @@ const updateDriverDailySummaryTotals = async (client, driverDailySummaryId) => {
     return updatedSummaryResult.rows[0];
 };
 
-//POST batch entries
+// GET customer prices for sales entry
+router.get('/customers/:customer_id/prices', authMiddleware, async (req, res) => {
+    const customer_id = parseInt(req.params.customer_id);
+    
+    if (isNaN(customer_id)) {
+        return res.status(400).json({ error: 'Invalid customer ID' });
+    }
+
+    try {
+        const sql = 'SELECT * FROM get_customer_all_prices($1)';
+        const result = await query(sql, [customer_id]);
+        
+        res.json({
+            customer_id,
+            prices: result.rows
+        });
+
+    } catch (err) {
+        handleError(res, err, 'Failed to fetch customer prices');
+    }
+});
+
+// PUT update customer price
+router.put('/customers/:customer_id/prices/:product_id', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const customer_id = parseInt(req.params.customer_id);
+    const product_id = parseInt(req.params.product_id);
+    const { unit_price, reason } = req.body;
+    const user_id = req.user.id;
+
+    if (isNaN(customer_id) || isNaN(product_id) || isNaN(parseFloat(unit_price))) {
+        return res.status(400).json({ error: 'Invalid parameters' });
+    }
+
+    try {
+        const result = await query(
+            'SELECT * FROM set_customer_price($1, $2, $3, $4, $5)',
+            [customer_id, product_id, parseFloat(unit_price), user_id, reason]
+        );
+
+        res.json(result.rows[0]);
+
+    } catch (err) {
+        handleError(res, err, 'Failed to update customer price');
+    }
+});
+
+// Enhanced batch sales save with pricing
 router.post('/sales-entry/batch', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     const { driver_daily_summary_id, sales_data } = req.body;
     const area_manager_id = req.user.id;
 
     if (!driver_daily_summary_id || !Array.isArray(sales_data)) {
-        return res.status(400).json({ error: 'Missing summary ID or sales data.' });
+        return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const client = await getClient();
+    const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
-        // First, clear any existing sales for this summary to prevent duplicates on re-submission
-        await client.query('DELETE FROM driver_sales WHERE driver_daily_summary_id = $1', [driver_daily_summary_id]);
+        // Get route_id from summary for updating customer assignments
+        const summaryResult = await client.query(
+            'SELECT route_id FROM driver_daily_summaries WHERE summary_id = $1',
+            [driver_daily_summary_id]
+        );
+        const route_id = summaryResult.rows[0]?.route_id;
 
+        // Clear existing sales for this summary (for complete replacement)
+        await client.query(
+            'DELETE FROM driver_sales WHERE driver_daily_summary_id = $1',
+            [driver_daily_summary_id]
+        );
+
+        // Process each sale
         for (const sale of sales_data) {
-            if (!sale.customer_id && !sale.customer_name_override) continue; // Skip rows with no customer info
-            if (!sale.items || sale.items.length === 0) continue; // Skip customers with no items sold
+            if (!sale.customer_id || !sale.items || sale.items.length === 0) continue;
 
-            // Create the main driver_sales record
-            const saleInsertSql = `
-                INSERT INTO driver_sales 
-                (driver_daily_summary_id, customer_id, customer_name_override, payment_type, total_sale_amount, area_manager_logged_by_id, notes)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
-                RETURNING sale_id;
-            `;
-            const saleValues = [
-                driver_daily_summary_id,
-                sale.customer_id || null,
-                sale.customer_name_override || null,
-                sale.payment_type || 'Cash',
-                sale.items.reduce((acc, item) => acc + (parseFloat(item.quantity_sold || 0) * parseFloat(item.unit_price || 0)), 0),
-                area_manager_id,
-                sale.notes || null
-            ];
-            const saleResult = await client.query(saleInsertSql, saleValues);
+            // Create the sale record
+            const saleResult = await client.query(
+                `INSERT INTO driver_sales (
+                    driver_daily_summary_id, customer_id, payment_type, 
+                    notes, area_manager_logged_by_id, total_sale_amount
+                ) VALUES ($1, $2, $3, $4, $5, 0) RETURNING sale_id`,
+                [
+                    driver_daily_summary_id,
+                    sale.customer_id,
+                    sale.payment_type || 'Cash',
+                    sale.notes,
+                    area_manager_id
+                ]
+            );
+
             const sale_id = saleResult.rows[0].sale_id;
+            let total_amount = 0;
 
-            // Insert each item for that sale
+            // Insert sale items with pricing
             for (const item of sale.items) {
-                if (parseFloat(item.quantity_sold || 0) <= 0) continue; // Skip items with no quantity
+                const quantity = parseFloat(item.quantity_sold);
+                if (quantity <= 0) continue;
 
-                const itemInsertSql = `
-                    INSERT INTO driver_sale_items
-                    (driver_sale_id, product_id, quantity_sold, unit_price, transaction_type)
-                    VALUES ($1, $2, $3, $4, $5);
-                `;
-                const itemValues = [
-                    sale_id,
-                    item.product_id,
-                    parseFloat(item.quantity_sold),
-                    parseFloat(item.unit_price),
-                    item.transaction_type || 'Sale' // Use the transaction type from the grid
-                ];
-                await client.query(itemInsertSql, itemValues);
+                // Use provided price or get customer/default price
+                let unit_price = item.unit_price;
+                if (!unit_price || parseFloat(unit_price) === 0) {
+                    const priceResult = await client.query(
+                        'SELECT get_customer_product_price($1, $2) as price',
+                        [sale.customer_id, item.product_id]
+                    );
+                    unit_price = priceResult.rows[0].price;
+                }
+
+                const subtotal = quantity * parseFloat(unit_price);
+                total_amount += subtotal;
+
+                await client.query(
+                    `INSERT INTO driver_sale_items (
+                        driver_sale_id, product_id, quantity_sold, 
+                        unit_price, subtotal, transaction_type
+                    ) VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [
+                        sale_id,
+                        item.product_id,
+                        quantity,
+                        unit_price,
+                        subtotal,
+                        item.transaction_type || 'Sale'
+                    ]
+                );
+
+                // Optionally update customer price if changed
+                if (item.price_changed) {
+                    await client.query(
+                        'SELECT set_customer_price($1, $2, $3, $4, $5)',
+                        [sale.customer_id, item.product_id, unit_price, area_manager_id, 'Updated during sale']
+                    );
+                }
+            }
+
+            // Update sale total
+            await client.query(
+                'UPDATE driver_sales SET total_sale_amount = $1 WHERE sale_id = $2',
+                [total_amount, sale_id]
+            );
+
+            // Update customer-route assignment last sale date
+            if (route_id) {
+                await client.query(
+                    `UPDATE customer_route_assignments 
+                     SET last_sale_date = CURRENT_DATE,
+                         total_sales_count = total_sales_count + 1
+                     WHERE customer_id = $1 AND route_id = $2`,
+                    [sale.customer_id, route_id]
+                );
             }
         }
-        
-        // After inserting all sales, update the summary totals
+
+        // Update summary totals
         await updateDriverDailySummaryTotals(client, driver_daily_summary_id);
 
         await client.query('COMMIT');
-        res.status(201).json({ message: 'Sales data saved successfully.' });
+
+        res.json({
+            success: true,
+            message: `Saved ${sales_data.length} sales records`
+        });
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, 'Failed to save batch sales data');
+        handleError(res, err, 'Failed to save batch sales');
+    } finally {
+        client.release();
+    }
+});
+
+// GET sales for editing
+router.get('/driver-sales/edit/:summary_id', authMiddleware, async (req, res) => {
+    const summary_id = parseInt(req.params.summary_id);
+
+    if (isNaN(summary_id)) {
+        return res.status(400).json({ error: 'Invalid summary ID' });
+    }
+
+    try {
+        // Get all sales with full details for editing
+        const salesSql = `
+            SELECT 
+                ds.*,
+                c.customer_name,
+                json_agg(
+                    json_build_object(
+                        'item_id', dsi.item_id,
+                        'product_id', dsi.product_id,
+                        'product_name', p.product_name,
+                        'quantity_sold', dsi.quantity_sold,
+                        'unit_price', dsi.unit_price,
+                        'transaction_type', dsi.transaction_type,
+                        'subtotal', dsi.subtotal
+                    ) ORDER BY dsi.product_id
+                ) as items
+            FROM driver_sales ds
+            JOIN customers c ON ds.customer_id = c.customer_id
+            LEFT JOIN driver_sale_items dsi ON ds.sale_id = dsi.driver_sale_id
+            LEFT JOIN products p ON dsi.product_id = p.product_id
+            WHERE ds.driver_daily_summary_id = $1
+            GROUP BY ds.sale_id, c.customer_name
+            ORDER BY ds.sale_id`;
+
+        const result = await query(salesSql, [summary_id]);
+
+        res.json({
+            summary_id,
+            sales: result.rows
+        });
+
+    } catch (err) {
+        handleError(res, err, 'Failed to fetch sales for editing');
+    }
+});
+
+// PUT update individual sale (for corrections)
+router.put('/driver-sales/:sale_id', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+    const sale_id = parseInt(req.params.sale_id);
+    const { payment_type, notes, items } = req.body;
+    const user_id = req.user.id;
+
+    if (isNaN(sale_id)) {
+        return res.status(400).json({ error: 'Invalid sale ID' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Update sale header if needed
+        if (payment_type || notes !== undefined) {
+            const updates = [];
+            const values = [];
+            let paramIndex = 1;
+
+            if (payment_type) {
+                updates.push(`payment_type = $${paramIndex++}`);
+                values.push(payment_type);
+            }
+            if (notes !== undefined) {
+                updates.push(`notes = $${paramIndex++}`);
+                values.push(notes);
+            }
+
+            if (updates.length > 0) {
+                values.push(sale_id);
+                await client.query(
+                    `UPDATE driver_sales 
+                     SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+                     WHERE sale_id = $${paramIndex}`,
+                    values
+                );
+            }
+        }
+
+        // Update items if provided
+        if (items && Array.isArray(items)) {
+            // Delete existing items
+            await client.query(
+                'DELETE FROM driver_sale_items WHERE driver_sale_id = $1',
+                [sale_id]
+            );
+
+            // Re-insert updated items
+            let total_amount = 0;
+            for (const item of items) {
+                if (item.quantity_sold && parseFloat(item.quantity_sold) > 0) {
+                    const quantity = parseFloat(item.quantity_sold);
+                    const unit_price = parseFloat(item.unit_price);
+                    const subtotal = quantity * unit_price;
+                    total_amount += subtotal;
+
+                    await client.query(
+                        `INSERT INTO driver_sale_items (
+                            driver_sale_id, product_id, quantity_sold,
+                            unit_price, subtotal, transaction_type
+                        ) VALUES ($1, $2, $3, $4, $5, $6)`,
+                        [
+                            sale_id,
+                            item.product_id,
+                            quantity,
+                            unit_price,
+                            subtotal,
+                            item.transaction_type || 'Sale'
+                        ]
+                    );
+                }
+            }
+
+            // Update total
+            await client.query(
+                'UPDATE driver_sales SET total_sale_amount = $1 WHERE sale_id = $2',
+                [total_amount, sale_id]
+            );
+        }
+
+        // Update summary totals
+        const summaryResult = await client.query(
+            'SELECT driver_daily_summary_id FROM driver_sales WHERE sale_id = $1',
+            [sale_id]
+        );
+        
+        if (summaryResult.rows[0]) {
+            await updateDriverDailySummaryTotals(client, summaryResult.rows[0].driver_daily_summary_id);
+        }
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Sale updated successfully'
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        handleError(res, err, 'Failed to update sale');
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE sale (soft delete with reason)
+router.delete('/driver-sales/:sale_id', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => {
+    const sale_id = parseInt(req.params.sale_id);
+    const { reason } = req.body;
+    const user_id = req.user.id;
+
+    if (isNaN(sale_id)) {
+        return res.status(400).json({ error: 'Invalid sale ID' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Get summary_id before deletion
+        const saleResult = await client.query(
+            'SELECT driver_daily_summary_id, customer_id FROM driver_sales WHERE sale_id = $1',
+            [sale_id]
+        );
+
+        if (saleResult.rows.length === 0) {
+            throw new Error('Sale not found');
+        }
+
+        const { driver_daily_summary_id, customer_id } = saleResult.rows[0];
+
+        // Log the deletion
+        await client.query(
+            `INSERT INTO sales_audit_log (
+                sale_id, action, action_by, action_reason, 
+                original_data
+            ) VALUES (
+                $1, 'deleted', $2, $3,
+                (SELECT row_to_json(ds) FROM driver_sales ds WHERE sale_id = $1)
+            )`,
+            [sale_id, user_id, reason]
+        );
+
+        // Delete sale items first
+        await client.query(
+            'DELETE FROM driver_sale_items WHERE driver_sale_id = $1',
+            [sale_id]
+        );
+
+        // Delete the sale
+        await client.query(
+            'DELETE FROM driver_sales WHERE sale_id = $1',
+            [sale_id]
+        );
+
+        // Update summary totals
+        await updateDriverDailySummaryTotals(client, driver_daily_summary_id);
+
+        await client.query('COMMIT');
+
+        res.json({
+            success: true,
+            message: 'Sale deleted successfully'
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        handleError(res, err, 'Failed to delete sale');
     } finally {
         client.release();
     }
