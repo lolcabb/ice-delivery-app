@@ -41,6 +41,9 @@ const containerRoutes = require('./routes/containerRoutes');
 const salesOperationsRoutes = require('./routes/salesOperations');
 //Driver Management
 const driverRoutes = require('./routes/drivers');
+//Routes
+const routesRoutes = require('./routes/routes');
+
 
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
@@ -53,7 +56,9 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/containers', containerRoutes);
 app.use('/api/sales-ops', salesOperationsRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use('/api/routes', routesRoutes);
 
+// Print Bill
 const printBillRoute = require('./routes/printBill');
 app.use('/print-bill', printBillRoute);
 
