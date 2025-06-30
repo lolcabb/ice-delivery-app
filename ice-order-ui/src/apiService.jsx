@@ -53,7 +53,11 @@ const request = async (endpoint, method = 'GET', body = null, options = {}) => {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
         clearTimeout(timeoutId);
 
-        const metadata = { status: response.status, statusText: response.statusText, headers: { etag: response.headers.get('ETag') } };
+        const metadata = { 
+            status: response.status, 
+            statusText: response.statusText, 
+            headers: { etag: response.headers.get('ETag') } 
+        };
 
         if (handleGlobalAuthError(response.status, endpoint)) {
             throw new Error('Session expired or unauthorized.');
@@ -62,14 +66,33 @@ const request = async (endpoint, method = 'GET', body = null, options = {}) => {
         if (response.status === 204) return { data: null, metadata };
         if (response.status === 304) return { data: null, metadata, notModified: true };
 
-        const responseData = await response.json().catch(() => response.text());
+        // Fix: Read response body only once
+        let responseData;
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+            try {
+                const text = await response.text();
+                responseData = text ? JSON.parse(text) : null;
+            } catch (e) {
+                console.error('Failed to parse JSON response:', e);
+                responseData = null;
+            }
+        } else {
+            responseData = await response.text();
+        }
 
         if (!response.ok) {
-            const error = new Error(responseData.message || responseData || 'API Request Failed');
+            const error = new Error(
+                (typeof responseData === 'object' && responseData?.message) || 
+                responseData || 
+                'API Request Failed'
+            );
             error.status = response.status;
-            error.data = responseData;
+            error.data = typeof responseData === 'object' ? responseData : { message: responseData };
             throw error;
         }
+
         return { data: responseData, metadata };
 
     } catch (error) {

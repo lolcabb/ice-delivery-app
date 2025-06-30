@@ -66,7 +66,10 @@ const uploadToGCS = (file) => {
 };
 
 // Simplified API routes for customer-route management
-// GET customers for a specific route
+// Add this to your routes/customers.js file
+
+// GET /api/routes/:route_id/customers
+// Get all customers assigned to a specific route
 router.get('/routes/:route_id/customers', authMiddleware, async (req, res) => {
     const route_id = parseInt(req.params.route_id);
     
@@ -75,20 +78,62 @@ router.get('/routes/:route_id/customers', authMiddleware, async (req, res) => {
     }
 
     try {
+        // First, check if we have any assignments
+        const assignmentCheck = await query(
+            'SELECT COUNT(*) as count FROM customer_route_assignments WHERE route_id = $1 AND is_active = true',
+            [route_id]
+        );
+
+        if (assignmentCheck.rows[0].count === 0) {
+            // No assignments yet - this is normal for new routes
+            // Option 1: Return empty array
+            return res.json({
+                route_id,
+                customers: [],
+                total: 0,
+                message: 'No customers assigned to this route yet'
+            });
+
+            // Option 2: Return ALL customers for easy assignment
+            // Uncomment below if you prefer this approach
+            /*
+            const allCustomersSQL = `
+                SELECT 
+                    c.customer_id,
+                    c.customer_name,
+                    c.phone,
+                    c.address,
+                    c.route_id as original_route_id,
+                    999999 as route_sequence,
+                    NULL as days_since_sale
+                FROM customers c
+                WHERE c.is_active = true
+                ORDER BY c.customer_name
+            `;
+            const allCustomers = await query(allCustomersSQL);
+            
+            return res.json({
+                route_id,
+                customers: allCustomers.rows,
+                total: allCustomers.rows.length,
+                all_customers_mode: true,
+                message: 'Showing all customers - drag to assign to this route'
+            });
+            */
+        }
+
+        // We have assignments - use the function
         const sql = `SELECT * FROM get_route_customers_for_sales($1)`;
         const result = await query(sql, [route_id]);
         
         res.json({
             route_id,
-            customers: result.rows.map(row => ({
-                ...row,
-                // Add visual hint for inactive customers without forcing status
-                is_inactive: row.days_since_sale > 14
-            })),
+            customers: result.rows,
             total: result.rows.length
         });
 
     } catch (err) {
+        console.error('Error in /routes/:route_id/customers:', err);
         handleError(res, err, 'Failed to fetch route customers');
     }
 });
