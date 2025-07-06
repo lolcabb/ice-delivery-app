@@ -52,3 +52,57 @@ export const formatDisplayDate = (dateValue, locale = 'th-TH', options = { day: 
         return 'Invalid Date';
     }
 };
+
+export const getISODate = (date) => {
+    if (!date) return null;
+    const d = new Date(date);
+    // Check for invalid date
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().split('T')[0];
+};
+
+/**
+ * Gets a local Date object, adjusting for timezone offset to prevent date changes.
+ * @param {Date | string} date - The date to convert.
+ * @returns {Date} A new Date object representing the local date.
+ */
+export const getLocalDate = (date) => {
+    if (!date) return new Date();
+    // Handles both Date objects and ISO strings
+    const d = new Date(date);
+    // Adjust for timezone offset to prevent date changes
+    const timezoneOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - timezoneOffset);
+};
+
+/**
+ * Formats a date string (like 'YYYY-MM-DD') into a more readable format (DD/MM/YYYY).
+ * This function is safe from timezone issues.
+ * @param {string} dateString - The date string to format.
+ * @returns {string} The formatted date, or the original string if invalid.
+ */
+export const formatDate = (dateString) => {
+  if (!dateString) {
+    return ''; // Return empty string for invalid input
+  }
+  try {
+    // Appending 'T00:00:00Z' treats the input as a UTC date, which prevents
+    // the user's local timezone from shifting the date.
+    const date = new Date(dateString + 'T00:00:00Z');
+    
+    // Check if the created date is valid
+    if (isNaN(date.getTime())) {
+      return dateString; // Return original string if it's not a valid date
+    }
+
+    // Use UTC methods to extract date parts to avoid timezone interference
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // getUTCMonth is 0-indexed
+    const year = date.getUTCFullYear();
+    
+    return `${day}/${month}/${year}`;
+  } catch (error) {
+    console.error("Error formatting date:", dateString, error);
+    return dateString; // On error, return the original string
+  }
+};

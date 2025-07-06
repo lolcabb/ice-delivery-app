@@ -169,13 +169,31 @@ export default function DailyOperationsManager() {
     useEffect(() => {
         const fetchPrereqs = async () => {
             try {
-                const [driversData, productsData, routesData] = await Promise.all([
-                    apiService.getDrivers({ is_active: true }), apiService.getSalesProducts(), apiService.getDeliveryRoutes()
+                const [driversResponse, productsResponse, routesResponse] = await Promise.all([
+                    apiService.getDrivers({ is_active: true }), 
+                    apiService.getSalesProducts(), 
+                    apiService.getDeliveryRoutes()
                 ]);
-                setAllDrivers(driversData || []);
-                setAllProducts(productsData || []);
-                setAllRoutes(routesData || []);
-            } catch (err) { setError("ไม่สามารถโหลดข้อมูลที่จำเป็นสำหรับฟอร์มได้" + (err.data?.error || err.message)); }
+            
+                // Fix: Handle response objects properly
+                const driversData = Array.isArray(driversResponse) ? driversResponse : 
+                               (driversResponse?.data ? driversResponse.data : []);
+                const productsData = Array.isArray(productsResponse) ? productsResponse : 
+                                (productsResponse?.data ? productsResponse.data : []);
+                const routesData = Array.isArray(routesResponse) ? routesResponse : 
+                              (routesResponse?.data ? routesResponse.data : []);
+            
+                setAllDrivers(driversData);
+                setAllProducts(productsData);
+                setAllRoutes(routesData);
+            } catch (err) { 
+                console.error("Failed to fetch prerequisites:", err);
+                setError("ไม่สามารถโหลดข้อมูลที่จำเป็นสำหรับฟอร์มได้ " + (err.data?.error || err.message)); 
+                // Set empty arrays as fallback to prevent iteration errors
+                setAllDrivers([]);
+                setAllProducts([]);
+                setAllRoutes([]);
+            }
         };
         fetchPrereqs();
     }, []);
@@ -231,8 +249,11 @@ export default function DailyOperationsManager() {
     };
 
     const handleNavigateToSalesEntry = (driverLog) => {
-        if (!driverLog.summary?.summary_id) { setError("กรุณาเริ่มวันสำหรับคนขับนี้ก่อนบันทึกการขาย"); return; }
-        navigate(`/sales-ops/entry/${driverLog.summary.summary_id}`);
+        if (driverLog.driver?.driver_id && selectedDate) {
+            navigate(`/sales-ops/entry/${driverLog.summary.summary_id}`);
+        } else {
+            setError("Cannot navigate: Missing driver ID or date information.");
+        }
     };
 
     return (

@@ -157,11 +157,10 @@ export const apiService = {
 
 
     // --- Sales Operations API Functions ---
-    // Add to apiService object
-    getRouteCustomers: (routeId) => apiService.get(`/routes/${routeId}/customers`),
-    addCustomerToRoute: (routeId, customerId) => apiService.post(`/routes/${routeId}/customers`, { customer_id: customerId }),
-    removeCustomerFromRoute: (routeId, customerId) => apiService.delete(`/routes/${routeId}/customers/${customerId}`),
-    saveCustomerOrder: (routeId, customerIds) => apiService.put(`/routes/${routeId}/customer-order`, { customer_ids: customerIds }),
+    getRouteCustomers: (routeId) => apiService.get(`/sales-ops/routes/${routeId}/customers`),
+    addCustomerToRoute: (routeId, customerId) => apiService.post(`/sales-ops/routes/${routeId}/customers`, { customer_id: customerId }),
+    removeCustomerFromRoute: (routeId, customerId) => apiService.delete(`/sales-ops/routes/${routeId}/customers/${customerId}`),
+    saveCustomerOrder: (routeId, customerIds) => apiService.put(`/sales-ops/routes/${routeId}/customer-order`, { customer_ids: customerIds }),
 
     // Customer pricing
     getCustomerPrices: (customerId) => apiService.get(`/customers/${customerId}/prices`),
@@ -182,24 +181,35 @@ export const apiService = {
 
     // --- Driver Management API Functions ---
     addDriver: (driverData) => apiService.post('/drivers', driverData),
-    getDrivers: (params = {}) => { 
+    getDrivers: async (params = {}) => { 
         const queryParams = new URLSearchParams(params).toString();
-        return apiService.get(`/drivers?${queryParams}`);
+        const response = await apiService.get(`/drivers?${queryParams}`);
+        return response.data || response || [];
     },
     getDriverById: (driverId) => apiService.get(`/drivers/${driverId}`),
     updateDriver: (driverId, driverData) => apiService.put(`/drivers/${driverId}`, driverData),
     deleteDriver: (driverId) => apiService.delete(`/drivers/${driverId}`), 
 
     // --- Sales Operations API Functions ---
-    getSalesProducts: () => { return request('/sales-ops/products');},
+    getSalesProducts: async () => { 
+        const response = await request('/sales-ops/products');
+        return response.data || response || [];
+    },
     getLossReasons: () => apiService.get('/sales-ops/loss-reasons'),
     
-    addLoadingLog: (logData) => apiService.post('/sales-ops/loading-logs', logData), 
-    getLoadingLogs: (params = {}) => { 
+    addLoadingLog: async (logData) => {
+        const response = await apiService.post('/sales-ops/loading-logs', logData);
+        return response.data || response;
+    }, 
+    getLoadingLogs: async (params = {}) => { 
         const queryParams = new URLSearchParams(params).toString();
-        return apiService.get(`/sales-ops/loading-logs?${queryParams}`);
+        const response = await apiService.get(`/sales-ops/loading-logs?${queryParams}`);
+        return response.data || response || [];
     },
-    updateLoadingLogBatch: (batchUUID, batchData) => apiService.put(`/sales-ops/loading-logs/batch/${batchUUID}`, batchData), 
+    updateLoadingLogBatch: async (batchUUID, batchData) => {
+        const response = await apiService.put(`/sales-ops/loading-logs/batch/${batchUUID}`, batchData);
+        return response.data || response;
+    },
 
     addDriverDailySummary: (summaryData) => apiService.post('/sales-ops/driver-daily-summaries', summaryData),
     getDriverDailySummaries: (params = {}) => { 
@@ -334,14 +344,18 @@ export const apiService = {
     },
     updateAssignmentDetails: (assignmentId, data) => apiService.put(`/containers/assignments/${assignmentId}`, data),
     addCustomer: (customerData) => apiService.post('/customers', customerData),
-    getCustomers: (filters = {}) => {
+    getCustomers: async (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
-        return apiService.get(`/customers?${queryParams}`);
+        const response = await apiService.get(`/customers?${queryParams}`);
+        return response;  // Keep returning full response for pagination info
     },
     getCustomerById: (customerId) => apiService.get(`/customers/${customerId}`),
     updateCustomer: (customerId, customerData) => apiService.put(`/customers/${customerId}`, customerData),
     deleteCustomer: (customerId) => apiService.delete(`/customers/${customerId}`),
-    getDeliveryRoutes: () => apiService.get('/customers/delivery-routes'),
+    getDeliveryRoutes: async () => {
+        const response = await apiService.get('/customers/delivery-routes');
+        return response.data || response || [];
+    },
 
     
     getCustomerCreditSales: (customerId) => apiService.get(`/customers/${customerId}/credit-sales`),

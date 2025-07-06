@@ -1,7 +1,7 @@
 // ice-delivery-app/routes/salesOperations.js
 const express = require('express');
 const router = express.Router();
-const { query, getClient } = require('../db/postgres');
+const { query, getClient, pool } = require('../db/postgres');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const { v4: uuidv4 } = require('uuid'); 
 
@@ -65,6 +65,138 @@ const updateDriverDailySummaryTotals = async (client, driverDailySummaryId) => {
     return updatedSummaryResult.rows[0];
 };
 
+// GET /api/sales-ops/routes/:routeId/customers
+// This now correctly joins and orders by the route_sequence
+router.get('/routes/:routeId/customers', authMiddleware, async (req, res) => { // FIXED: Using authMiddleware
+    const { routeId } = req.params;
+    try {
+        const query = `
+            SELECT 
+                c.customer_id,
+                c.customer_name,
+                c.phone,
+                c.address,
+                cra.route_sequence
+            FROM customers c
+            JOIN customer_route_assignments cra ON c.customer_id = cra.customer_id
+            WHERE cra.route_id = $1 AND cra.is_active = true
+            ORDER BY cra.route_sequence ASC, c.customer_name ASC;
+        `;
+        const { rows } = await pool.query(query, [routeId]);
+        res.json({ customers: rows });
+    } catch (err) {
+        console.error('Error fetching route customers:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// POST /api/sales-ops/routes/:routeId/customers
+// Adds a single customer to a route, placing them at the end of the sequence.
+router.post('/routes/:routeId/customers', authMiddleware, async (req, res) => { // FIXED: Using authMiddleware
+    const { routeId } = req.params;
+    const { customer_id } = req.body;
+
+    if (!customer_id) {
+        return res.status(400).json({ error: 'Customer ID is required.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const existingAssignment = await client.query(
+            'SELECT * FROM customer_route_assignments WHERE route_id = $1 AND customer_id = $2',
+            [routeId, customer_id]
+        );
+
+        if (existingAssignment.rows.length > 0) {
+            await client.query(
+                'UPDATE customer_route_assignments SET is_active = true, updated_at = CURRENT_TIMESTAMP WHERE assignment_id = $1',
+                [existingAssignment.rows[0].assignment_id]
+            );
+        } else {
+            const maxSeqResult = await client.query(
+                'SELECT MAX(route_sequence) as max_seq FROM customer_route_assignments WHERE route_id = $1',
+                [routeId]
+            );
+            const newSequence = (maxSeqResult.rows[0].max_seq || 0) + 1;
+
+            await client.query(
+                `INSERT INTO customer_route_assignments (customer_id, route_id, route_sequence, is_active, created_by)
+                 VALUES ($1, $2, $3, true, $4)`,
+                [customer_id, routeId, newSequence, req.user.id] // This will now work correctly
+            );
+        }
+
+        await client.query('COMMIT');
+        res.status(201).json({ message: 'Customer added to route successfully.' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error adding customer to route:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        client.release();
+    }
+});
+
+// DELETE /api/sales-ops/routes/:routeId/customers/:customerId
+// Deactivates a customer from a route instead of hard deleting
+router.delete('/routes/:routeId/customers/:customerId', authMiddleware, async (req, res) => { // FIXED: Using authMiddleware
+    const { routeId, customerId } = req.params;
+    try {
+        const result = await pool.query(
+            `UPDATE customer_route_assignments 
+             SET is_active = false, updated_at = CURRENT_TIMESTAMP 
+             WHERE route_id = $1 AND customer_id = $2`,
+            [routeId, customerId]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Assignment not found.' });
+        }
+        res.status(200).json({ message: 'Customer removed from route.' });
+    } catch (err) {
+        console.error('Error removing customer from route:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// PUT /api/sales-ops/routes/:routeId/customer-order
+// This now correctly performs a bulk update of the sequence.
+router.put('/routes/:routeId/customer-order', authMiddleware, async (req, res) => { // FIXED: Using authMiddleware
+    const { routeId } = req.params;
+    const { customer_ids } = req.body;
+
+    if (!Array.isArray(customer_ids)) {
+        return res.status(400).json({ error: 'customer_ids must be an array.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const updatePromises = customer_ids.map((customerId, index) => {
+            const sequence = index + 1;
+            return client.query(
+                `UPDATE customer_route_assignments
+                 SET route_sequence = $1, updated_at = CURRENT_TIMESTAMP
+                 WHERE route_id = $2 AND customer_id = $3`,
+                [sequence, routeId, customerId]
+            );
+        });
+
+        await Promise.all(updatePromises);
+
+        await client.query('COMMIT');
+        res.status(200).json({ message: 'Customer order updated successfully.' });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error updating customer order:', err);
+        res.status(500).json({ error: 'Internal server error' });
+    } finally {
+        client.release();
+    }
+});
+
 // GET customer prices for sales entry
 router.get('/customers/:customer_id/prices', authMiddleware, async (req, res) => {
     const customer_id = parseInt(req.params.customer_id);
@@ -120,7 +252,7 @@ router.post('/sales-entry/batch', authMiddleware, requireRole(['admin', 'manager
         return res.status(400).json({ error: 'Invalid request data' });
     }
 
-    const client = await pool.connect();
+    const client = await getClient();
     try {
         await client.query('BEGIN');
 
@@ -292,7 +424,7 @@ router.put('/driver-sales/:sale_id', authMiddleware, requireRole(['admin', 'mana
         return res.status(400).json({ error: 'Invalid sale ID' });
     }
 
-    const client = await pool.connect();
+    const client = await getClient();
     try {
         await client.query('BEGIN');
 
@@ -398,7 +530,7 @@ router.delete('/driver-sales/:sale_id', authMiddleware, requireRole(['admin', 'm
         return res.status(400).json({ error: 'Invalid sale ID' });
     }
 
-    const client = await pool.connect();
+    const client = await getClient();
     try {
         await client.query('BEGIN');
 

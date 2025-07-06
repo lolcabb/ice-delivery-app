@@ -1,5 +1,5 @@
 const express = require('express');
-const bodyParser = require('body-parser');
+//const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
 
@@ -19,7 +19,7 @@ app.use(cors({
   exposedHeaders: ['Content-Length', 'ETag'],
   maxAge: 3600
 }));
-app.use(bodyParser.json());
+app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
 
@@ -41,9 +41,6 @@ const containerRoutes = require('./routes/containerRoutes');
 const salesOperationsRoutes = require('./routes/salesOperations');
 //Driver Management
 const driverRoutes = require('./routes/drivers');
-//Routes
-const routesRoutes = require('./routes/routes');
-
 
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
@@ -56,7 +53,6 @@ app.use('/api/customers', customerRoutes);
 app.use('/api/containers', containerRoutes);
 app.use('/api/sales-ops', salesOperationsRoutes);
 app.use('/api/drivers', driverRoutes);
-app.use('/api/routes', routesRoutes);
 
 // Print Bill
 const printBillRoute = require('./routes/printBill');

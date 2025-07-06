@@ -100,7 +100,7 @@ export default function ReturnsLogManager() {
                 try {
                     const reconciliationData = await apiService.getReconciliationSummary(driverId, selectedDate);
                     if (reconciliationData.summary) driverLog.summary = reconciliationData.summary;
-                    if (reconciliationData.product_reconciliation) driverLog.product_reconciliation = reconciliationData.product_reconciliation;
+                    if (reconciliationData && reconciliationData.product_reconciliation) driverLog.product_reconciliation = reconciliationData.product_reconciliation;
                 } catch (summaryErr) {
                     console.log(`No summary found for driver ${driverId} on ${selectedDate}, they may need to "Start Day".`);
                 }
@@ -134,13 +134,13 @@ export default function ReturnsLogManager() {
         setSuccessMessage('');
         try {
             const driverInfo = driverLogs.find(d => d.driver.driver_id === driverId);
-            // FIX: Safely access potentially undefined array
+            // Safely access the route_id from the first loading log for the day
             const routeIdForDay = driverInfo?.product_reconciliation?.[0]?.route_id || null;
 
             await apiService.addDriverDailySummary({
                 driver_id: driverId,
                 sale_date: selectedDate,
-                route_id: routeIdForDay
+                route_id: routeIdForDay // Pass the correct route_id
             });
             setSuccessMessage("เริ่มต้นวันสำเร็จ! ตอนนี้คุณสามารถบันทึกคืนสินค้าได้แล้ว");
             await fetchDataForDay();

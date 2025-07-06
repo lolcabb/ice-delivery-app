@@ -4,7 +4,6 @@ import Modal from '../Modal';
 import { getCurrentLocalDateISO } from '../utils/dateUtils'; 
 import { PlusCircleIcon, TrashIcon } from '../components/Icons';
 
-
 // Driver Search Input Component
 const DriverSearchInput = ({ drivers, selectedDriver, onSelect, disabled }) => {
     const [searchText, setSearchText] = useState('');
