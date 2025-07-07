@@ -50,13 +50,17 @@ const aggregateSalesByProduct = (sales = []) => {
 
 // --- Sub-Component for each driver's daily card ---
 const DriverDayCard = ({ driverLog, onOpenLoadingLog, onOpenReturnLog, onNavigateToSales, onStartDay, isProcessing }) => {
-    const { driver, summary, loading_logs, product_returns } = driverLog;
+    const { driver, summary, loading_logs, product_returns, product_reconciliation } = driverLog;
     const [isExpanded, setIsExpanded] = useState(false);
 
     const dayHasBeenStarted = !!summary;
     const hasLoadingLogs = loading_logs && loading_logs.length > 0;
     const returnsAreLogged = product_returns && product_returns.length > 0;
-    const totalLoaded = hasLoadingLogs ? loading_logs.reduce((acc, log) => acc + log.items.reduce((sum, item) => sum + parseFloat(item.quantity_loaded || 0), 0), 0) : 0;
+    const totalLoaded = Array.isArray(product_reconciliation)
+        ? product_reconciliation.reduce((acc, item) => acc + parseFloat(item.loaded || 0), 0)
+        : (hasLoadingLogs
+            ? loading_logs.reduce((acc, log) => acc + log.items.reduce((sum, item) => sum + parseFloat(item.quantity_loaded || 0), 0), 0)
+            : 0);
 
     const initialLog = hasLoadingLogs ? loading_logs.find(log => log.load_type === 'initial') : null;
     const refillLogs = hasLoadingLogs ? loading_logs.filter(log => log.load_type !== 'initial').sort((a, b) => new Date(a.load_timestamp) - new Date(b.load_timestamp)) : [];
@@ -304,22 +308,19 @@ export default function DailyOperationsManager() {
     };
 
     const handleSaveLoadingLog = async (logDataPayload) => {
-        const action = editingBatch ? 'updateLoadingLogBatch' : 'addLoadingLog';
-        const batchId = editingBatch ? editingBatch.batch_id : null;
         try {
-            await apiService[action](batchId || logDataPayload, batchId ? logDataPayload : undefined);
-            setSuccessMessage(`บันทึกการขึ้นของ ${editingBatch ? 'แก้ไข' : 'สร้างใหม่'} สำเร็จแล้ว!`);
-            setIsLoadModalOpen(false); setEditingBatch(null);
-            if(editingBatch && editingBatch.load_batch_uuid) {
-                await apiService.updateLoadingLogBatch(editingBatch.load_batch_uuid, logDataPayload)
-                setSuccessMessage('บันทึกการแก้ไขขึ้นของสำเร็จแล้ว!')
-            } else if (editingBatch && !editingBatch.load_batch_uuid) {
-                setError('ไม่สามารถแก้ไขบันทึกชุดเก่าได้ จะสร้างชุดใหม่แทน');
-                await apiService.addLoadingLog(logDataPayload);
-                setSuccessMessage('บันทึกการขึ้นของสร้างใหม่สำเร็จแล้ว!');
+            if (editingBatch) {
+                if (editingBatch.load_batch_uuid) {
+                    await apiService.updateLoadingLogBatch(editingBatch.load_batch_uuid, logDataPayload);
+                } else {
+                    setError('ไม่สามารถแก้ไขบันทึกชุดเก่าได้ จะสร้างชุดใหม่แทน');
+                    await apiService.addLoadingLog(logDataPayload);
+                }
             } else {
                 await apiService.addLoadingLog(logDataPayload);
             }
+
+            setSuccessMessage(`บันทึกการขึ้นของ ${editingBatch ? 'แก้ไข' : 'สร้างใหม่'} สำเร็จแล้ว!`);
             setIsLoadModalOpen(false);
             setEditingBatch(null);
             fetchDataForDay();
