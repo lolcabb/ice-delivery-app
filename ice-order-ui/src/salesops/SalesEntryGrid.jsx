@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { DndContext, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+// ice-order-ui/src/salesops/SalesEntryGrid.jsx
+import React, { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
+import { DndContext, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { TrashIcon, PlusIcon, ArrowPathIcon } from '../components/Icons';
 import { apiService } from '../apiService';
-import { ArrowPathIcon, TrashIcon } from '../components/Icons';
 
 // --- Customer Search Component ---
 const CustomerSearchInput = memo(({ onSelectCustomer, currentCustomers }) => {
@@ -66,53 +68,159 @@ const CustomerSearchInput = memo(({ onSelectCustomer, currentCustomers }) => {
     );
 });
 
-// --- Draggable Row Component ---
-const DraggableRow = memo(({ sale, products, onInputChange, onCustomerFieldChange, onRemoveRow }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sale.id });
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.7 : 1,
-    };
+// Individual row component with drag support
+const DraggableRow = React.memo(({ sale, products, onInputChange, onCustomerFieldChange, onRemoveRow, onAddSaleItem, onRemoveSaleItem }) => {
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: sale.id });
+    const style = { transform: CSS.Transform.toString(transform), transition };
 
     return (
-        <tr ref={setNodeRef} style={style} {...attributes} className="bg-white">
-            <td className="px-2 py-2 text-center text-gray-400 cursor-grab" {...listeners}>☰</td>
-            <td className="px-3 py-2 text-sm font-medium text-gray-900">{sale.customer_name}</td>
-            {products.map(product => {
-                const item = sale.items.find(i => i.product_id === product.product_id) || {};
-                return (
-                    <td key={product.product_id} className="px-2 py-1">
-                        <input
-                            type="number"
-                            placeholder="0"
-                            min="0"
-                            value={item.quantity_sold || ''}
-                            onChange={e => onInputChange(sale.id, product.product_id, 'quantity_sold', e.target.value)}
-                            className="w-24 input-field text-sm text-right"
+        <>
+            {sale.items.map((item, itemIndex) => (
+                <tr key={`${sale.id}-${item.product_id}-${itemIndex}`} ref={itemIndex === 0 ? setNodeRef : null} style={itemIndex === 0 ? style : {}} className="hover:bg-gray-50">
+                    {/* Drag handle - only on first row */}
+                    <td className="px-2 py-1 text-center">
+                        {itemIndex === 0 && (
+                            <div {...attributes} {...listeners} className="cursor-grab hover:cursor-grabbing p-1">
+                                <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                            </div>
+                        )}
+                    </td>
+                    
+                    {/* Customer name - only on first row, with rowspan */}
+                    {itemIndex === 0 && (
+                        <td className="px-3 py-1" rowSpan={sale.items.length}>
+                            <div className="font-medium text-gray-900">{sale.customer_name}</div>
+                        </td>
+                    )}
+                    
+                    {/* Product selection */}
+                    <td className="px-2 py-1">
+                        <select 
+                            value={item.product_id} 
+                            onChange={e => onInputChange(sale.id, itemIndex, 'product_id', parseInt(e.target.value))}
+                            className="input-field text-sm w-full"
+                        >
+                            <option value="">เลือกสินค้า</option>
+                            {products.map(p => (
+                                <option key={p.product_id} value={p.product_id}>{p.product_name}</option>
+                            ))}
+                        </select>
+                    </td>
+                    
+                    {/* Quantity */}
+                    <td className="px-2 py-1">
+                        <input 
+                            type="number" 
+                            min="0" 
+                            step="0.01"
+                            placeholder="จำนวน" 
+                            value={item.quantity_sold || ''} 
+                            onChange={e => onInputChange(sale.id, itemIndex, 'quantity_sold', e.target.value)}
+                            className="input-field text-sm w-full text-center"
                         />
                     </td>
-                );
-            })}
-            <td className="px-2 py-1">
-                <select value={sale.payment_type} onChange={e => onCustomerFieldChange(sale.id, 'payment_type', e.target.value)} className="input-field text-sm w-full">
-                    <option value="Cash">เงินสด</option>
-                    <option value="Credit">เครดิต</option>
-                </select>
-            </td>
-            <td className="px-2 py-1">
-                <input type="text" placeholder="หมายเหตุ..." value={sale.notes || ''} onChange={e => onCustomerFieldChange(sale.id, 'notes', e.target.value)} className="input-field text-sm w-full"/>
-            </td>
-            <td className="px-2 py-1 text-center">
-                <button type="button" onClick={() => onRemoveRow(sale.id)} className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50">
-                    <TrashIcon className="w-5 h-5"/>
-                </button>
-            </td>
-        </tr>
+                    
+                    {/* Unit Price */}
+                    <td className="px-2 py-1">
+                        <input 
+                            type="number" 
+                            min="0" 
+                            step="0.01"
+                            placeholder="ราคา/หน่วย" 
+                            value={item.unit_price || ''} 
+                            onChange={e => onInputChange(sale.id, itemIndex, 'unit_price', e.target.value)}
+                            className="input-field text-sm w-full text-center"
+                        />
+                    </td>
+                    
+                    {/* Transaction Type */}
+                    <td className="px-2 py-1">
+                        <select 
+                            value={item.transaction_type || 'Sale'} 
+                            onChange={e => onInputChange(sale.id, itemIndex, 'transaction_type', e.target.value)}
+                            className="input-field text-sm w-full"
+                        >
+                            <option value="Sale">ขาย</option>
+                            <option value="Giveaway">แจก</option>
+                            <option value="Internal Use">ใช้ภายใน</option>
+                        </select>
+                    </td>
+                    
+                    {/* Total for this item */}
+                    <td className="px-2 py-1 text-center font-medium">
+                        {item.quantity_sold && item.unit_price && item.transaction_type === 'Sale' 
+                            ? (parseFloat(item.quantity_sold) * parseFloat(item.unit_price)).toFixed(2)
+                            : item.transaction_type === 'Giveaway' ? '0.00' : ''
+                        }
+                    </td>
+                    
+                    {/* Payment type - only on first row */}
+                    {itemIndex === 0 && (
+                        <td className="px-2 py-1" rowSpan={sale.items.length}>
+                            <select 
+                                value={sale.payment_type || 'Cash'} 
+                                onChange={e => onCustomerFieldChange(sale.id, 'payment_type', e.target.value)}
+                                className="input-field text-sm w-full"
+                            >
+                                <option value="Cash">เงินสด</option>
+                                <option value="Credit">เครดิต</option>
+                            </select>
+                        </td>
+                    )}
+                    
+                    {/* Notes - only on first row */}
+                    {itemIndex === 0 && (
+                        <td className="px-2 py-1" rowSpan={sale.items.length}>
+                            <input 
+                                type="text" 
+                                placeholder="หมายเหตุ..." 
+                                value={sale.notes || ''} 
+                                onChange={e => onCustomerFieldChange(sale.id, 'notes', e.target.value)} 
+                                className="input-field text-sm w-full"
+                            />
+                        </td>
+                    )}
+                    
+                    {/* Actions */}
+                    <td className="px-2 py-1 text-center">
+                        <div className="flex items-center justify-center space-x-1">
+                            <button 
+                                type="button" 
+                                onClick={() => onRemoveSaleItem(sale.id, itemIndex)}
+                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
+                                title="ลบรายการนี้"
+                            >
+                                <TrashIcon className="w-4 h-4"/>
+                            </button>
+                            {itemIndex === sale.items.length - 1 && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => onAddSaleItem(sale.id)}
+                                    className="text-green-500 hover:text-green-700 p-1 rounded-md hover:bg-green-50"
+                                    title="เพิ่มรายการ"
+                                >
+                                    <PlusIcon className="w-4 h-4"/>
+                                </button>
+                            )}
+                            {itemIndex === 0 && sale.items.length === 1 && (
+                                <button 
+                                    type="button" 
+                                    onClick={() => onRemoveRow(sale.id)}
+                                    className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
+                                    title="ลบลูกค้า"
+                                >
+                                    <TrashIcon className="w-4 h-4"/>
+                                </button>
+                            )}
+                        </div>
+                    </td>
+                </tr>
+            ))}
+        </>
     );
 });
 
-// --- Main Grid Component ---
+// Main Grid Component
 function SalesEntryGrid({ summary, products, initialCustomers, onOrderChange, onAddCustomer, onRemoveCustomer, onSaveSuccess }) {
     const [salesData, setSalesData] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -126,12 +234,12 @@ function SalesEntryGrid({ summary, products, initialCustomers, onOrderChange, on
             customer_name: customer.customer_name,
             payment_type: 'Cash',
             notes: '',
-            items: products.map(p => ({
-                product_id: p.product_id,
+            items: [{
+                product_id: '',
                 quantity_sold: '',
-                unit_price: p.default_unit_price,
+                unit_price: '',
                 transaction_type: 'Sale'
-            }))
+            }]
         }));
         setSalesData(gridData);
     }, [initialCustomers, products]);
@@ -149,10 +257,15 @@ function SalesEntryGrid({ summary, products, initialCustomers, onOrderChange, on
         }
     };
 
-    const handleInputChange = useCallback((customerId, productId, field, value) => {
+    const handleInputChange = useCallback((customerId, itemIndex, field, value) => {
         setSalesData(current => current.map(sale => 
             sale.id === customerId 
-                ? { ...sale, items: sale.items.map(item => item.product_id === productId ? { ...item, [field]: value } : item) }
+                ? { 
+                    ...sale, 
+                    items: sale.items.map((item, idx) => 
+                        idx === itemIndex ? { ...item, [field]: value } : item
+                    ) 
+                }
                 : sale
         ));
     }, []);
@@ -161,11 +274,49 @@ function SalesEntryGrid({ summary, products, initialCustomers, onOrderChange, on
         setSalesData(current => current.map(sale => sale.id === customerId ? { ...sale, [field]: value } : sale));
     }, []);
 
+    const handleAddSaleItem = useCallback((customerId) => {
+        setSalesData(current => current.map(sale => 
+            sale.id === customerId 
+                ? { 
+                    ...sale, 
+                    items: [...sale.items, {
+                        product_id: '',
+                        quantity_sold: '',
+                        unit_price: '',
+                        transaction_type: 'Sale'
+                    }] 
+                }
+                : sale
+        ));
+    }, []);
+
+    const handleRemoveSaleItem = useCallback((customerId, itemIndex) => {
+        setSalesData(current => current.map(sale => 
+            sale.id === customerId 
+                ? { 
+                    ...sale, 
+                    items: sale.items.filter((_, idx) => idx !== itemIndex) 
+                }
+                : sale
+        ));
+    }, []);
+
     const handleSave = async () => {
         setIsSaving(true);
         setError(null);
+        
+        // Filter and validate sales data
         const salesToSave = salesData
-            .map(sale => ({ ...sale, items: sale.items.filter(item => item.quantity_sold && parseFloat(item.quantity_sold) > 0) }))
+            .map(sale => ({
+                ...sale,
+                items: sale.items.filter(item => 
+                    item.product_id && 
+                    item.quantity_sold && 
+                    parseFloat(item.quantity_sold) > 0 &&
+                    item.unit_price &&
+                    parseFloat(item.unit_price) >= 0
+                )
+            }))
             .filter(sale => sale.items.length > 0);
         
         if (salesToSave.length === 0) {
@@ -205,14 +356,14 @@ function SalesEntryGrid({ summary, products, initialCustomers, onOrderChange, on
                             <tr>
                                 <th className="w-12"></th>
                                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[200px]">ลูกค้า</th>
-                                {products.map(p => (
-                                    <th key={p.product_id} className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">
-                                        {p.product_name}
-                                    </th>
-                                ))}
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[150px]">สินค้า</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[100px]">จำนวน</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">ราคา/หน่วย</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">ประเภท</th>
+                                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[100px]">ยอดรวม</th>
                                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[130px]">การชำระเงิน</th>
                                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[180px]">หมายเหตุ</th>
-                                <th className="w-16"></th>
+                                <th className="w-20">จัดการ</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -225,6 +376,8 @@ function SalesEntryGrid({ summary, products, initialCustomers, onOrderChange, on
                                         onInputChange={handleInputChange}
                                         onCustomerFieldChange={handleCustomerFieldChange}
                                         onRemoveRow={onRemoveCustomer}
+                                        onAddSaleItem={handleAddSaleItem}
+                                        onRemoveSaleItem={handleRemoveSaleItem}
                                     />
                                 ))}
                             </SortableContext>

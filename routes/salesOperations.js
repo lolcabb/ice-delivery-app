@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { query, getClient, pool } = require('../db/postgres');
 const { authMiddleware, requireRole } = require('../middleware/auth');
-const { v4: uuidv4 } = require('uuid'); 
+const { v4: uuidv4, validate: uuidValidate } = require('uuid'); 
 
 // --- Helper function for error handling ---
 const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
@@ -16,10 +16,11 @@ const handleError = (res, error, message = "An error occurred", statusCode = 500
 
 // Helper for uuid validation (example, if not using a library that provides it)
 // This is a simple regex, for robust validation use a library or PostgreSQL's own type checking
-const uuidValidate = (uuid) => {
+const uuidValidateRegex = (uuid) => {
+    if (!uuid || typeof uuid !== 'string') return false;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(uuid);
-}
+};
 
 // --- Helper function to update financial totals on driver_daily_summary ---
 const updateDriverDailySummaryTotals = async (client, driverDailySummaryId) => {
@@ -248,20 +249,33 @@ router.post('/sales-entry/batch', authMiddleware, requireRole(['admin', 'manager
     const { driver_daily_summary_id, sales_data } = req.body;
     const area_manager_id = req.user.id;
 
+    console.log(`[SalesOps API] POST /sales-entry/batch - User: ${area_manager_id}, Summary: ${driver_daily_summary_id}`);
+
     if (!driver_daily_summary_id || !Array.isArray(sales_data)) {
-        return res.status(400).json({ error: 'Invalid request data' });
+        return res.status(400).json({ error: 'Invalid request data. driver_daily_summary_id and sales_data array are required.' });
+    }
+
+    if (sales_data.length === 0) {
+        return res.status(400).json({ error: 'At least one sale record is required.' });
     }
 
     const client = await getClient();
     try {
         await client.query('BEGIN');
+        console.log(`[SalesOps API] Transaction BEGIN for batch sales save`);
 
         // Get route_id from summary for updating customer assignments
         const summaryResult = await client.query(
-            'SELECT route_id FROM driver_daily_summaries WHERE summary_id = $1',
+            'SELECT route_id, driver_id FROM driver_daily_summaries WHERE summary_id = $1',
             [driver_daily_summary_id]
         );
-        const route_id = summaryResult.rows[0]?.route_id;
+        
+        if (summaryResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Driver daily summary not found.' });
+        }
+        
+        const { route_id, driver_id } = summaryResult.rows[0];
 
         // Clear existing sales for this summary (for complete replacement)
         await client.query(
@@ -269,9 +283,26 @@ router.post('/sales-entry/batch', authMiddleware, requireRole(['admin', 'manager
             [driver_daily_summary_id]
         );
 
+        let processedSalesCount = 0;
+        let totalSalesAmount = 0;
+
         // Process each sale
         for (const sale of sales_data) {
-            if (!sale.customer_id || !sale.items || sale.items.length === 0) continue;
+            if (!sale.customer_id || !sale.items || sale.items.length === 0) {
+                console.warn(`[SalesOps API] Skipping sale for customer ${sale.customer_id} - no items or invalid data`);
+                continue;
+            }
+
+            // Validate customer exists
+            const customerCheck = await client.query(
+                'SELECT customer_id FROM customers WHERE customer_id = $1 AND is_active = true',
+                [sale.customer_id]
+            );
+            
+            if (customerCheck.rows.length === 0) {
+                console.warn(`[SalesOps API] Skipping sale - Customer ${sale.customer_id} not found or inactive`);
+                continue;
+            }
 
             // Create the sale record
             const saleResult = await client.query(
@@ -283,86 +314,123 @@ router.post('/sales-entry/batch', authMiddleware, requireRole(['admin', 'manager
                     driver_daily_summary_id,
                     sale.customer_id,
                     sale.payment_type || 'Cash',
-                    sale.notes,
+                    sale.notes || null,
                     area_manager_id
                 ]
             );
 
             const sale_id = saleResult.rows[0].sale_id;
-            let total_amount = 0;
+            let sale_total_amount = 0;
 
-            // Insert sale items with pricing
+            // Insert sale items with pricing and transaction types
             for (const item of sale.items) {
                 const quantity = parseFloat(item.quantity_sold);
-                if (quantity <= 0) continue;
-
-                // Use provided price or get customer/default price
-                let unit_price = item.unit_price;
-                if (!unit_price || parseFloat(unit_price) === 0) {
-                    const priceResult = await client.query(
-                        'SELECT get_customer_product_price($1, $2) as price',
-                        [sale.customer_id, item.product_id]
-                    );
-                    unit_price = priceResult.rows[0].price;
+                if (!quantity || quantity <= 0) {
+                    console.warn(`[SalesOps API] Skipping item - invalid quantity: ${quantity}`);
+                    continue;
                 }
 
-                const subtotal = quantity * parseFloat(unit_price);
-                total_amount += subtotal;
+                // Validate product exists
+                const productCheck = await client.query(
+                    'SELECT product_id, default_unit_price FROM products WHERE product_id = $1',
+                    [item.product_id]
+                );
+                
+                if (productCheck.rows.length === 0) {
+                    console.warn(`[SalesOps API] Skipping item - Product ${item.product_id} not found`);
+                    continue;
+                }
 
+                const defaultPrice = productCheck.rows[0].default_unit_price;
+
+                // Determine unit price
+                let unit_price = parseFloat(item.unit_price);
+                if (!unit_price || unit_price < 0) {
+                    // Try to get customer-specific price
+                    const customerPriceResult = await client.query(
+                        'SELECT unit_price FROM customer_prices WHERE customer_id = $1 AND product_id = $2 ORDER BY effective_date DESC LIMIT 1',
+                        [sale.customer_id, item.product_id]
+                    );
+                    
+                    unit_price = customerPriceResult.rows.length > 0 
+                        ? parseFloat(customerPriceResult.rows[0].unit_price)
+                        : parseFloat(defaultPrice) || 0;
+                }
+
+                // Calculate total based on transaction type
+                const transaction_type = item.transaction_type || 'Sale';
+                let item_total = 0;
+                
+                if (transaction_type === 'Sale') {
+                    item_total = quantity * unit_price;
+                    sale_total_amount += item_total;
+                } else if (transaction_type === 'Giveaway') {
+                    // Giveaways have zero value but we track the unit price for reference
+                    item_total = 0;
+                } else if (transaction_type === 'Internal Use') {
+                    // Internal use typically has zero value too
+                    item_total = 0;
+                }
+
+                // Insert the sale item
                 await client.query(
                     `INSERT INTO driver_sale_items (
                         driver_sale_id, product_id, quantity_sold, 
-                        unit_price, subtotal, transaction_type
-                    ) VALUES ($1, $2, $3, $4, $5, $6)`,
+                        unit_price, transaction_type
+                    ) VALUES ($1, $2, $3, $4, $5)`,
                     [
                         sale_id,
                         item.product_id,
                         quantity,
                         unit_price,
-                        subtotal,
-                        item.transaction_type || 'Sale'
+                        transaction_type
                     ]
                 );
 
-                // Optionally update customer price if changed
-                if (item.price_changed) {
-                    await client.query(
-                        'SELECT set_customer_price($1, $2, $3, $4, $5)',
-                        [sale.customer_id, item.product_id, unit_price, area_manager_id, 'Updated during sale']
-                    );
-                }
+                console.log(`[SalesOps API] Inserted sale item: Product ${item.product_id}, Qty: ${quantity}, Price: ${unit_price}, Type: ${transaction_type}, Total: ${item_total}`);
             }
 
             // Update sale total
             await client.query(
                 'UPDATE driver_sales SET total_sale_amount = $1 WHERE sale_id = $2',
-                [total_amount, sale_id]
+                [sale_total_amount, sale_id]
             );
 
-            // Update customer-route assignment last sale date
+            totalSalesAmount += sale_total_amount;
+
+            // Update customer-route assignment last sale date and sales count
             if (route_id) {
                 await client.query(
-                    `UPDATE customer_route_assignments 
-                     SET last_sale_date = CURRENT_DATE,
-                         total_sales_count = total_sales_count + 1
-                     WHERE customer_id = $1 AND route_id = $2`,
+                    `INSERT INTO customer_route_assignments (customer_id, route_id, last_sale_date, total_sales_count, is_active)
+                     VALUES ($1, $2, CURRENT_DATE, 1, true)
+                     ON CONFLICT (customer_id, route_id) 
+                     DO UPDATE SET 
+                         last_sale_date = CURRENT_DATE,
+                         total_sales_count = customer_route_assignments.total_sales_count + 1,
+                         is_active = true`,
                     [sale.customer_id, route_id]
                 );
             }
+
+            processedSalesCount++;
         }
 
         // Update summary totals
         await updateDriverDailySummaryTotals(client, driver_daily_summary_id);
 
         await client.query('COMMIT');
+        console.log(`[SalesOps API] Transaction COMMIT. Processed ${processedSalesCount} sales with total amount ${totalSalesAmount}`);
 
         res.json({
             success: true,
-            message: `Saved ${sales_data.length} sales records`
+            message: `Successfully saved ${processedSalesCount} sales records`,
+            processed_sales: processedSalesCount,
+            total_amount: totalSalesAmount
         });
 
     } catch (err) {
         await client.query('ROLLBACK');
+        console.error(`[SalesOps API] Transaction ROLLBACK for batch sales save. Error: ${err.message}`);
         handleError(res, err, 'Failed to save batch sales');
     } finally {
         client.release();
@@ -381,31 +449,39 @@ router.get('/driver-sales/edit/:summary_id', authMiddleware, async (req, res) =>
         // Get all sales with full details for editing
         const salesSql = `
             SELECT 
-                ds.*,
+                ds.sale_id,
+                ds.customer_id,
                 c.customer_name,
-                json_agg(
-                    json_build_object(
-                        'item_id', dsi.item_id,
-                        'product_id', dsi.product_id,
-                        'product_name', p.product_name,
-                        'quantity_sold', dsi.quantity_sold,
-                        'unit_price', dsi.unit_price,
-                        'transaction_type', dsi.transaction_type,
-                        'subtotal', dsi.subtotal
-                    ) ORDER BY dsi.product_id
+                ds.payment_type,
+                ds.notes,
+                ds.total_sale_amount,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'item_id', dsi.item_id,
+                            'product_id', dsi.product_id,
+                            'product_name', p.product_name,
+                            'quantity_sold', dsi.quantity_sold,
+                            'unit_price', dsi.unit_price,
+                            'transaction_type', dsi.transaction_type,
+                            'total_amount', dsi.total_amount
+                        ) ORDER BY dsi.item_id
+                    ) FILTER (WHERE dsi.item_id IS NOT NULL), 
+                    '[]'
                 ) as items
             FROM driver_sales ds
             JOIN customers c ON ds.customer_id = c.customer_id
             LEFT JOIN driver_sale_items dsi ON ds.sale_id = dsi.driver_sale_id
             LEFT JOIN products p ON dsi.product_id = p.product_id
             WHERE ds.driver_daily_summary_id = $1
-            GROUP BY ds.sale_id, c.customer_name
-            ORDER BY ds.sale_id`;
+            GROUP BY ds.sale_id, ds.customer_id, c.customer_name, ds.payment_type, ds.notes, ds.total_sale_amount
+            ORDER BY c.customer_name, ds.sale_id
+        `;
 
         const result = await query(salesSql, [summary_id]);
 
         res.json({
-            summary_id,
+            success: true,
             sales: result.rows
         });
 
@@ -936,61 +1012,136 @@ router.get('/loading-logs', authMiddleware, requireRole(['admin', 'manager', 'st
 router.put('/loading-logs/batch/:batchUUID', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
     const { batchUUID } = req.params;
     const { driver_id, route_id, load_type, load_timestamp, notes, items } = req.body;
-    const area_manager_id = req.user.id; // User performing the update
+    const area_manager_id = req.user.id;
 
     console.log(`[SalesOps API] PUT /loading-logs/batch/${batchUUID} - User: ${area_manager_id}`);
 
-    // --- Validations ---
-    if (!uuidValidate(batchUUID)) { // Assuming uuidValidate is a helper or from uuid package
-        return res.status(400).json({ error: 'Invalid Batch UUID format.' });
+    // --- Enhanced Validations ---
+    // UUID validation with better error handling
+    if (!batchUUID || typeof batchUUID !== 'string') {
+        return res.status(400).json({ error: 'Batch UUID is required and must be a valid string.' });
     }
+
+    // Use the imported uuid validate function or regex fallback
+    const isValidUUID = typeof uuidValidate === 'function' ? uuidValidate(batchUUID) : uuidValidateRegex(batchUUID);
+    
+    if (!isValidUUID) {
+        console.error(`[SalesOps API] Invalid UUID format: ${batchUUID}`);
+        return res.status(400).json({ 
+            error: 'Invalid Batch UUID format. Expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+            received: batchUUID 
+        });
+    }
+
     if (!driver_id || isNaN(parseInt(driver_id))) {
         return res.status(400).json({ error: 'Valid Driver ID is required.' });
     }
+
     if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: 'At least one product item is required.' });
     }
-    // Add other common field validations as in POST
+
+    // Validate load_timestamp
     const finalLoadTimestamp = load_timestamp ? new Date(load_timestamp) : new Date();
     if (isNaN(finalLoadTimestamp.getTime())) {
-        return res.status(400).json({ error: 'Invalid load_timestamp format.' });
+        return res.status(400).json({ error: 'Invalid load_timestamp format. Please provide a valid date.' });
     }
-     for (const item of items) {
-        if (!item.product_id || isNaN(parseInt(item.product_id)) || item.quantity_loaded === undefined || isNaN(parseFloat(item.quantity_loaded)) || parseFloat(item.quantity_loaded) <= 0) {
-            return res.status(400).json({ error: 'Each item must have valid Product ID and positive Quantity Loaded.' });
+
+    // Validate each item
+    for (const [index, item] of items.entries()) {
+        if (!item.product_id || isNaN(parseInt(item.product_id))) {
+            return res.status(400).json({ error: `Item ${index + 1}: Product ID must be a valid integer.` });
+        }
+        if (item.quantity_loaded === undefined || isNaN(parseFloat(item.quantity_loaded)) || parseFloat(item.quantity_loaded) <= 0) {
+            return res.status(400).json({ error: `Item ${index + 1}: Quantity Loaded must be a positive number.` });
         }
     }
 
     const client = await getClient();
     try {
         await client.query('BEGIN');
+        console.log(`[SalesOps API] Transaction BEGIN for batch UUID: ${batchUUID}`);
 
-        // 1. Delete existing logs for this batchUUID
-        const deleteResult = await client.query('DELETE FROM loading_logs WHERE load_batch_uuid = $1 RETURNING driver_id', [batchUUID]);
-        if (deleteResult.rowCount === 0) {
-            // Optional: If no rows were deleted, it means the batchUUID didn't exist.
-            // This could be an error, or you might allow creating it as a new batch if that's the desired UX.
-            // For an edit, it usually implies the batch should exist.
-            console.warn(`[SalesOps API] No logs found for batchUUID ${batchUUID} during edit. Proceeding to create as new batch logic.`);
-            // If strictly an edit, you might throw an error here:
-            // await client.query('ROLLBACK');
-            // return res.status(404).json({ error: `Loading log batch ${batchUUID} not found for update.` });
+        // Check if the batch exists before attempting to delete
+        const existingBatchCheck = await client.query(
+            'SELECT COUNT(*) as count FROM loading_logs WHERE load_batch_uuid = $1', 
+            [batchUUID]
+        );
+        
+        const batchExists = parseInt(existingBatchCheck.rows[0].count) > 0;
+        console.log(`[SalesOps API] Batch ${batchUUID} exists: ${batchExists}`);
+
+        if (!batchExists) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ 
+                error: `Loading log batch with UUID ${batchUUID} not found. Cannot edit non-existent batch.`,
+                batch_uuid: batchUUID
+            });
         }
 
-        // 2. Insert new logs with the updated data and the same batchUUID
+        // Validate that the driver exists
+        const driverCheck = await client.query(
+            'SELECT driver_id, first_name, last_name FROM drivers WHERE driver_id = $1 AND is_active = true', 
+            [parseInt(driver_id)]
+        );
+        
+        if (driverCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: `Driver with ID ${driver_id} not found or is inactive.` });
+        }
+
+        // Validate route if provided
+        if (route_id && route_id !== null) {
+            const routeCheck = await client.query(
+                'SELECT route_id FROM delivery_routes WHERE route_id = $1', 
+                [parseInt(route_id)]
+            );
+            
+            if (routeCheck.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: `Route with ID ${route_id} not found.` });
+            }
+        }
+
+        // Validate all products exist
+        const productIds = items.map(item => parseInt(item.product_id));
+        const productCheck = await client.query(
+            'SELECT product_id FROM products WHERE product_id = ANY($1)', 
+            [productIds]
+        );
+        
+        const existingProductIds = productCheck.rows.map(row => row.product_id);
+        const missingProducts = productIds.filter(id => !existingProductIds.includes(id));
+        
+        if (missingProducts.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ 
+                error: `The following product IDs were not found: ${missingProducts.join(', ')}` 
+            });
+        }
+
+        // Delete existing logs for this batchUUID
+        const deleteResult = await client.query(
+            'DELETE FROM loading_logs WHERE load_batch_uuid = $1 RETURNING loading_log_id', 
+            [batchUUID]
+        );
+        
+        console.log(`[SalesOps API] Deleted ${deleteResult.rowCount} existing logs for batch ${batchUUID}`);
+
+        // Insert new logs with the updated data and the same batchUUID
         const insertPromises = items.map(item => {
             const sql = `
                 INSERT INTO loading_logs 
                 (driver_id, route_id, product_id, quantity_loaded, load_type, load_timestamp, area_manager_id, notes, load_batch_uuid)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                RETURNING *; 
+                RETURNING loading_log_id, product_id, quantity_loaded; 
             `;
             const values = [
                 parseInt(driver_id),
                 route_id ? parseInt(route_id) : null,
                 parseInt(item.product_id),
                 parseFloat(item.quantity_loaded),
-                load_type || 'initial', // Default if not provided
+                load_type || 'initial',
                 finalLoadTimestamp,
                 area_manager_id,
                 notes || null,
@@ -1002,42 +1153,63 @@ router.put('/loading-logs/batch/:batchUUID', authMiddleware, requireRole(['admin
         const results = await Promise.all(insertPromises);
         const updatedLogs = results.map(result => result.rows[0]);
         
-        const commonData = updatedLogs[0] ? {
-            driver_id: updatedLogs[0].driver_id,
-            route_id: updatedLogs[0].route_id,
-            load_type: updatedLogs[0].load_type,
-            load_timestamp: updatedLogs[0].load_timestamp,
-            area_manager_id: updatedLogs[0].area_manager_id,
-            notes: updatedLogs[0].notes,
-            load_batch_uuid: batchUUID
-        } : {};
-
-        const updatedItems = updatedLogs.map(r => ({
-            loading_log_id: r.loading_log_id,
-            product_id: r.product_id,
-            quantity_loaded: r.quantity_loaded
-        }));
+        // Get additional info for response
+        const driverInfo = driverCheck.rows[0];
+        const driverName = `${driverInfo.first_name} ${driverInfo.last_name || ''}`.trim();
         
-        let driverNameResult, areaManagerNameResult, routeNameResult;
-        if (commonData.driver_id) driverNameResult = await client.query('SELECT first_name, last_name FROM drivers WHERE driver_id = $1', [commonData.driver_id]);
-        if (commonData.area_manager_id) areaManagerNameResult = await client.query('SELECT username FROM users WHERE id = $1', [commonData.area_manager_id]);
-        if (commonData.route_id) routeNameResult = await client.query('SELECT route_name FROM delivery_routes WHERE route_id = $1', [commonData.route_id]);
+        let routeName = null;
+        if (route_id) {
+            const routeInfo = await client.query(
+                'SELECT route_name FROM delivery_routes WHERE route_id = $1', 
+                [parseInt(route_id)]
+            );
+            routeName = routeInfo.rows[0]?.route_name || null;
+        }
+
+        const managerInfo = await client.query(
+            'SELECT username FROM users WHERE id = $1', 
+            [area_manager_id]
+        );
+        const managerName = managerInfo.rows[0]?.username || null;
 
         await client.query('COMMIT');
-        console.log(`[SalesOps API] Transaction COMMIT. Batch ${batchUUID} updated. ${updatedItems.length} logs processed.`);
+        console.log(`[SalesOps API] Transaction COMMIT. Batch ${batchUUID} updated with ${updatedLogs.length} logs.`);
         
         res.status(200).json({
-            ...commonData,
-            items: updatedItems,
-            driver_name: driverNameResult?.rows[0] ? `${driverNameResult.rows[0].first_name} ${driverNameResult.rows[0].last_name || ''}`.trim() : null,
-            area_manager_name: areaManagerNameResult?.rows[0]?.username || null,
-            route_name: routeNameResult?.rows[0]?.route_name || null,
+            success: true,
+            message: `Successfully updated batch ${batchUUID}`,
+            batch_uuid: batchUUID,
+            driver_id: parseInt(driver_id),
+            driver_name: driverName,
+            route_id: route_id ? parseInt(route_id) : null,
+            route_name: routeName,
+            area_manager_name: managerName,
+            load_type: load_type || 'initial',
+            load_timestamp: finalLoadTimestamp,
+            notes: notes || null,
+            items: updatedLogs,
+            items_count: updatedLogs.length
         });
-
 
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(`[SalesOps API] Transaction ROLLBACK for batch loading log update. Error: ${err.message}`);
+        
+        // Provide more specific error messages
+        if (err.code === '23503') {
+            return res.status(400).json({ 
+                error: 'Foreign key constraint violation. One or more referenced IDs (driver, route, product, or user) are invalid.',
+                details: err.detail || err.message
+            });
+        }
+        
+        if (err.code === '23505') {
+            return res.status(409).json({ 
+                error: 'Duplicate entry conflict.',
+                details: err.detail || err.message
+            });
+        }
+        
         handleError(res, err, "Failed to update loading log batch");
     } finally {
         client.release();
