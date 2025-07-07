@@ -9,6 +9,45 @@ import ProductReturnModal from './ProductReturnModal';
 
 const formatCurrency = (amount) => `฿${parseFloat(amount || 0).toFixed(2)}`;
 
+// Helper to aggregate quantities loaded per product from an array of loading logs
+const aggregateLoadsByProduct = (loadingLogs = []) => {
+    const result = {};
+    loadingLogs.forEach(log => {
+        const routeId = log.route_id;
+        (log.items || []).forEach(item => {
+            if (!result[item.product_id]) {
+                result[item.product_id] = {
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    loaded: 0,
+                    route_id: routeId
+                };
+            }
+            result[item.product_id].loaded += parseFloat(item.quantity_loaded || 0);
+            if (!result[item.product_id].route_id) result[item.product_id].route_id = routeId;
+        });
+    });
+    return result;
+};
+
+// Helper to aggregate quantities sold per product from an array of sales records
+const aggregateSalesByProduct = (sales = []) => {
+    const result = {};
+    sales.forEach(sale => {
+        (sale.sale_items || []).forEach(item => {
+            if (!result[item.product_id]) {
+                result[item.product_id] = {
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    sold: 0
+                };
+            }
+            result[item.product_id].sold += parseFloat(item.quantity_sold || 0);
+        });
+    });
+    return result;
+};
+
 // --- Sub-Component for each driver's daily card ---
 const DriverDayCard = ({ driverLog, onOpenLoadingLog, onOpenReturnLog, onNavigateToSales, onStartDay, isProcessing }) => {
     const { driver, summary, loading_logs, product_returns } = driverLog;
@@ -133,7 +172,13 @@ export default function DailyOperationsManager() {
             if (Array.isArray(loadingLogsForDay)) {
                 loadingLogsForDay.forEach(log => {
                     if (!driverDataMap.has(log.driver_id)) {
-                        driverDataMap.set(log.driver_id, { driver: { driver_id: log.driver_id, name: log.driver_name }, summary: null, loading_logs: [], product_returns: [] });
+                        driverDataMap.set(log.driver_id, {
+                            driver: { driver_id: log.driver_id, name: log.driver_name },
+                            summary: null,
+                            loading_logs: [],
+                            product_returns: [],
+                            product_reconciliation: []
+                        });
                     }
                     const entry = driverDataMap.get(log.driver_id);
                     const batchUUID = log.load_batch_uuid || `${log.driver_id}-${log.load_timestamp}-${log.load_type}`;
@@ -146,16 +191,58 @@ export default function DailyOperationsManager() {
                 });
             }
             
+            // Pre-compute load aggregates for each driver
+            const loadAggregates = new Map();
+            for (const [dId, data] of driverDataMap.entries()) {
+                loadAggregates.set(dId, aggregateLoadsByProduct(data.loading_logs));
+            }
+
             for (const driverId of driverDataMap.keys()) {
                 const driverLog = driverDataMap.get(driverId);
+                const loadAgg = loadAggregates.get(driverId);
                 try {
                     const [reconciliationData, productReturns] = await Promise.all([
                         apiService.getReconciliationSummary(driverId, selectedDate).catch(() => null),
                         apiService.getProductReturns({ driver_id: driverId, date: selectedDate }).catch(() => [])
                     ]);
+
                     driverLog.summary = reconciliationData?.summary || null;
                     driverLog.product_returns = productReturns || [];
-                } catch (err) { console.error(`Error fetching details for driver ${driverId}`, err); }
+
+                    let salesAgg = {};
+                    if (driverLog.summary?.summary_id) {
+                        try {
+                            const salesData = await apiService.getDriverSales(driverLog.summary.summary_id);
+                            if (Array.isArray(salesData)) salesAgg = aggregateSalesByProduct(salesData);
+                        } catch (salesErr) {
+                            console.error(`Error fetching sales for driver ${driverId}`, salesErr);
+                        }
+                    }
+
+                    if (reconciliationData?.product_reconciliation && reconciliationData.product_reconciliation.length > 0) {
+                        driverLog.product_reconciliation = reconciliationData.product_reconciliation;
+                    } else {
+                        const productIds = new Set([...Object.keys(loadAgg), ...Object.keys(salesAgg)]);
+                        driverLog.product_reconciliation = Array.from(productIds).map(pid => ({
+                            product_id: parseInt(pid),
+                            product_name: loadAgg[pid]?.product_name || salesAgg[pid]?.product_name || '',
+                            loaded: loadAgg[pid]?.loaded || 0,
+                            sold: salesAgg[pid]?.sold || 0,
+                            returned: 0,
+                            route_id: loadAgg[pid]?.route_id || null
+                        }));
+                    }
+                } catch (err) {
+                    console.error(`Error fetching details for driver ${driverId}`, err);
+                    driverLog.product_reconciliation = Object.entries(loadAgg).map(([pid, item]) => ({
+                        product_id: item.product_id,
+                        product_name: item.product_name,
+                        loaded: item.loaded,
+                        sold: 0,
+                        returned: 0,
+                        route_id: item.route_id
+                    }));
+                }
             }
             setDriverLogs(Array.from(driverDataMap.values()));
         } catch (err) {
