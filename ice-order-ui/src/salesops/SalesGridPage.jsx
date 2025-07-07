@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { apiService } from '../apiService';
 import SalesEntryGrid from './SalesEntryGrid';
-import { formatDate } from '../utils/dateUtils';
+import { formatDisplayDate } from '../utils/dateUtils';
 import { ArrowPathIcon } from '../components/Icons';
 
 function SalesGridPage() {
@@ -115,11 +115,13 @@ function SalesGridPage() {
         <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
             <div className="max-w-7xl mx-auto">
                 <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                    <h1 className="text-2xl font-bold text-gray-800">บันทึกการขาย</h1>
-                    <p className="text-gray-600">
-                        พนักงานขับรถ: <span className="font-semibold">{summary?.driver_name || '...'}</span> |
-                        วันที่: <span className="font-semibold">{formatDate(summary?.sale_date)}</span>
-                    </p>
+                    <div classsName="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                            <h1 className="text-2x1 font-bold text-gray-800">บันทึกการขาย</h1>
+                            <p className="text-gray-600">
+                                พนักงานขับรถ: <span className="font-semibold">{summary?.driver_name || '...'}</span> 
+                                วันที่: <span classNAme="font-semibold">{formatDisplayDate(summary?.sale_date)}</span>
+                            </p>
+                    </div>
                 </div>
 
                 {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">{error}</div>}
@@ -147,6 +149,46 @@ function SalesGridPage() {
                     )
                 )}
             </div>
+            <style jsx>{`
+                .input-field {
+                    display: block;
+                    width: 100%;
+                    padding-left: 0.75rem;
+                    padding-right: 0.75rem;
+                    padding-top: 0.5rem;
+                    padding-bottom: 0.5rem;
+                    border-width: 1px;
+                    border-style: solid;
+                    border-color: #D1D5DB;
+                    border-radius: 0.375rem;
+                    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+                    background-color: white;
+                }
+                input[type="date"].input-field {
+                    padding-right: 0.75rem;
+                }
+                .input-field:focus {
+                    outline: 2px solid transparent;
+                    outline-offset: 2px;
+                    border-color: #6366F1;
+                    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.5);
+                }
+                .btn-primary {
+                    background-color: #4f46e5;
+                    color: white;
+                    padding: 0.625rem 1.25rem;
+                    font-weight: 500;
+                    font-size: 0.875rem;
+                    border-radius: 0.5rem;
+                    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06);
+                }
+                .btn-primary:hover {
+                    background-color: #4338ca;
+                }
+                .btn-primary:disabled {
+                    opacity: 0.5;
+                }
+            `}</style>
         </div>
     );
 }

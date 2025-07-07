@@ -5,7 +5,7 @@ import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
 // Define the sub-navigation items for the Sales Operations panel
 const salesOpsSubNavItems = [
     { name: 'ปฏิบัติงานรายวัน', path: '/sales-ops/daily-operations' }, //
-    { name: 'บันทึกการขาย', path: '/sales-ops/sales-entry' }, //
+    //{ name: 'บันทึกการขาย', path: '/sales-ops/sales-entry' }, //
     { name: 'กระทบยอดรายวัน', path: '/sales-ops/daily-reconciliation' }, //
     { name: 'จัดการคนขับ', path: '/sales-ops/driver-manager' }, //
 ];
@@ -45,7 +45,7 @@ export default function SalesOperationsLayout() {
                                         `whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
                                         ${
                                             // Use our custom active state for the sales entry tab, otherwise use the default
-                                            item.path === '/sales-ops/sales-entry' ? isItemActive : isActive
+                                            item.path === '/sales-ops/daily-operations' ? isItemActive : isActive
                                                 ? 'border-cyan-500 text-cyan-600' // Active tab color
                                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                         }`

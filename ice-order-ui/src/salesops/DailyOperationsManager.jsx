@@ -136,10 +136,10 @@ export default function DailyOperationsManager() {
                         driverDataMap.set(log.driver_id, { driver: { driver_id: log.driver_id, name: log.driver_name }, summary: null, loading_logs: [], product_returns: [] });
                     }
                     const entry = driverDataMap.get(log.driver_id);
-                    const batchUUID = log.load_batch_uuid;
-                    let batch = entry.loading_logs.find(b => b.batch_id === batchUUID);
+                    const batchUUID = log.load_batch_uuid || `${log.driver_id}-${log.load_timestamp}-${log.load_type}`;
+                    let batch = entry.loading_logs.find(b => b.load_batch_uuid === batchUUID);
                     if (!batch) {
-                        batch = { ...log, items: [] };
+                        batch = { ...log, batch_id: batchUUID, load_batch_uuid: log.load_batch_uuid, items: [] };
                         entry.loading_logs.push(batch);
                     }
                     batch.items.push({ product_id: log.product_id, product_name: log.product_name, quantity_loaded: log.quantity_loaded });
@@ -223,9 +223,22 @@ export default function DailyOperationsManager() {
             await apiService[action](batchId || logDataPayload, batchId ? logDataPayload : undefined);
             setSuccessMessage(`บันทึกการขึ้นของ ${editingBatch ? 'แก้ไข' : 'สร้างใหม่'} สำเร็จแล้ว!`);
             setIsLoadModalOpen(false); setEditingBatch(null);
+            if(editingBatch && editingBatch.load_batch_uuid) {
+                await apiService.updateLoadingLogBatch(editingBatch.load_batch_uuid, logDataPayload)
+                setSuccessMessage('บันทึกการแก้ไขขึ้นของสำเร็จแล้ว!')
+            } else if (editingBatch && !editingBatch.load_batch_uuid) {
+                setError('ไม่สามารถแก้ไขบันทึกชุดเก่าได้ จะสร้างชุดใหม่แทน');
+                await apiService.addLoadingLog(logDataPayload);
+                setSuccessMessage('บันทึกการขึ้นของสร้างใหม่สำเร็จแล้ว!');
+            } else {
+                await apiService.addLoadingLog(logDataPayload);
+            }
+            setIsLoadModalOpen(false);
+            setEditingBatch(null);
             fetchDataForDay();
         } catch(err) {
-            setError("บันทึกการขึ้นของไม่สำเร็จ " + (err.data?.error || err.message)); throw err;
+            setError("บันทึกการขึ้นของไม่สำเร็จ " + (err.data?.error || err.message));
+            throw err;
         }
     };
 

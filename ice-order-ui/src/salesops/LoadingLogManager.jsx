@@ -57,6 +57,7 @@ export default function LoadingLogManager() {
             if (!acc[groupKey]) {
                 acc[groupKey] = {
                     batch_id: groupKey, // This is the key for the group, effectively the load_batch_uuid
+                    load_batch_uuid: log.load_batch_uuid,
                     driver_id: log.driver_id,
                     driver_name: log.driver_name,
                     load_timestamp: log.load_timestamp,
@@ -167,11 +168,15 @@ export default function LoadingLogManager() {
 
     const handleSaveLoadingLog = async (logDataPayload) => {
         try {
-            if (editingBatch && editingBatch.batch_id) { 
-                await apiService.updateLoadingLogBatch(editingBatch.batch_id, logDataPayload);
+            if (editingBatch && editingBatch.load_batch_uuid) { 
+                await apiService.updateLoadingLogBatch(editingBatch.load_batch_uuid, logDataPayload);
                 setSuccessMessage('ชุดบันทึกการขึ้นของอัปเดตสำเร็จ!');
-            } else { 
+            } else if (editingBatch && !editingBatch.load_batch_uuid) {
+                setError('ไม่สามารถแก้ไขบันทึกชุดเก่าได้ จะสร้างชุดใหม่แทน');                
                 await apiService.addLoadingLog(logDataPayload); 
+                setSuccessMessage('สร้างบันทึกการขึ้นของสำเร็จ!');
+            } else {
+                await apiService.addLoadingLog(logDataPayload);
                 setSuccessMessage('สร้างบันทึกการขึ้นของสำเร็จ!');
             }
             handleCloseFormModal();

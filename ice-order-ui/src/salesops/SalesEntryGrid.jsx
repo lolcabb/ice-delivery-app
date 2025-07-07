@@ -4,7 +4,7 @@ import { DndContext, closestCenter, useSensor, useSensors, PointerSensor } from 
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { TrashIcon, PlusIcon, ArrowPathIcon } from '../components/Icons';
+import { TrashIcon, PlusIcon, ArrowPathIcon, MagnifyingGlassIcon } from '../components/Icons';
 import { apiService } from '../apiService';
 
 // --- Customer Search Component ---
@@ -47,12 +47,16 @@ const CustomerSearchInput = memo(({ onSelectCustomer, currentCustomers }) => {
 
     return (
         <div className="relative">
+            <label htmlFor="customer-search" className="sr-only">ค้นหาลูกค้า</label>
+            <MagnifyingGlassIcon className="search-icon w-h h-5" />
             <input
+                id="customer-search"
                 type="text"
                 value={searchText}
                 onChange={handleInputChange}
                 placeholder="ค้นหาลูกค้าเพื่อเพิ่มในเส้นทาง..."
-                className="w-full input-field"
+                className="w-full input-field search-input"
+                autoComplete="off"
             />
             {isLoading && <ArrowPathIcon className="w-5 h-5 text-gray-400 animate-spin absolute right-2 top-2.5" />}
             {suggestions.length > 0 && (
@@ -185,9 +189,9 @@ const DraggableRow = React.memo(({ sale, products, onInputChange, onCustomerFiel
                     <td className="px-2 py-1 text-center">
                         <div className="flex items-center justify-center space-x-1">
                             <button 
-                                type="button" 
+                                type="button"
                                 onClick={() => onRemoveSaleItem(sale.id, itemIndex)}
-                                className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
+                                className="icon-btn text-red-500 hover:text-red-700 hover:bg-red-50"
                                 title="ลบรายการนี้"
                             >
                                 <TrashIcon className="w-4 h-4"/>
@@ -196,7 +200,7 @@ const DraggableRow = React.memo(({ sale, products, onInputChange, onCustomerFiel
                                 <button 
                                     type="button" 
                                     onClick={() => onAddSaleItem(sale.id)}
-                                    className="text-green-500 hover:text-green-700 p-1 rounded-md hover:bg-green-50"
+                                    className="icon-btn text-green-500 hover:text-green-700 hover:bg-green-50"
                                     title="เพิ่มรายการ"
                                 >
                                     <PlusIcon className="w-4 h-4"/>
@@ -206,7 +210,7 @@ const DraggableRow = React.memo(({ sale, products, onInputChange, onCustomerFiel
                                 <button 
                                     type="button" 
                                     onClick={() => onRemoveRow(sale.id)}
-                                    className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50"
+                                    className="icon-btn text-red-500 hover:text-red-700 hover:bg-red-50"
                                     title="ลบลูกค้า"
                                 >
                                     <TrashIcon className="w-4 h-4"/>
@@ -348,6 +352,7 @@ function SalesEntryGrid({ summary, products, initialCustomers, initialSales, onO
     };
 
     return (
+        <>
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <div className="bg-white p-4 rounded-lg shadow">
                 {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">{error}</div>}
@@ -395,6 +400,26 @@ function SalesEntryGrid({ summary, products, initialCustomers, initialSales, onO
                 </div>
             </div>
         </DndContext>
+        <style jsx global>{`
+            .btn-primary {
+                background-color: #4f46e5;
+                color: white;
+                padding: 0.625rem 1rem;
+                font-weight: 500;
+                font-size: 0.875rem;
+                border-radius: 0.5rem;
+                box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+            }
+            .btn-primary:hover:not(:disabled) { background-color: #4338ca; }
+            .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+            .icon-btn {
+                padding: 0.25rem;
+                border-radius: 0.375rem;
+                transition: color 0.15s, background-color 0.15s;
+            }
+            .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        `}</style>
+        </>
     );
 }
 
