@@ -6,7 +6,7 @@ import { formatDate } from '../utils/dateUtils';
 import { ArrowPathIcon } from '../components/Icons';
 
 function SalesGridPage() {
-    const { driverId, date } = useParams();
+    const { summaryId } = useParams();
     const [summary, setSummary] = useState(null);
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -16,40 +16,44 @@ function SalesGridPage() {
     const saveOrderTimeoutRef = useRef(null);
 
     const fetchData = useCallback(async () => {
-        if (!driverId || !date) {
+        if (!summaryId) {
+            console.warn('⚠️ Missing summaryId parameter');
             setIsLoading(false);
+            setError('ไม่พบข้อมูล Summary ID');
             return;
         }
+
         setIsLoading(true);
         setError(null);
         setSuccess('');
         try {
-            const [summaryData, productsData] = await Promise.all([
-                apiService.getReconciliationSummary(driverId, date),
-                apiService.getProducts({ is_active: true, limit: 500 })
+            const [{ data: summaryList }, productsData] = await Promise.all([
+                apiService.getDriverDailySummaries({ summary_id: summaryId }),
+                apiService.getSalesProducts()
             ]);
+        
 
-            setSummary(summaryData);
-            setProducts(productsData.data || []);
+        const fetchedSummary = Array.isArray(summaryList) ? summaryList[0] : null;
+        setSummary(fetchedSummary);
+        setProducts(Array.isArray(productsData) ? productsData : []);
 
-            if (summaryData?.route_id) {
-                const customerResponse = await apiService.getRouteCustomers(summaryData.route_id);
-                setCustomers(customerResponse.customers || []);
-            } else {
-                setCustomers([]);
-            }
-        } catch (err) {
-            // FIXED: Make error message handling more robust to prevent crashes inside the catch block.
-            const errorMessage = err?.data?.error || err?.message || "An unknown error occurred.";
-            setError(`ไม่สามารถโหลดข้อมูลได้: ${errorMessage}`);
-            setSummary(null);
-            setProducts([]);
+        if(fetchedSummary?.route_id) {
+            const customerResponse = await apiService.getRouteCustomers(fetchedSummary.route_id);
+            setCustomers(customerResponse.customers || []);
+        } else {
             setCustomers([]);
-        } finally {
-            // This will now be reached reliably.
-            setIsLoading(false);
         }
-    }, [driverId, date]);
+    } catch (err) {
+        const errorMessage = err?.data?.error || err?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล';
+        setError(`ไม่สามารถโหลดข้อมูลได้: ${errorMessage}`);
+        setSummary(null);
+        setProducts([]);
+        setCustomers([]);
+    } finally {
+        setIsLoading(false);
+    }
+
+    }, [summaryId]); // CHANGED: Now depends on summaryId
 
     useEffect(() => {
         fetchData();
@@ -108,7 +112,8 @@ function SalesGridPage() {
                 <div className="bg-white p-6 rounded-lg shadow-md mb-6">
                     <h1 className="text-2xl font-bold text-gray-800">บันทึกการขาย</h1>
                     <p className="text-gray-600">
-                        พนักงานขับรถ: <span className="font-semibold">{summary?.driver_name || '...'}</span> | วันที่: <span className="font-semibold">{formatDate(date)}</span>
+                        พนักงานขับรถ: <span className="font-semibold">{summary?.driver_name || '...'}</span> |
+                        วันที่: <span className="font-semibold">{formatDate(summary?.sale_date)}</span>
                     </p>
                 </div>
 
