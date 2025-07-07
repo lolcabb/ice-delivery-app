@@ -6,6 +6,46 @@ import ProductReturnModal from './ProductReturnModal';
 import ProductReturnList from './ProductReturnList';
 import { CheckCircleIcon, PlayCircleIcon } from '../components/Icons';
 
+//Helper to aggregate loaded quantities by prodct for each driver
+const aggregateLoadsByProduct = (logs) => {
+    const byDriver = {};
+    logs.forEach(log => {
+        if (!byDriver[log.driver_id]) byDriver[log.driver_id] = {};
+        const driverMap = byDriver[log.driver_id];
+        if (!driverMap[log.product_id]) {
+            driverMap[log.product_id] = {
+                product_id: log.product_id,
+                product_name: log.product_name,
+                route_id: log.route_id,
+                loaded: 0
+            };
+        }
+        driverMap[log.product_id].loaded += Number(log.quantity_loaded || 0);
+    });
+    const result = {};
+    Object.keys(byDriver).forEach(did => {
+        result[did] = Object.values(byDriver[did]);
+    });
+    return result;
+};
+
+//Helper to aggregate quantity sold per product from driver sales
+const aggregateSalesByProduct = (sales = []) => {
+    return sales.reduce((acc, sale) => {
+        (sale.sale_items || []).forEach(item => {
+            if(!acc[item.product_id]) {
+                acc[item.product_id] = {
+                    product_id: item.product_id,
+                    product_name: item.product_name,
+                    sold: 0
+                };
+            }
+            acc[item.product_id].sold += Number(item.quantity_sold || 0);
+        });
+        return acc;
+    }, {});
+};
+
 const DriverCard = ({ driverLog, onOpenModal, onStartDay, isProcessing }) => {
     const { driver, summary, product_reconciliation: loadedItems, existingReturns } = driverLog;
     const dayHasBeenStarted = !!summary;
@@ -87,6 +127,8 @@ export default function ReturnsLogManager() {
                 }
             });
 
+            const loadsAggregated = aggregateLoadsByProduct(allLogs);
+
             const [productReturnsResult, packagingReturnsResult] = await Promise.all([
                 apiService.getProductReturns({ date: selectedDate }).catch(e => { console.error("Failed to get product returns:", e); return []; }),
                 apiService.getPackagingLogs({ date: selectedDate }).catch(e => { console.error("Failed to get packaging logs:", e); return []; })
@@ -97,6 +139,9 @@ export default function ReturnsLogManager() {
 
             for (const driverId of driverDataMap.keys()) {
                 const driverLog = driverDataMap.get(driverId);
+                const aggregatedLoad = loadsAggregated[driverId] || [];
+                let salesAggregated = {};
+
                 try {
                     const reconciliationData = await apiService.getReconciliationSummary(driverId, selectedDate);
                     if (reconciliationData.summary) driverLog.summary = reconciliationData.summary;
@@ -104,7 +149,27 @@ export default function ReturnsLogManager() {
                 } catch (summaryErr) {
                     console.log(`No summary found for driver ${driverId} on ${selectedDate}, they may need to "Start Day".`);
                 }
-                
+
+                if(driverLog.summary && driverLog.summary.summary_id) {
+                    try {
+                        const salesData = await apiService.getDriverSales(driverLog.summary.summary_id);
+                        salesAggregated = aggregateSalesByProduct(Array.isArray(salesData) ? salesData : []);
+                    } catch (salesErr) {
+                        console.error(`Failed to get driver sales for summary ${driverLog.summary.summary_id}:`, salesErr);
+                    }
+                }
+
+                if(!driverLog.product_reconciliation || driverLog.product_reconciliation.length === 0) {
+                    driverLog.product_reconciliation = aggregatedLoad.map(item => ({
+                        product_id: item.product_id,
+                        product_name: item.product_name,
+                        loaded: item.loaded,
+                        sold: salesAggregated[item.product_id]?.sold || 0,
+                        returned: 0,
+                        route_id: item.route_id
+                    }));
+                }
+
                 driverLog.existingReturns = allProductReturns.filter(r => r.driver_id === driverId);
                 driverLog.existingPackagingReturns = allPackagingReturns.filter(p => p.driver_id === driverId);
             }
