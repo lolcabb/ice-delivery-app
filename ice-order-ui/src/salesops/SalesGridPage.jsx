@@ -10,6 +10,7 @@ function SalesGridPage() {
     const [summary, setSummary] = useState(null);
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
+    const [existingSales, setExistingSales] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [success, setSuccess] = useState('');
@@ -37,6 +38,9 @@ function SalesGridPage() {
         setSummary(fetchedSummary);
         setProducts(Array.isArray(productsData) ? productsData : []);
 
+        const SalesResponse = await apiService.getDriverSalesForEdit(summaryId);
+        setExistingSales(SalesResponse?.sales || []);
+
         if(fetchedSummary?.route_id) {
             const customerResponse = await apiService.getRouteCustomers(fetchedSummary.route_id);
             setCustomers(customerResponse.customers || []);
@@ -49,6 +53,7 @@ function SalesGridPage() {
         setSummary(null);
         setProducts([]);
         setCustomers([]);
+        setExistingSales([]);
     } finally {
         setIsLoading(false);
     }
@@ -128,6 +133,7 @@ function SalesGridPage() {
                             summary={summary}
                             products={products}
                             initialCustomers={customers}
+                            initialSales={existingSales}
                             onOrderChange={handleOrderChange}
                             onAddCustomer={handleAddCustomer}
                             onRemoveCustomer={handleRemoveCustomer}

@@ -221,28 +221,37 @@ const DraggableRow = React.memo(({ sale, products, onInputChange, onCustomerFiel
 });
 
 // Main Grid Component
-function SalesEntryGrid({ summary, products, initialCustomers, onOrderChange, onAddCustomer, onRemoveCustomer, onSaveSuccess }) {
+function SalesEntryGrid({ summary, products, initialCustomers, initialSales, onOrderChange, onAddCustomer, onRemoveCustomer, onSaveSuccess }) {
     const [salesData, setSalesData] = useState([]);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState(null);
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 
     useEffect(() => {
-        const gridData = initialCustomers.map(customer => ({
-            id: customer.customer_id,
-            customer_id: customer.customer_id,
-            customer_name: customer.customer_name,
-            payment_type: 'Cash',
-            notes: '',
-            items: [{
-                product_id: '',
-                quantity_sold: '',
-                unit_price: '',
-                transaction_type: 'Sale'
-            }]
-        }));
+        const gridData = initialCustomers.map(customer => {
+            const existing = initialSales.find(s => s.customer_id === customer.customer_id);
+            return {
+                id: customer.customer_id,
+                customer_id: customer.customer_id,
+                customer_name: customer.customer_name,
+                payment_type: existing?.payment_type || 'Cash',
+                notes: existing?.notes || '',
+                items: (existing?.items && existing.items.length > 0 ? existing.items.map(item => ({
+                    product_id: item.product_id || '',
+                    quantity_sold: item.quantity_sold || '',
+                    unit_price: item.unit_price || '',
+                    transaction_type: item.transaction_type || 'Sale'
+                })) 
+                : [{
+                    product_id: '',
+                    quantity_sold: '',
+                    unit_price: '',
+                    transaction_type: 'Sale'
+                }])
+            };
+    });
         setSalesData(gridData);
-    }, [initialCustomers, products]);
+    }, [initialCustomers, initialSales, products]);
 
     const handleDragEnd = (event) => {
         const { active, over } = event;
