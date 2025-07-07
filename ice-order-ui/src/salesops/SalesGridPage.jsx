@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { apiService } from '../apiService';
 import SalesEntryGrid from './SalesEntryGrid';
 import { formatDisplayDate } from '../utils/dateUtils';
-import { ArrowPathIcon } from '../components/Icons';
+import { ArrowPathIcon, ArrowLeftIcon } from '../components/Icons';
 
 function SalesGridPage() {
     const { summaryId } = useParams();
+    const navigate = useNavigate();
     const [summary, setSummary] = useState(null);
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -116,10 +117,19 @@ function SalesGridPage() {
             <div className="max-w-7xl mx-auto">
                 <div className="bg-white p-6 rounded-lg shadow-md mb-6">
                     <div classsName="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <button
+                                onClick={() => navigate('/sales-ops/daily-operations')}
+                                className="flex items-center text-sm text-cyan-600 hover:text-cyan-800"
+                            >
+                                <ArrowLeftIcon className="w-5 h-5 mr-1" />
+                                กลับ
+                            </button>
                             <h1 className="text-2x1 font-bold text-gray-800">บันทึกการขาย</h1>
+                        </div>
                             <p className="text-gray-600">
-                                พนักงานขับรถ: <span className="font-semibold">{summary?.driver_name || '...'}</span> 
-                                วันที่: <span classNAme="font-semibold">{formatDisplayDate(summary?.sale_date)}</span>
+                                พนักงานขับรถ: <span className="font-semibold"> {summary?.driver_name || '...'} </span>
+                                วันที่: <span classNAme="font-semibold">{formatDisplayDate(summary?.sale_date)} </span>
                             </p>
                     </div>
                 </div>
