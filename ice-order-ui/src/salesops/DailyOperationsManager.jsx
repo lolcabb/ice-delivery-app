@@ -49,7 +49,7 @@ const aggregateSalesByProduct = (sales = []) => {
 };
 
 // --- Sub-Component for each driver's daily card ---
-const DriverDayCard = ({ driverLog, onOpenLoadingLog, onOpenReturnLog, onNavigateToSales, onStartDay, isProcessing }) => {
+const DriverDayCard = ({ driverLog, selectedDate, onOpenLoadingLog, onOpenReturnLog, onNavigateToSales, onStartDay, isProcessing }) => {
     const { driver, summary, loading_logs, product_returns, product_reconciliation } = driverLog;
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -59,8 +59,14 @@ const DriverDayCard = ({ driverLog, onOpenLoadingLog, onOpenReturnLog, onNavigat
     const totalLoaded = Array.isArray(product_reconciliation)
         ? product_reconciliation.reduce((acc, item) => acc + parseFloat(item.loaded || 0), 0)
         : (hasLoadingLogs
-            ? loading_logs.reduce((acc, log) => acc + log.items.reduce((sum, item) => sum + parseFloat(item.quantity_loaded || 0), 0), 0)
-            : 0);
+        ? loading_logs
+            .filter(log => {
+                // Filter to only include logs from the current selected date
+                const logDate = new Date(log.load_timestamp).toISOString().split('T')[0];
+                return logDate === selectedDate; // You'll need to pass selectedDate as a prop
+            })
+            .reduce((acc, log) => acc + log.items.reduce((sum, item) => sum + parseFloat(item.quantity_loaded || 0), 0), 0)
+        : 0);
 
     const initialLog = hasLoadingLogs ? loading_logs.find(log => log.load_type === 'initial') : null;
     const refillLogs = hasLoadingLogs ? loading_logs.filter(log => log.load_type !== 'initial').sort((a, b) => new Date(a.load_timestamp) - new Date(b.load_timestamp)) : [];
