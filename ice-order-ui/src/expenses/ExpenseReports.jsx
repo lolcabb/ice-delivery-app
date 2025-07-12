@@ -111,17 +111,28 @@ export default function ExpenseReports() {
             alert("No data to export.");
             return;
         }
-        const headers = ["วันที่", "หมวดหมู่", "รายละเอียด", "จำนวนเงิน (บาท)", "วิธีการชำระเงิน", "อ้างอิง", "เงินสดย่อย", "บันทึกโดย", "บันทึกเมื่อ"];
+
+        const escapeCSV = (value) => {
+            if (value === null || value === undefined) return '';
+            const str = String(value);
+            if (/[,"\n]/.test(str)) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        };
+
+        const headers = ["วันที่", "หมวดหมู่", "รายละเอียด", "จำนวนเงิน (บาท)", "วิธีการชำระเงิน", "เงินสดย่อย", "บันทึกโดย", "อ้างอิง", "บันทึกเมื่อ"];
+
         const rows = reportData.map(row => [
-            formatDate(row.expense_date),
-            row.category_name,
-            `"${(row.description || '').replace(/"/g, '""')}"`, // Handle quotes and ensure string
-            row.amount,
-            row.payment_method || '',
-            `"${(row.reference_details || '').replace(/"/g, '""')}"`, // Handle quotes and ensure string
-            row.is_petty_cash_expense ? 'ใช่' : 'ไม่',
-            row.recorded_by || '',
-            row.recorded_at ? new Date(row.recorded_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : '' // Use Thai locale for date
+            escapeCSV(formatDate(row.expense_date)),
+            escapeCSV(row.category_name),
+            escapeCSV(row.description),
+            escapeCSV(row.amount),
+            escapeCSV(row.payment_method || ''),
+            escapeCSV(row.is_petty_cash_expense ? 'ใช่' : 'ไม่'),
+            escapeCSV(row.recorded_by || ''),
+            escapeCSV(row.reference_details || ''),
+            escapeCSV(row.recorded_at ? new Date(row.recorded_at).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) : '')
         ]);
 
         // Add UTF-8 BOM
