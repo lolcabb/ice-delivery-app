@@ -116,7 +116,7 @@ function SalesGridPage() {
         <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
             <div className="max-w-7xl mx-auto">
                 <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                    <div classsName="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={() => navigate('/sales-ops/daily-operations')}
