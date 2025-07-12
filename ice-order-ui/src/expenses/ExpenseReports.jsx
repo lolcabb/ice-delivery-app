@@ -136,9 +136,10 @@ export default function ExpenseReports() {
         ]);
 
         // Add UTF-8 BOM
-        const BOM = "\\uFEFF";
-        let csvContent = BOM + headers.join(",") + "\\n" 
-            + rows.map(e => e.join(",")).join("\\n");
+        const BOM = "\uFEFF";
+        const rowSeparator = "\r\n";
+        let csvContent = BOM + headers.join(",") + rowSeparator
+            + rows.map(e => e.join(",")).join(rowSeparator);
 
         // Create a Blob with UTF-8 encoding specified
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
