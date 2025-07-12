@@ -213,7 +213,7 @@ router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountan
     }
     if (user_id) { conditions.push(`e.user_id = $${paramCount++}`); values.push(parseInt(user_id)); }
     if (conditions.length > 0) { sqlQuery += ' WHERE ' + conditions.join(' AND '); }
-    sqlQuery += ` ORDER BY e.expense_date DESC, e.created_at DESC`;
+    sqlQuery += ` ORDER BY e.expense_date ASC, e.created_at ASC`;
     try {
         const result = await query(sqlQuery, values);
         const totalAmountResult = await query(
