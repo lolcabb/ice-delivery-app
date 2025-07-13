@@ -4,7 +4,7 @@ const pool = require('../db/postgres');
  * @desc    Get all vehicles
  * @route   GET /api/v1/vehicles
  */
-exports.getAllVehles = async (req, res) => {
+exports.getAllVehicles = async (req, res) => {
     try {
         const query = 'SELECT vehicle_id, vehicle_name, license_plate, vehicle_type, make, model, year, status FROM vehicles ORDER BY vehicle_name ASC';
         const { rows } = await pool.query(query);
