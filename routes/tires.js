@@ -5,12 +5,12 @@ const tireController = require('../controllers/tireController');
 // Get all tires & add a new tire
 router.route('/')
     .get(authMiddleware, tireController.getAllTires)
-    .post(authMiddleware, requireRole('admin', 'manager', 'accountant', 'staff'), tireController.addTire);
+    .post(authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), tireController.addTire);
 
 // Get and update a single tire
 router.route('/:id')
     .get(authMiddleware, tireController.getTireById)
-    .put(authMiddleware, requireRole('admin', 'manager', 'accountant', 'staff'), tireController.updateTire);
+    .put(authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), tireController.updateTire);
 
 // Get all tire assignments
 router.route('/assignments')
@@ -18,10 +18,10 @@ router.route('/assignments')
 
 // Assign a tire to a vehicle
 router.route('/assign')
-    .post(authMiddleware, requireRole('admin', 'manager', 'accountant', 'staff'), tireController.assignTire);
+    .post(authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), tireController.assignTire);
 
 // Unmount a tire
 router.route('/unmount/:tireId')
-    .put(authMiddleware, requireRole('admin', 'manager', 'accountant', 'staff'), tireController.unmountTire);
+    .put(authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), tireController.unmountTire);
 
 module.exports = router;
