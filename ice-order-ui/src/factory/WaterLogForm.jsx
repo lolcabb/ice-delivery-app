@@ -265,97 +265,9 @@ const WaterLogForm = ({
                                 </tbody>
                             </table>
                         </div>
+                    </div>
 
-                        {/* Legend */}
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
-                                <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 bg-green-50 border border-green-300 rounded"></div>
-                                    <span>Safe values</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 bg-red-50 border border-red-300 rounded"></div>
-                                    <AlertTriangle className="w-3 h-3 text-red-500" />
-                                    <span>Dangerous values (outside safe range)</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Sun className="w-3 h-3 text-yellow-600" />
-                                    <span>Morning tests</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Moon className="w-3 h-3 text-blue-600" />
-                                    <span>Afternoon tests</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Buttons */}
-                        <div className="flex gap-3 pt-6">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleSubmit}
-                                disabled={loading}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                            >
-                                <Save className="w-5 h-5" />
-                                {loading ? 'Submitting...' : 'Submit All Tests'}
-                            </button>
-                        </div>
-                    </div>text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <input
-                                                                type="number"
-                                                                step="1"
-                                                                min="0"
-                                                                value={formData[stage.stage_id]?.[session]?.ec_us_cm_value || ''}
-                                                                onChange={(e) => handleInputChange(stage.stage_id, session, 'ec_us_cm_value', e.target.value)}
-                                                                className={getInputClassName('ec_us_cm_value', formData[stage.stage_id]?.[session]?.ec_us_cm_value)}
-                                                                placeholder="100"
-                                                            />
-                                                            {isValueDangerous('ec_us_cm_value', formData[stage.stage_id]?.[session]?.ec_us_cm_value) && (
-                                                                <AlertTriangle className="w-4 h-4 text-red-500" />
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Legend */}
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
-                                <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 bg-green-50 border border-green-300 rounded"></div>
-                                    <span>Safe values</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <div className="w-3 h-3 bg-red-50 border border-red-300 rounded"></div>
-                                    <AlertTriangle className="w-3 h-3 text-red-500" />
-                                    <span>Dangerous values (outside safe range)</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Sun className="w-3 h-3 text-yellow-600" />
-                                    <span>Morning tests</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <Moon className="w-3 h-3 text-blue-600" />
-                                    <span>Afternoon tests</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Buttons */}
+                    {/* Buttons */}
                         <div className="flex gap-3 pt-6">
                             <button
                                 type="button"
@@ -373,7 +285,29 @@ const WaterLogForm = ({
                                 {loading ? 'Submitting...' : 'Submit All Tests'}
                             </button>
                         </div>
-                    </form>
+
+                    {/* Legend */}
+                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 bg-green-50 border border-green-300 rounded"></div>
+                                <span>Safe values</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 bg-red-50 border border-red-300 rounded"></div>
+                                <AlertTriangle className="w-3 h-3 text-red-500" />
+                                <span>Dangerous values (outside safe range)</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Sun className="w-3 h-3 text-yellow-600" />
+                                <span>Morning tests</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Moon className="w-3 h-3 text-blue-600" />
+                                <span>Afternoon tests</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
