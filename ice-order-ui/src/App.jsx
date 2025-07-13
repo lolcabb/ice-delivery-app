@@ -25,7 +25,7 @@ import ContainerAssignmentManager from './crm/ContainerAssignmentManager';
 import DeliveryRouteManager from './crm/DeliveryRouteManager';
 import CreditCollectionManager from './crm/CreditCollectionManager';
 
-// Import the new SalesOperationsLayout
+// SalesOperationsLayout
 import SalesOperationsLayout from './salesops/SalesOperationsLayout';
 //import LoadingLogManager from './salesops/LoadingLogManager';
 import SalesEntryManager from './salesops/SalesEntryManager';
@@ -35,6 +35,16 @@ import DailyReconciliation from './salesops/DailyReconciliation';
 
 import DailyOperationsManager from './salesops/DailyOperationsManager';
 import SalesGridPage from './salesops/SalesGridPage';
+
+// --- Factory Management ---
+// Water Info
+import WaterTestPlaceholder from './factory/WaterTestPlaceholder';
+// Fleet management components
+import FleetPanelLayout from './factory/FleetPanelLayout';
+import VehicleMonitor from './factory/VehicleMonitor';
+import TireStockManager from './factory/TireStockManager';
+// --- Factory Management ---
+
 
 // Use React.lazy for code splitting to prevent initialization errors
 //const AdminPanel = React.lazy(() => import('./AdminPanel'));
@@ -107,6 +117,7 @@ function AppShell({ handleLogout }) {
     const canViewInventory = user && ['admin', 'accountant', 'manager', 'staff'].includes(user.role?.toLowerCase());
     const canViewCRM = user && ['admin', 'accountant', 'manager', 'staff'].includes(user.role?.toLowerCase());
     const canViewSalesOps = user && ['admin', 'manager', 'staff'].includes(user.role?.toLowerCase());
+    const canViewFactory = user && ['admin', 'accountant', 'manager', 'staff'].includes(user.role?.toLowerCase());
 
     return (
         <div className="min-h-screen bg-zinc-50">
@@ -133,6 +144,9 @@ function AppShell({ handleLogout }) {
                                 )}
                                 {canViewCRM && ( // Show CRM link based on role
                                     <NavLinkStyled to="/crm">CRM</NavLinkStyled>
+                                )}
+                                {canViewFactory && (
+                                    <NavLinkStyled to="/factory">Factory</NavLinkStyled>
                                 )}
                             </div>
                         </div>
@@ -273,6 +287,7 @@ function App() {
         const canAccessInventory = currentUser && ['admin', 'accountant', 'manager', 'staff'].includes(currentUser.role?.toLowerCase());
         const canAccessCRM = currentUser && ['admin', 'accountant', 'manager', 'staff'].includes(currentUser.role?.toLowerCase());
         const canAccessSalesOps = currentUser && ['admin', 'manager', 'staff'].includes(currentUser.role?.toLowerCase());
+        const canAccessFactory = currentUser && ['admin', 'accountant', 'manager', 'staff'].includes(currentUser.role?.toLowerCase());
 
         return (
             <Routes>
@@ -379,6 +394,23 @@ function App() {
                             <Route path="daily-reconciliation" element={<DailyReconciliation />} />
                             <Route path="driver-manager" element={<DriverManager />} />
                             {/* Add more sales-ops sub-routes here */}
+                        </Route>
+                        {/* Factory Operations Panel Routes */}
+                        <Route 
+                            path="/factory/*" 
+                            element={
+                                canAccessFactory ? (
+                                    <FleetPanelLayout />
+                                ) : (
+                                    <Navigate to="/main" replace state={{ message: "Access denied: Insufficient role for Factory Operations."}} />
+                                )
+                            }
+                        >
+                            <Route index element={<Navigate to="vehicles" replace />} />
+                            <Route path="vehicles" element={<VehicleMonitor />} />
+                            <Route path="tires" element={<TireStockManager />} />
+                            <Route path="water-test" element={<WaterTestPlaceholder />} />
+                            {/* Add more factory sub-routes here */}
                         </Route>
                         <Route path="/" element={<Navigate to="/main" replace />} />
                     </Route>

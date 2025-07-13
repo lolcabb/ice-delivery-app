@@ -357,6 +357,22 @@ export const apiService = {
         return response.data || response || [];
     },
 
+    // --- Fleet management API functions ---
+    getVehicles: (filters = {}) => {
+        const queryParams = new URLSearchParams(filters).toString();
+        return apiService.get(`/factory/vehicles?${queryParams}`);
+    },
+    getVehicleById: (vehicleId) => apiService.get(`/factory/vehicles/${vehicleId}`),
+    addVehicle: (vehicleData) => apiService.post('/factory/vehicles', vehicleData),
+    updateVehicle: (vehicleId, vehicleData) => apiService.put(`/factory/vehicles/${vehicleId}`, vehicleData),
+    deleteVehicle: (vehicleId) => apiService.delete(`/factory/vehicles/${vehicleId}`),
+    getVehicleTires: (filters = {}) => {
+        const queryParams = new URLSearchParams(filters).toString();
+        return apiService.get(`/factory/tires?${queryParams}`);
+    },
+    addVehicleTire: (tireData) => apiService.post('/factory/tires', tireData),
+    updateVehicleTire: (tireId, tireData) => apiService.put(`/factory/tires/${tireId}`, tireData),
+    deleteVehicleTire: (tireId) => apiService.delete(`/factory/tires/${tireId}`),
     
     getCustomerCreditSales: (customerId) => apiService.get(`/customers/${customerId}/credit-sales`),
     // This is different because it sends FormData
