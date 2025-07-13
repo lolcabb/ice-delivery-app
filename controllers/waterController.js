@@ -24,7 +24,7 @@ exports.getAllWaterLogs = async (req, res) => {
 };
 
 // Insert a new water test log
-exports.addWaterLog = async (req, res) {
+exports.addWaterLog = async (req, res) => {
     const {
         stage_id,
         test_session,
