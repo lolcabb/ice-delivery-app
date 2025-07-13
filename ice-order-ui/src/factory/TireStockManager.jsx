@@ -348,8 +348,9 @@ export default function TireStockManager() {
                     </div>
                 </div>
 
-                {/* Filter Bar - Replace with TireFilterBar component */}
-                { <TireFilterBar 
+                {/* Filter Bar */}
+
+                <TireFilterBar
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
                     statusFilter={statusFilter}
@@ -360,44 +361,7 @@ export default function TireStockManager() {
                     setSizeFilter={setSizeFilter}
                     tireBrands={tireBrands}
                     tireSizes={tireSizes}
-                /> */}
-
-                {/* Temporary simple filter bar - replace with TireFilterBar component */}
-                <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                    <div className="flex flex-col lg:flex-row gap-4">
-                        <div className="flex-1">
-                            <input
-                                type="text"
-                                placeholder="Search tires..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            />
-                        </div>
-                        <div className="flex gap-4">
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            >
-                                <option value="All">All Statuses</option>
-                                <option value="In Stock">In Stock</option>
-                                <option value="On Vehicle">On Vehicle</option>
-                                <option value="Retired">Retired</option>
-                            </select>
-                            <select
-                                value={brandFilter}
-                                onChange={(e) => setBrandFilter(e.target.value)}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            >
-                                <option value="All">All Brands</option>
-                                {tireBrands.map(brand => (
-                                    <option key={brand} value={brand}>{brand}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-                </div>
+                />
 
                 {/* Error Message */}
                 {error && (
@@ -434,7 +398,6 @@ export default function TireStockManager() {
                         </div>
                     ) : (
                         filteredTires.map((tire) => (
-                            /* Replace with TireCard component:
                             <TireCard
                                 key={tire.tire_id}
                                 tire={tire}
@@ -444,40 +407,9 @@ export default function TireStockManager() {
                                 onAssign={openAssignModal}
                                 onUnmount={handleUnmountTire}
                             />
-                            
-                            <div key={tire.tire_id} className="bg-white rounded-lg shadow-sm p-6">
-                                <h3 className="text-lg font-semibold text-gray-900">{tire.serial_number}</h3>
-                                <p className="text-gray-600">{tire.brand} - {tire.sidewall}</p>
-                                <p className="text-sm text-gray-500">Status: {tire.status}</p>
-                                <div className="mt-4 flex gap-2">
-                                    <button
-                                        onClick={() => openEditModal(tire)}
-                                        className="px-3 py-1 bg-green-100 text-green-700 rounded text-sm"
-                                    >
-                                        Edit
-                                    </button>
-                                    {tire.status === 'In Stock' && (
-                                        <button
-                                            onClick={() => openAssignModal(tire)}
-                                            className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm"
-                                        >
-                                            Assign
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleDeleteTire(tire.tire_id)}
-                                        className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                            </div>
                         ))
                     )}
                 </div>
-
-                {/* Modals - Replace with actual modal components */}
-                {/* 
                 <TireFormModal
                     isOpen={showAddModal}
                     onClose={() => setShowAddModal(false)}
@@ -508,23 +440,7 @@ export default function TireStockManager() {
                     vehicles={vehicles}
                     loading={loading}
                 />
-                */}
-
-                {/* Placeholder modals - replace with actual modals */}
-                {showAddModal && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                            <h3 className="text-lg font-semibold mb-4">Add Tire Modal</h3>
-                            <p className="text-gray-600 mb-4">Replace with TireFormModal component</p>
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                className="px-4 py-2 bg-gray-600 text-white rounded-lg"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                )}
+                
             </div>
         </div>
     );

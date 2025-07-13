@@ -6,8 +6,6 @@ import { apiService } from '../apiService';
 import WaterDashboard from './WaterDashboard';
 import WaterLogForm from './WaterLogForm';
 
-// Note: Replace the above commented imports with actual imports when you create the component files
-
 export default function WaterTestLogManager() {
     const [logs, setLogs] = useState([]);
     const [stages, setStages] = useState([]);
@@ -510,8 +508,6 @@ export default function WaterTestLogManager() {
                     )}
                 </div>
 
-                {/* Log Form Modal - Replace with WaterLogForm component */}
-                {/* 
                 <WaterLogForm 
                     isOpen={showLogForm}
                     onClose={() => setShowLogForm(false)}
@@ -524,23 +520,7 @@ export default function WaterTestLogManager() {
                     loading={loading}
                     dangerThresholds={dangerThresholds}
                 />
-                */}
 
-                {/* Placeholder modal - replace with actual WaterLogForm */}
-                {showLogForm && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-white rounded-lg p-6 max-w-md w-full">
-                            <h3 className="text-lg font-semibold mb-4">Water Log Form Modal</h3>
-                            <p className="text-gray-600 mb-4">Replace with WaterLogForm component</p>
-                            <button
-                                onClick={() => setShowLogForm(false)}
-                                className="px-4 py-2 bg-gray-600 text-white rounded-lg"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
