@@ -359,19 +359,19 @@ export const apiService = {
     // --- Fleet management API functions ---
     getVehicles: (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
-        return apiService.get(`/factory/vehicles?${queryParams}`);
+        return apiService.get(`/vehicles?${queryParams}`);
     },
-    getVehicleById: (vehicleId) => apiService.get(`/factory/vehicles/${vehicleId}`),
-    addVehicle: (vehicleData) => apiService.post('/factory/vehicles', vehicleData),
-    updateVehicle: (vehicleId, vehicleData) => apiService.put(`/factory/vehicles/${vehicleId}`, vehicleData),
-    deleteVehicle: (vehicleId) => apiService.delete(`/factory/vehicles/${vehicleId}`),
+    getVehicleById: (vehicleId) => apiService.get(`/vehicles/${vehicleId}`),
+    addVehicle: (vehicleData) => apiService.post('/vehicles', vehicleData),
+    updateVehicle: (vehicleId, vehicleData) => apiService.put(`/vehicles/${vehicleId}`, vehicleData),
+    deleteVehicle: (vehicleId) => apiService.delete(`/vehicles/${vehicleId}`),
     getVehicleTires: (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
-        return apiService.get(`/factory/tires?${queryParams}`);
+        return apiService.get(`/tires?${queryParams}`);
     },
-    addVehicleTire: (tireData) => apiService.post('/factory/tires', tireData),
-    updateVehicleTire: (tireId, tireData) => apiService.put(`/factory/tires/${tireId}`, tireData),
-    deleteVehicleTire: (tireId) => apiService.delete(`/factory/tires/${tireId}`),
+    addVehicleTire: (tireData) => apiService.post('/tires', tireData),
+    updateVehicleTire: (tireId, tireData) => apiService.put(`/tires/${tireId}`, tireData),
+    deleteVehicleTire: (tireId) => apiService.delete(`/tires/${tireId}`),
     
     getCustomerCreditSales: (customerId) => apiService.get(`/customers/${customerId}/credit-sales`),
     // This is different because it sends FormData
