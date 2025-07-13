@@ -1,4 +1,4 @@
-const pool = require('../db/postgres');
+const db = require('../db/postgres');
 
 /**
  * @desc    Get all tires
@@ -6,7 +6,7 @@ const pool = require('../db/postgres');
  */
 exports.getAllTires = async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM tires ORDER BY purchase_date DESC');
+        const { rows } = await db.query('SELECT * FROM tires ORDER BY purchase_date DESC');
         res.status(200).json(rows);
     } catch (err) {
         console.error(err.message);
@@ -20,7 +20,7 @@ exports.getAllTires = async (req, res) => {
  */
 exports.getTireById = async (req, res) => {
     try {
-        const { rows } = await pool.query('SELECT * FROM tires WHERE tire_id = $1', [req.params.id]);
+        const { rows } = await db.query('SELECT * FROM tires WHERE tire_id = $1', [req.params.id]);
         if (rows.length === 0) {
             return res.status(404).json({ msg: 'Tire not found' });
         }
@@ -44,7 +44,7 @@ exports.addTire = async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, $6) 
             RETURNING *
         `;
-        const { rows } = await pool.query(query, [serial_number, brand, sidewall, status, purchase_date, created_by_user_id]);
+        const { rows } = await db.query(query, [serial_number, brand, sidewall, status, purchase_date, created_by_user_id]);
         res.status(201).json(rows[0]);
     } catch (err) {
         console.error(err.message);
@@ -65,7 +65,7 @@ exports.updateTire = async (req, res) => {
             WHERE tire_id = $6 
             RETURNING *
         `;
-        const { rows } = await pool.query(query, [serial_number, brand, sidewall, status, purchase_date, req.params.id]);
+        const { rows } = await db.query(query, [serial_number, brand, sidewall, status, purchase_date, req.params.id]);
         if (rows.length === 0) {
             return res.status(404).json({ msg: 'Tire not found' });
         }
@@ -94,7 +94,7 @@ exports.getAllAssignments = async (req, res) => {
             LEFT JOIN users u ON ta.recorded_by_user_id = u.id
             ORDER BY ta.mount_date DESC
         `;
-        const { rows } = await pool.query(query);
+        const { rows } = await db.query(query);
         res.status(200).json(rows);
     } catch (err) {
         console.error(err.message);
@@ -108,7 +108,7 @@ exports.getAllAssignments = async (req, res) => {
  */
 exports.assignTire = async (req, res) => {
     const { tire_id, vehicle_id, position, mount_date } = req.body;
-    const client = await pool.connect();
+    const client = await db.getClient();
     try {
         await client.query('BEGIN');
         
@@ -140,7 +140,7 @@ exports.assignTire = async (req, res) => {
 exports.unmountTire = async (req, res) => {
     const { unmount_date, new_status } = req.body; // new_status could be 'In Stock' or 'Retired'
     const { tireId } = req.params;
-    const client = await pool.connect();
+    const client = await db.getClient();
 
     if (!new_status || !['In Stock', 'Retired'].includes(new_status)) {
         return res.status(400).json({ msg: "Invalid 'new_status' provided. Must be 'In Stock' or 'Retired'." });
