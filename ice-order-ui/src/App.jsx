@@ -38,9 +38,9 @@ import SalesGridPage from './salesops/SalesGridPage';
 
 // --- Factory Management ---
 // Water Info
-import WaterTestPlaceholder from './factory/WaterTestPlaceholder';
-// Fleet management components
-import FleetPanelLayout from './factory/FleetPanelLayout';
+import WaterTestLogManager from './factory/WaterTestLogManager';
+// Factory management components
+import FactoryPanelLayout from './factory/FactoryPanelLayout';
 import VehicleMonitor from './factory/VehicleMonitor';
 import TireStockManager from './factory/TireStockManager';
 // --- Factory Management ---
@@ -400,7 +400,7 @@ function App() {
                             path="/factory/*" 
                             element={
                                 canAccessFactory ? (
-                                    <FleetPanelLayout />
+                                    <FactoryPanelLayout />
                                 ) : (
                                     <Navigate to="/main" replace state={{ message: "Access denied: Insufficient role for Factory Operations."}} />
                                 )
@@ -409,7 +409,7 @@ function App() {
                             <Route index element={<Navigate to="vehicles" replace />} />
                             <Route path="vehicles" element={<VehicleMonitor />} />
                             <Route path="tires" element={<TireStockManager />} />
-                            <Route path="water-test" element={<WaterTestPlaceholder />} />
+                            <Route path="water-test" element={<WaterTestLogManager />} />
                             {/* Add more factory sub-routes here */}
                         </Route>
                         <Route path="/" element={<Navigate to="/main" replace />} />

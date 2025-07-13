@@ -3,7 +3,6 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-// ... (keep existing debugToken, handleGlobalAuthError, and request functions as they are)
 const debugToken = () => {
     const token = localStorage.getItem('authToken');
     if (!token) {

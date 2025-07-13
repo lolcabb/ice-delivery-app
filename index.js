@@ -42,17 +42,35 @@ const salesOperationsRoutes = require('./routes/salesOperations');
 //Driver Management
 const driverRoutes = require('./routes/drivers');
 
+// --- Factory Operations ---
+const vehicleRoutes = require('./routes/vehicles');
+const tireRoutes = require('./routes/tires');
+const waterRoutes = require('./routes/water');
+
 app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/logs', logRoutes);
+
+// --- Expense Operations Routes ---
 app.use('/api/reports', reportRoutes);
 app.use('/api/expenses', expenseRoutes);
+
+// --- Inventory Operations Routes ---
 app.use('/api/inventory', inventoryRoutes);
+
+// --- CRM Operations Routes ---
 app.use('/api/customers', customerRoutes);
 app.use('/api/containers', containerRoutes);
+
+// --- Sales Operations Routes ---
 app.use('/api/sales-ops', salesOperationsRoutes);
 app.use('/api/drivers', driverRoutes);
+
+// --- Factory Operations Routers ---
+app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/tires', tireRoutes);
+app.use('/api/water', waterRoutes);
 
 // Print Bill
 const printBillRoute = require('./routes/printBill');
