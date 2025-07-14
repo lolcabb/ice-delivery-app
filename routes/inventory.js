@@ -98,21 +98,27 @@ router.get('/dashboard/consumables/item-type-movement-trend', authMiddleware, re
     }
 
     try {
-         const result = await query(
-            `SELECT 
-                TO_CHAR(m.movement_date, 'YYYY-MM-DD') as date,
-                SUM(CASE WHEN m.movement_type = 'in' THEN m.quantity_changed 
-                         WHEN m.movement_type = 'adjustment' AND m.quantity_changed > 0 THEN m.quantity_changed
-                         ELSE 0 END) as total_in,
-                SUM(CASE WHEN m.movement_type = 'out' THEN ABS(m.quantity_changed) 
-                         WHEN m.movement_type = 'adjustment' AND m.quantity_changed < 0 THEN ABS(m.quantity_changed)
-                         ELSE 0 END) as total_out
-            FROM inventory_consumable_movements m
-            JOIN inventory_consumables c ON m.consumable_id = c.consumable_id
-            WHERE c.item_type_id = $1 AND m.movement_date >= $2 AND m.movement_date < $3
-            GROUP BY TO_CHAR(m.movement_date, 'YYYY-MM-DD')
-            ORDER BY date ASC`,
-            [parsedItemTypeId, startDate.toISOString().split('T')[0], new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] ] 
+        const endDate = new Date(today);
+        endDate.setDate(today.getDate() + 1);
+        const result = await query(
+            `SELECT
+                TO_CHAR(gs.day, 'YYYY-MM-DD') AS date,
+                COALESCE(SUM(CASE WHEN m.movement_type = 'in' THEN m.quantity_changed
+                                  WHEN m.movement_type = 'adjustment' AND m.quantity_changed > 0 THEN m.quantity_changed
+                                  ELSE 0 END), 0) AS total_in,
+                COALESCE(SUM(CASE WHEN m.movement_type = 'out' THEN ABS(m.quantity_changed)
+                                  WHEN m.movement_type = 'adjustment' AND m.quantity_changed < 0 THEN ABS(m.quantity_changed)
+                                  ELSE 0 END), 0) AS total_out
+            FROM generate_series($2::date, $3::date - INTERVAL '1 day', INTERVAL '1 day') AS gs(day)
+            LEFT JOIN inventory_consumable_movements m ON DATE(m.movement_date) = gs.day
+            LEFT JOIN inventory_consumables c ON m.consumable_id = c.consumable_id AND c.item_type_id = $1
+            GROUP BY gs.day
+            ORDER BY gs.day ASC`,
+            [
+                parsedItemTypeId,
+                startDate.toISOString().split('T')[0],
+                endDate.toISOString().split('T')[0]
+            ]
         );
 
         res.json(result.rows.map(row => ({
