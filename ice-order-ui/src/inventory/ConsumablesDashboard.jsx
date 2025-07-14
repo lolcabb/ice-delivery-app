@@ -1,44 +1,137 @@
-// Suggested path: src/inventory/ConsumablesDashboard.jsx
+// Enhanced ConsumablesDashboard.jsx - Production-focused transformation
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiService } from '../apiService'; // Adjust path as needed
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { apiService } from '../apiService';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { CriticalStockIcon, ProductionItemsIcon, ValueIcon, ActivityIcon, ClockIcon, RefreshIcon } from '../components/Icons';
 
-// --- Helper to format currency (if needed for any value, though mostly counts here) ---
+// Enhanced helper function for number formatting
 const formatNumber = (num) => {
     if (num === null || num === undefined || isNaN(parseFloat(num))) return 'N/A';
-    return new Intl.NumberFormat('en-US').format(num); // Basic number formatting
+    return new Intl.NumberFormat('en-US').format(num);
 };
 
-// --- Icon Components (simple SVGs for cards) ---
-const LowStockIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-red-500">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-    </svg>
-);
-const ItemsIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-blue-500">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10.5 11.25h3M12 15h.008m-7.008 0h14.016m0 0A48.108" />
-    </svg>
-);
-const ActivityIcon = () => (
-     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-green-500">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5zM13.5 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5z" />
-    </svg>
-);
-// --- End Icon Components ---
-
-// --- Summary Card Component ---
-const SummaryCard = ({ title, value, icon, subValue }) => {    
+// Enhanced Summary Card Component
+const SummaryCard = ({ title, value, icon, subValue, valueColor = "text-gray-900" }) => {
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
             <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">{title}</p>
-                <span className="inline-flex items-center justify-center">{icon}</span> 
+                <span className="inline-flex items-center justify-center">{icon}</span>
             </div>
-            <p className="text-3xl font-bold text-gray-800">{value}</p>
+            <p className={`text-3xl font-bold ${valueColor} mb-1`}>{value}</p>
             {subValue && (
-                <p className="text-xs text-gray-500 mt-1">{subValue}</p>
+                <p className="text-xs text-gray-500">{subValue}</p>
             )}
+        </div>
+    );
+};
+
+// Production-focused alerts component
+const ProductionAlertsPanel = ({ summaryData, recentMovements, usagePatterns, inventoryValue  }) => {
+    const generateProductionAlerts = () => {
+        const alerts = [];
+        
+        // Critical stock alerts based on actual data
+        if (summaryData?.lowStockItemsCount > 0) {
+            alerts.push({
+                type: 'critical',
+                message: `${summaryData.lowStockItemsCount} รายการ ต้องเร่งจัดหา`,
+                priority: 'high'
+            });
+        }
+        
+        // Out of stock alerts from enhanced data
+        if (inventoryValue?.inventory_summary?.out_of_stock_count > 0) {
+            alerts.push({
+                type: 'critical',
+                message: `${inventoryValue.inventory_summary.out_of_stock_count} รายการ หมดสต็อกแล้ว`,
+                priority: 'high'
+            });
+        }
+        
+        // Usage pattern alerts
+        if (usagePatterns?.risk_analysis?.length > 0) {
+            const mostUrgent = usagePatterns.risk_analysis[0];
+            if (mostUrgent.estimated_days_remaining <= 3) {
+                alerts.push({
+                    type: 'warning',
+                    message: `${mostUrgent.name} เหลือประมาณ ${mostUrgent.estimated_days_remaining} วัน ตามอัตราการใช้งาน`,
+                    priority: 'medium'
+                });
+            }
+        }
+        
+        // Check for unusual activity patterns from enhanced data
+        if (inventoryValue?.today_activity) {
+            const { total_movements, total_used, total_received } = inventoryValue.today_activity;
+            
+            if (total_movements === 0) {
+                alerts.push({
+                    type: 'warning',
+                    message: 'ไม่มีการเคลื่อนไหวของสต็อกวันนี้ - ตรวจสอบการผลิต',
+                    priority: 'medium'
+                });
+            } else if (total_used > total_received * 2) {
+                alerts.push({
+                    type: 'info',
+                    message: `การใช้งานสูงกว่าการรับเข้า ${total_used - total_received} หน่วย วันนี้`,
+                    priority: 'low'
+                });
+            }
+        }
+        
+        // High usage alert from original data
+        if (summaryData?.mostActiveConsumable?.movement_count > 10) {
+            alerts.push({
+                type: 'info',
+                message: `${summaryData.mostActiveConsumable.consumable_name} ใช้งานสูงผิดปกติ (${summaryData.mostActiveConsumable.movement_count} ครั้ง)`,
+                priority: 'low'
+            });
+        }
+        
+        return alerts;
+    };
+
+    const alerts = generateProductionAlerts();
+
+    if (alerts.length === 0) {
+        return (
+            <div className="bg-green-50 p-6 rounded-xl shadow-sm border border-green-200 mb-8">
+                <h3 className="text-lg font-semibold text-green-800 mb-2">
+                    ✅ สถานะคลังปกติ
+                </h3>
+                <p className="text-sm text-green-700">ไม่มีการแจ้งเตือนด่วนสำหรับคงคลัง</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mb-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                <CriticalStockIcon className="inline h-5 w-5 mr-2 text-red-500" />
+                การแจ้งเตือนคงคลัง
+            </h3>
+            <div className="space-y-3">
+                {alerts.map((alert, index) => (
+                    <div key={index} className={`p-4 rounded-lg border-l-4 ${
+                        alert.priority === 'high' ? 'border-red-500 bg-red-50' :
+                        alert.priority === 'medium' ? 'border-yellow-500 bg-yellow-50' :
+                        'border-blue-500 bg-blue-50'
+                    }`}>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-800">{alert.message}</span>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                                alert.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                alert.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-blue-100 text-blue-700'
+                            }`}>
+                                {alert.priority === 'high' ? 'ด่วน' :
+                                 alert.priority === 'medium' ? 'เตือน' : 'ข้อมูล'}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
@@ -47,7 +140,7 @@ export default function ConsumablesDashboard() {
     const [summaryData, setSummaryData] = useState(null);
     const [recentMovements, setRecentMovements] = useState([]);
     const [itemTypeMovementTrend, setItemTypeMovementTrend] = useState([]);
-    const [itemTypes, setItemTypes] = useState([]); // For the trend chart filter
+    const [itemTypes, setItemTypes] = useState([]);
 
     const [loadingSummary, setLoadingSummary] = useState(true);
     const [loadingRecent, setLoadingRecent] = useState(true);
@@ -57,7 +150,7 @@ export default function ConsumablesDashboard() {
 
     const [trendChartFilters, setTrendChartFilters] = useState({
         item_type_id: '',
-        period: 'last_7_days' // 'last_7_days', 'last_30_days'
+        period: 'last_7_days'
     });
 
     const fetchTrendData = useCallback(async (itemTypeId, period) => {
@@ -67,7 +160,7 @@ export default function ConsumablesDashboard() {
             return;
         }
         setLoadingTrend(true);
-        setError(null); // clear previous trend errors
+        setError(null);
         try {
             const trendData = await apiService.getDashboardConsumablesItemTypeMovementTrend(itemTypeId, period);
             setItemTypeMovementTrend(Array.isArray(trendData) ? trendData : []);
@@ -80,208 +173,350 @@ export default function ConsumablesDashboard() {
         }
     }, []);
 
+    // Add the new API service methods for the enhanced endpoints
+    const fetchEnhancedData = useCallback(async () => {
+        setLoadingEnhanced(true);
+        try {
+            const [valueData, usageData] = await Promise.all([
+                apiService.getInventoryValueSummary(),
+                apiService.getUsagePatterns()
+            ]);
+            setInventoryValue(valueData);
+            setUsagePatterns(usageData);
+        } catch (err) {
+            console.error("Failed to fetch enhanced data:", err);
+            // Set fallback data if new endpoints fail
+            setInventoryValue(null);
+            setUsagePatterns(null);
+        } finally {
+            setLoadingEnhanced(false);
+        }
+    }, []);
+
     const fetchAllDashboardData = useCallback(async () => {
         setLoadingSummary(true);
         setLoadingRecent(true);
-        //setLoadingTrend(true); // Will also be set by fetchTrendData
         setLoadingItemTypes(true);
         setError(null);
 
         try {
             const [summary, recent, types] = await Promise.all([
                 apiService.getDashboardConsumablesSummary(),
-                apiService.getDashboardConsumablesRecentMovements(5),
-                apiService.getInventoryItemTypes() // Fetch all active item types for the dropdown
+                apiService.getDashboardConsumablesRecentMovements(10), // Increased limit for better insights
+                apiService.getInventoryItemTypes()
             ]);
             setSummaryData(summary);
             setRecentMovements(Array.isArray(recent) ? recent : []);
-            const activeTypes = Array.isArray(types) ? types.filter(t => t.is_active !== false) : [];
+            const activeTypes = Array.isArray(types) ? types.filter(type => type.is_active !== false) : [];
             setItemTypes(activeTypes);
 
-            // Logic to set initial filter or fetch trend data based on types
-            if (activeTypes.length > 0) {
-                if (!trendChartFilters.item_type_id && activeTypes[0]?.item_type_id) {
-                    // If no filter set, default to first active type and trigger trend fetch via state update
-                    setTrendChartFilters(prev => ({ ...prev, item_type_id: activeTypes[0].item_type_id.toString() }));
-                } else if (trendChartFilters.item_type_id) {
-                    // If a filter is already set (or was just set), explicitly fetch trend data
-                    fetchTrendData(trendChartFilters.item_type_id, trendChartFilters.period);
-                } else {
-                    setLoadingTrend(false); // No specific item type to fetch trend for
-                }
-            } else {
-                setItemTypeMovementTrend([]); // No types, so clear trend data
-                setLoadingTrend(false);
-            }
-
+            // Fetch enhanced data as well
+            fetchEnhancedData();
         } catch (err) {
-            console.error("Failed to fetch initial dashboard data:", err);
-            setError(err.data?.error || err.message || "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้.");
-            if (err.status === 401) {
-                apiService.handleComponentAuthError(err, () => window.location.replace('/login'));
-            }
+            console.error("Failed to fetch dashboard data:", err);
+            setError(err.data?.error || err.message || 'ไม่สามารถโหลดข้อมูลแดชบอร์ด.');
         } finally {
             setLoadingSummary(false);
             setLoadingRecent(false);
             setLoadingItemTypes(false);
-            // setLoadingTrend will be handled by fetchTrendData or if no types
         }
-    }, [trendChartFilters.item_type_id, trendChartFilters.period, fetchTrendData]); // Added dependencies
+    }, [fetchEnhancedData]);
 
     useEffect(() => {
         fetchAllDashboardData();
-    }, [fetchAllDashboardData]); // Initial fetch
+    }, [fetchAllDashboardData]);
 
     useEffect(() => {
-        // Re-fetch trend data specifically when trendChartFilters change,
-        // if an item_type_id is selected.
         if (trendChartFilters.item_type_id) {
             fetchTrendData(trendChartFilters.item_type_id, trendChartFilters.period);
         } else {
-            // If no item_type_id selected (e.g., cleared), clear trend data
             setItemTypeMovementTrend([]);
         }
-    }, [trendChartFilters, fetchTrendData]); // Depends on the filters object and the memoized fetchTrendData
-
+    }, [trendChartFilters, fetchTrendData]);
 
     const handleTrendFilterChange = (e) => {
         const { name, value } = e.target;
         setTrendChartFilters(prev => ({ ...prev, [name]: value }));
     };
-    
+
     const MovementTypePill = ({ type }) => {
         let colorClasses = 'bg-gray-100 text-gray-700';
-        if (type === 'in') colorClasses = 'bg-green-100 text-green-700';
-        else if (type === 'out') colorClasses = 'bg-red-100 text-red-700';
-        else if (type === 'adjustment') colorClasses = 'bg-yellow-100 text-yellow-700';
-        return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${colorClasses}`}>{type}</span>;
+        let displayText = type;
+        
+        if (type === 'in') {
+            colorClasses = 'bg-green-100 text-green-700';
+            displayText = 'รับเข้า';
+        } else if (type === 'out') {
+            colorClasses = 'bg-red-100 text-red-700';
+            displayText = 'ใช้งาน'; // Production context
+        } else if (type === 'adjustment') {
+            colorClasses = 'bg-yellow-100 text-yellow-700';
+            displayText = 'ปรับปรุง';
+        }
+        
+        return (
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${colorClasses}`}>
+                {displayText}
+            </span>
+        );
     };
 
+    // New state for enhanced data from your new APIs
+    const [inventoryValue, setInventoryValue] = useState(null);
+    const [usagePatterns, setUsagePatterns] = useState(null);
+    const [loadingEnhanced, setLoadingEnhanced] = useState(true);
 
-    if (error && !loadingRecent && !loadingSummary && !loadingTrend && !loadingItemTypes ) { // Show general error if no specific loading is active
+    if (error && !loadingRecent && !loadingSummary && !loadingTrend && !loadingItemTypes) {
         return (
             <div className="p-6 bg-red-50 text-red-700 rounded-md shadow">
                 <p><strong>ข้อผิดพลาด:</strong> {error}</p>
-                <button onClick={fetchAllDashboardData} className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">
+                <button 
+                    onClick={fetchAllDashboardData} 
+                    className="mt-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                >
                     ลองใหม่ทั้งหมด
                 </button>
             </div>
         );
     }
-    
-    return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-8 bg-gray-100 min-h-screen">
-            <h1 className="text-3xl font-bold text-gray-800">แดชบอร์ดวัสดุสิ้นเปลือง</h1>
 
-            {/* Summary Cards */}
-            {loadingSummary ? (
-                <div className="text-center py-8"><p className="text-gray-500">กำลังโหลดข้อมูลสรุป...</p></div>
-            ) : summaryData && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    return (
+        <div className="p-4 sm:p-6 lg:p-8 space-y-8 bg-gray-50 min-h-screen">
+            {/* Enhanced Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">แดชบอร์ดคลังวัสดุสิ้นเปลือง</h1>
+                    <p className="text-gray-600 mt-1">ติดตามและจัดการคลังวัสดุสิ้นเปลืองแบบเรียลไทม์</p>
+                </div>
+                <button
+                    onClick={fetchAllDashboardData}
+                    disabled={loadingSummary || loadingRecent}
+                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                    <RefreshIcon className="mr-2" />
+                    รีเฟรช
+                </button>
+            </div>
+
+            {/* Enhanced Summary Cards using real data */}
+            {loadingSummary || loadingEnhanced ? (
+                <div className="text-center py-8">
+                    <p className="text-gray-500">กำลังโหลดข้อมูลสรุป...</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <SummaryCard 
-                        title="รายการสต็อกต่ำ" 
-                        value={formatNumber(summaryData.lowStockItemsCount)} 
-                        icon={<LowStockIcon />}
-                        subValue={summaryData.lowStockItemsCount > 0 ? "รายการที่มีสต็อกต่ำกว่าจุดสั่งซื้อ" : "รายการทั้งหมดมีสต็อกสูงกว่าจุดสั่งซื้อ"}
+                        title="รายการทั้งหมด" 
+                        value={formatNumber(inventoryValue?.inventory_summary?.total_items || summaryData?.distinctConsumableItems || 0)}
+                        icon={<ProductionItemsIcon />}
+                        subValue={`${formatNumber(inventoryValue?.inventory_summary?.total_units || 0)} หน่วยรวม`}
                     />
                     <SummaryCard 
-                        title="จำนวนชนิดวัสดุสิ้นเปลือง" 
-                        value={formatNumber(summaryData.distinctConsumableItems)} 
-                        icon={<ItemsIcon />}
-                        subValue="จำนวนชนิดวัสดุสิ้นเปลืองทั้งหมดที่ติดตาม"
+                        title="ต้องเร่งจัดหา" 
+                        value={formatNumber(inventoryValue?.inventory_summary?.low_stock_count || summaryData?.lowStockItemsCount || 0)} 
+                        icon={<CriticalStockIcon />}
+                        subValue={
+                            inventoryValue?.inventory_summary?.out_of_stock_count > 0 
+                                ? `${inventoryValue.inventory_summary.out_of_stock_count} รายการหมดสต็อก` 
+                                : "สถานะปกติ"
+                        }
+                        valueColor={
+                            (inventoryValue?.inventory_summary?.low_stock_count || summaryData?.lowStockItemsCount || 0) > 0 
+                                ? "text-red-600" : "text-green-600"
+                        }
                     />
                     <SummaryCard 
-                        title="วัสดุใช้บ่อยสุดใน 30 วันที่ผ่านมา" 
-                        value={summaryData.mostActiveConsumable?.consumable_name || 'N/A'}
+                        title="มูลค่าคงคลัง" 
+                        value={`₿${formatNumber(inventoryValue?.inventory_summary?.estimated_value || 0)}`}
+                        icon={<ValueIcon />}
+                        subValue={`${formatNumber(inventoryValue?.inventory_summary?.total_units || 0)} หน่วย`}
+                    />
+                    <SummaryCard 
+                        title="การเคลื่อนไหววันนี้" 
+                        value={formatNumber(inventoryValue?.today_activity?.total_movements || 0)}
                         icon={<ActivityIcon />}
-                        subValue={summaryData.mostActiveConsumable?.movement_count > 0 ? `${summaryData.mostActiveConsumable.movement_count} ครั้ง 'จ่ายออก'` : "ไม่มีการเคลื่อนไหวที่สำคัญ"}
+                        subValue={
+                            inventoryValue?.today_activity 
+                                ? `รับ: ${inventoryValue.today_activity.total_received} ใช้: ${inventoryValue.today_activity.total_used}`
+                                : "รายการเคลื่อนไหว"
+                        }
                     />
                 </div>
             )}
 
-            {/* Item Type Movement Trend (Bar Chart) */}
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-                <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-                    <h2 className="text-xl font-semibold text-gray-700">แนวโน้มการเคลื่อนไหวรายวันตามประเภทวัสดุ</h2>
-                    <div className="flex items-center gap-4">
-                        <select 
-                            name="item_type_id"
-                            value={trendChartFilters.item_type_id} 
-                            onChange={handleTrendFilterChange}
-                            disabled={loadingItemTypes || itemTypes.length === 0}
-                            className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                            <option value="">{loadingItemTypes ? "กำลังโหลดประเภท..." : "เลือกประเภทวัสดุ"}</option>
-                            {itemTypes.map(type => (
-                                <option key={type.item_type_id} value={type.item_type_id.toString()}>
-                                    {type.type_name}
-                                </option>
-                            ))}
-                        </select>
-                        <select 
-                            name="period"
-                            value={trendChartFilters.period} 
-                            onChange={handleTrendFilterChange}
-                            className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                            <option value="last_7_days">7 วันที่ผ่านมา</option>
-                            <option value="last_30_days">30 วันที่ผ่านมา</option>
-                        </select>
-                    </div>
-                </div>
-                {loadingTrend ? (
-                    <div className="text-center py-8 h-[300px] flex items-center justify-center"><p className="text-gray-500">กำลังโหลดข้อมูลแนวโน้ม...</p></div>
-                ) : itemTypeMovementTrend.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={itemTypeMovementTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0"/>
-                            <XAxis dataKey="date" tickFormatter={(dateStr) => new Date(dateStr + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} />
-                            <YAxis />
-                            <Tooltip formatter={(value) => formatNumber(value)} />
-                            <Legend />
-                            <Bar dataKey="total_in" fill="#00C49F" name="Stock In" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="total_out" fill="#FF8042" name="Stock Out" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                ) : (
-                    <p className="text-center text-gray-500 py-8 h-[300px] flex items-center justify-center">
-                        {trendChartFilters.item_type_id ? "ไม่มีข้อมูลการเคลื่อนไหวสำหรับประเภท/ช่วงเวลาที่เลือก." : "กรุณาเลือกประเภทวัสดุเพื่อดูแนวโน้ม."}
-                    </p>
-                )}
-            </div>
+            {/* Enhanced Production Alerts using real data*/}
+            <ProductionAlertsPanel 
+                summaryData={summaryData} 
+                recentMovements={recentMovements} 
+                usagePatterns={usagePatterns}
+                inventoryValue={inventoryValue}
+            />
 
-            {/* Recent Consumable Stock Movements List */}
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h2 className="text-xl font-semibold text-gray-700 mb-4">การเคลื่อนไหวของสต็อกวัสดุสิ้นเปลืองล่าสุด</h2>
-                {loadingRecent ? (
-                    <div className="text-center py-8"><p className="text-gray-500">กำลังโหลดรายการเคลื่อนไหวล่าสุด...</p></div>
-                ) : recentMovements.length > 0 ? (
-                    <ul className="divide-y divide-gray-200">
-                        {recentMovements.map((movement) => (
-                            <li key={movement.movement_id} className="py-4">
-                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                                    <div>
-                                        <p className="text-sm font-medium text-indigo-600">{movement.consumable_name}</p>
-                                        <p className="text-xs text-gray-500">
-                                            {new Date(movement.movement_date).toLocaleString()}
-                                            {movement.recorded_by_username && ` โดย ${movement.recorded_by_username}`}
-                                        </p>
-                                        {movement.notes && <p className="text-xs text-gray-500 italic mt-1">หมายเหตุ: {movement.notes}</p>}
+            {/* Enhanced Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Enhanced Movement Trend Chart */}
+                <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                        <h2 className="text-xl font-semibold text-gray-700">แนวโน้มการใช้วัสดุสิ้นเปลือง</h2>
+                        <div className="flex items-center gap-4">
+                            <select 
+                                name="item_type_id"
+                                value={trendChartFilters.item_type_id} 
+                                onChange={handleTrendFilterChange}
+                                disabled={loadingItemTypes || itemTypes.length === 0}
+                                className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">{loadingItemTypes ? "กำลังโหลดประเภท..." : "เลือกประเภทวัสดุ"}</option>
+                                {itemTypes.map(type => (
+                                    <option key={type.item_type_id} value={type.item_type_id.toString()}>
+                                        {type.type_name}
+                                    </option>
+                                ))}
+                            </select>
+                            <select 
+                                name="period"
+                                value={trendChartFilters.period} 
+                                onChange={handleTrendFilterChange}
+                                className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="last_7_days">7 วันที่ผ่านมา</option>
+                                <option value="last_30_days">30 วันที่ผ่านมา</option>
+                            </select>
+                        </div>
+                    </div>
+                    {loadingTrend ? (
+                        <div className="text-center py-8 h-[300px] flex items-center justify-center">
+                            <p className="text-gray-500">กำลังโหลดข้อมูลแนวโน้ม...</p>
+                        </div>
+                    ) : itemTypeMovementTrend.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                            <AreaChart data={itemTypeMovementTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
+                                <XAxis 
+                                    dataKey="date" 
+                                    tickFormatter={(dateStr) => new Date(dateStr + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} 
+                                />
+                                <YAxis />
+                                <Tooltip 
+                                    formatter={(value, name) => [
+                                        formatNumber(value), 
+                                        name === 'total_in' ? 'รับเข้า' : 'ใช้งาน'
+                                    ]} 
+                                />
+                                <Legend />
+                                <Area 
+                                    type="monotone" 
+                                    dataKey="total_in" 
+                                    stackId="1" 
+                                    stroke="#10b981" 
+                                    fill="#10b981" 
+                                    fillOpacity={0.6}
+                                    name="รับเข้า"
+                                />
+                                <Area 
+                                    type="monotone" 
+                                    dataKey="total_out" 
+                                    stackId="1" 
+                                    stroke="#ef4444" 
+                                    fill="#ef4444" 
+                                    fillOpacity={0.6}
+                                    name="ใช้งาน"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <p className="text-center text-gray-500 py-8 h-[300px] flex items-center justify-center">
+                            {trendChartFilters.item_type_id ? "ไม่มีข้อมูลการเคลื่อนไหวสำหรับประเภท/ช่วงเวลาที่เลือก." : "กรุณาเลือกประเภทวัสดุเพื่อดูแนวโน้ม."}
+                        </p>
+                    )}
+                </div>
+
+                {/* Enhanced Recent Movements with Usage Insights */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h2 className="text-xl font-semibold text-gray-700 mb-4">การเคลื่อนไหวล่าสุด</h2>
+
+                    {/* Usage Insights Section */}
+                    {usagePatterns?.high_usage_items?.length > 0 && (
+                        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                            <h3 className="text-sm font-semibold text-blue-800 mb-2">วัสดุที่ใช้บ่อยที่สุด (30 วันที่ผ่านมา)</h3>
+                            <div className="space-y-2">
+                                {usagePatterns.high_usage_items.slice(0, 3).map((item, index) => (
+                                    <div key={index} className="flex justify-between text-xs">
+                                        <span className="text-blue-700">{item.name}</span>
+                                        <span className="text-blue-600">
+                                            {formatNumber(item.daily_usage)}/วัน • คงเหลือ {formatNumber(item.current_stock)}
+                                        </span>
                                     </div>
-                                    <div className="flex items-center gap-2 sm:text-right">
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {loadingRecent ? (
+                        <div className="text-center py-8">
+                            <p className="text-gray-500">กำลังโหลดรายการเคลื่อนไหวล่าสุด...</p>
+                        </div>
+                    ) : recentMovements.length > 0 ? (
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {recentMovements.map((movement) => (
+                                <div key={movement.movement_id} className="p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex-1">
+                                            <p className="text-sm font-medium text-gray-900">{movement.consumable_name}</p>
+                                            <div className="flex items-center text-xs text-gray-500 mt-1">
+                                                <ClockIcon className="mr-1" />
+                                                {new Date(movement.movement_date).toLocaleString('th-TH')}
+                                            </div>
+                                        </div>
                                         <MovementTypePill type={movement.movement_type} />
-                                        <p className={`text-sm font-semibold ${movement.quantity_changed > 0 && movement.movement_type !== 'out' ? 'text-green-600' : (movement.quantity_changed < 0 || movement.movement_type === 'out' ? 'text-red-600' : 'text-gray-700')}`}>
-                                            จำนวน: {movement.quantity_changed > 0 && movement.movement_type !== 'out' ? '+' : ''}{formatNumber(movement.quantity_changed)} {movement.unit_of_measure}
-                                        </p>
-                                        <p className="text-xs text-gray-500">(สต็อกใหม่: {formatNumber(movement.new_stock_level_after_movement)})</p>
                                     </div>
+                                    <div className="flex justify-between items-center">
+                                        <p className={`text-sm font-semibold ${
+                                            movement.movement_type === 'in' ? 'text-green-600' : 
+                                            movement.movement_type === 'out' ? 'text-red-600' : 'text-gray-700'
+                                        }`}>
+                                            {movement.movement_type === 'in' ? '+' : 
+                                             movement.movement_type === 'out' ? '-' : ''}
+                                            {formatNumber(Math.abs(movement.quantity_changed))} {movement.unit_of_measure}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                            สต็อก: {formatNumber(movement.new_stock_level_after_movement)}
+                                        </p>
+                                    </div>
+                                    {movement.recorded_by_username && (
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            โดย {movement.recorded_by_username}
+                                        </p>
+                                    )}
+                                    {movement.notes && (
+                                        <p className="text-xs text-gray-500 italic mt-1">
+                                            หมายเหตุ: {movement.notes}
+                                        </p>
+                                    )}
                                 </div>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-center text-gray-500 py-8">ไม่พบการเคลื่อนไหวของสต็อกล่าสุด.</p>
-                )}
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-center text-gray-500 py-8">ไม่พบการเคลื่อนไหวของสต็อกล่าสุด.</p>
+                    )}
+
+                    {/* Risk Analysis Section */}
+                    {usagePatterns?.risk_analysis?.length > 0 && (
+                        <div className="mt-6 p-4 bg-yellow-50 rounded-lg">
+                            <h3 className="text-sm font-semibold text-yellow-800 mb-2">รายการเสี่ยงหมดเร็ว</h3>
+                            <div className="space-y-2">
+                                {usagePatterns.risk_analysis.slice(0, 3).map((item, index) => (
+                                    <div key={index} className="flex justify-between text-xs">
+                                        <span className="text-yellow-700">{item.name}</span>
+                                        <span className="text-yellow-600">
+                                            ~{item.estimated_days_remaining} วัน
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
