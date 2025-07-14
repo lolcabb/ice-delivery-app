@@ -12,7 +12,6 @@ const handleError = (res, error, message = "An error occurred", statusCode = 500
 };
 
 // === INVENTORY DASHBOARD (CONSUMABLES) ===
-
 // GET /api/inventory/dashboard/consumables/summary
 router.get('/dashboard/consumables/summary', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
     try {
@@ -121,6 +120,161 @@ router.get('/dashboard/consumables/item-type-movement-trend', authMiddleware, re
     }
 });
 
+// GET /api/inventory/dashboard/consumables/inventory-value
+router.get('/dashboard/consumables/inventory-value', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+    try {
+        // Get total inventory value (you'll need to add cost_per_unit to your inventory_consumables table)
+        // For now, this is a placeholder - you can modify based on your cost tracking needs
+        const valueResult = await query(`
+            SELECT 
+                SUM(ic.current_stock_level) as total_units,
+                COUNT(ic.consumable_id) as total_items,
+                SUM(CASE WHEN ic.current_stock_level <= COALESCE(ic.reorder_point, 0) THEN 1 ELSE 0 END) as low_stock_count,
+                SUM(CASE WHEN ic.current_stock_level = 0 THEN 1 ELSE 0 END) as out_of_stock_count
+            FROM inventory_consumables ic
+        `);
+
+        // Get movement statistics for today
+        const todayMovementsResult = await query(`
+            SELECT 
+                COUNT(icm.movement_id) as total_movements_today,
+                SUM(CASE WHEN icm.movement_type = 'in' THEN icm.quantity_changed ELSE 0 END) as total_in_today,
+                SUM(CASE WHEN icm.movement_type = 'out' THEN ABS(icm.quantity_changed) ELSE 0 END) as total_out_today
+            FROM inventory_consumable_movements icm
+            WHERE DATE(icm.movement_date) = CURRENT_DATE
+        `);
+
+        // Get weekly consumption patterns
+        const weeklyTrendResult = await query(`
+            SELECT 
+                DATE(icm.movement_date) as date,
+                SUM(CASE WHEN icm.movement_type = 'in' THEN icm.quantity_changed ELSE 0 END) as daily_in,
+                SUM(CASE WHEN icm.movement_type = 'out' THEN ABS(icm.quantity_changed) ELSE 0 END) as daily_out
+            FROM inventory_consumable_movements icm
+            WHERE icm.movement_date >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY DATE(icm.movement_date)
+            ORDER BY date DESC
+        `);
+
+        const baseStats = valueResult.rows[0] || {};
+        const todayStats = todayMovementsResult.rows[0] || {};
+        const weeklyTrend = weeklyTrendResult.rows || [];
+
+        res.json({
+            inventory_summary: {
+                total_units: parseInt(baseStats.total_units || 0),
+                total_items: parseInt(baseStats.total_items || 0),
+                low_stock_count: parseInt(baseStats.low_stock_count || 0),
+                out_of_stock_count: parseInt(baseStats.out_of_stock_count || 0),
+                estimated_value: parseInt(baseStats.total_units || 0) * 10 // Placeholder: 10 baht per unit average
+            },
+            today_activity: {
+                total_movements: parseInt(todayStats.total_movements_today || 0),
+                total_received: parseInt(todayStats.total_in_today || 0),
+                total_used: parseInt(todayStats.total_out_today || 0),
+                net_change: parseInt(todayStats.total_in_today || 0) - parseInt(todayStats.total_out_today || 0)
+            },
+            weekly_trend: weeklyTrend.map(day => ({
+                date: day.date,
+                received: parseInt(day.daily_in || 0),
+                used: parseInt(day.daily_out || 0),
+                net: parseInt(day.daily_in || 0) - parseInt(day.daily_out || 0)
+            }))
+        });
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve inventory value summary");
+    }
+});
+
+// GET /api/inventory/dashboard/consumables/usage-patterns
+router.get('/dashboard/consumables/usage-patterns', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+    try {
+        // Get items with highest usage in last 30 days
+        const highUsageResult = await query(`
+            SELECT 
+                ic.consumable_name,
+                ic.current_stock_level,
+                ic.unit_of_measure,
+                COUNT(icm.movement_id) as movement_count,
+                SUM(CASE WHEN icm.movement_type = 'out' THEN ABS(icm.quantity_changed) ELSE 0 END) as total_used,
+                AVG(CASE WHEN icm.movement_type = 'out' THEN ABS(icm.quantity_changed) ELSE 0 END) as avg_usage_per_transaction,
+                ROUND(
+                    SUM(CASE WHEN icm.movement_type = 'out' THEN ABS(icm.quantity_changed) ELSE 0 END) / 
+                    GREATEST(DATE_PART('days', CURRENT_DATE - MIN(icm.movement_date)), 1), 
+                    2
+                ) as daily_usage_rate
+            FROM inventory_consumables ic
+            LEFT JOIN inventory_consumable_movements icm ON ic.consumable_id = icm.consumable_id 
+                AND icm.movement_date >= CURRENT_DATE - INTERVAL '30 days'
+                AND icm.movement_type = 'out'
+            GROUP BY ic.consumable_id, ic.consumable_name, ic.current_stock_level, ic.unit_of_measure
+            HAVING COUNT(icm.movement_id) > 0
+            ORDER BY total_used DESC
+            LIMIT 10
+        `);
+
+        // Get items that might run out soon (based on usage patterns)
+        const riskAnalysisResult = await query(`
+            WITH usage_stats AS (
+                SELECT 
+                    ic.consumable_id,
+                    ic.consumable_name,
+                    ic.current_stock_level,
+                    ic.unit_of_measure,
+                    ROUND(
+                        COALESCE(
+                            SUM(CASE WHEN icm.movement_type = 'out' THEN ABS(icm.quantity_changed) ELSE 0 END) / 
+                            GREATEST(DATE_PART('days', CURRENT_DATE - MIN(icm.movement_date)), 1),
+                            0
+                        ), 
+                        2
+                    ) as daily_usage_rate
+                FROM inventory_consumables ic
+                LEFT JOIN inventory_consumable_movements icm ON ic.consumable_id = icm.consumable_id 
+                    AND icm.movement_date >= CURRENT_DATE - INTERVAL '30 days'
+                    AND icm.movement_type = 'out'
+                GROUP BY ic.consumable_id, ic.consumable_name, ic.current_stock_level, ic.unit_of_measure
+            )
+            SELECT 
+                consumable_name,
+                current_stock_level,
+                unit_of_measure,
+                daily_usage_rate,
+                CASE 
+                    WHEN daily_usage_rate > 0 THEN ROUND(current_stock_level / daily_usage_rate, 1)
+                    ELSE null
+                END as estimated_days_remaining
+            FROM usage_stats
+            WHERE daily_usage_rate > 0
+            ORDER BY 
+                CASE 
+                    WHEN daily_usage_rate > 0 THEN current_stock_level / daily_usage_rate
+                    ELSE 999
+                END ASC
+            LIMIT 5
+        `);
+
+        res.json({
+            high_usage_items: highUsageResult.rows.map(item => ({
+                name: item.consumable_name,
+                current_stock: parseInt(item.current_stock_level),
+                unit: item.unit_of_measure,
+                total_used_30d: parseInt(item.total_used || 0),
+                daily_usage: parseFloat(item.daily_usage_rate || 0),
+                avg_per_transaction: parseFloat(item.avg_usage_per_transaction || 0)
+            })),
+            risk_analysis: riskAnalysisResult.rows.map(item => ({
+                name: item.consumable_name,
+                current_stock: parseInt(item.current_stock_level),
+                unit: item.unit_of_measure,
+                daily_usage: parseFloat(item.daily_usage_rate || 0),
+                estimated_days_remaining: parseFloat(item.estimated_days_remaining || 0)
+            }))
+        });
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve usage patterns");
+    }
+});
 
 // === INVENTORY ITEM TYPES ===
 // (For categorizing consumables like "Packaging", "Cleaning Supplies", etc.)

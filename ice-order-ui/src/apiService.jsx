@@ -219,6 +219,9 @@ export const apiService = {
         const queryParams = new URLSearchParams({ item_type_id: itemTypeId, period }).toString();
         return apiService.get(`/inventory/dashboard/consumables/item-type-movement-trend?${queryParams}`);
     },
+    // Enhanced dashboard methods
+    getInventoryValueSummary: () => apiService.get('/inventory/dashboard/consumables/inventory-value'),
+    getUsagePatterns: () => apiService.get('/inventory/dashboard/consumables/usage-patterns'),
     getContainerSizes: () => apiService.get('/containers/sizes'),
     getReturnReasons: () => apiService.get('/containers/return-reasons'), // For CRM Container Returns
     addIceContainer: (containerData) => apiService.post('/containers/items', containerData),
