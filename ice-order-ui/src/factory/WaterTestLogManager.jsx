@@ -84,8 +84,14 @@ export default function WaterTestLogManager() {
             const startDate = new Date();
             startDate.setDate(startDate.getDate() - 7);
             
-            // You might need to add date range support to your API
-            const recentLogs = await apiService.get('/water/logs');
+            const formatDate = (d) => d.toISOString().split('T')[0];
+
+            const query = new URLSearchParams({
+                start_date: formatDate(startDate),
+                end_date: formatDate(endDate)
+            }).toString();
+
+            const recentLogs = await apiService.get(`/water/logs/recent?${query}`);
             
             // Calculate dangerous values
             const dangerousValues = [];

@@ -7,6 +7,10 @@ router.route('/logs')
     .get(authMiddleware, waterController.getAllWaterLogs)
     .post(authMiddleware, waterController.addWaterLog); // Accessible by any authenticated user
 
+// Get recent water logs over a date range (defaults to last 7 days)
+router.route('/logs/recent')
+    .get(authMiddleware, waterController.getRecentWaterLogs);
+
 // Get all defined water test stages
 router.route('/stages')
     .get(authMiddleware, waterController.getTestStages);
