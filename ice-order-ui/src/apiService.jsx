@@ -373,6 +373,9 @@ export const apiService = {
     updateVehicleTire: (tireId, tireData) => apiService.put(`/tires/${tireId}`, tireData),
     deleteVehicleTire: (tireId) => apiService.delete(`/tires/${tireId}`),
     
+    addVehicleMaintenance: (vehicleId, maintenanceData) =>
+        apiService.post(`/vehicles/${vehicleId}/maintenance`, maintenanceData),
+    
     getCustomerCreditSales: (customerId) => apiService.get(`/customers/${customerId}/credit-sales`),
     // This is different because it sends FormData
     addCustomerCreditPayment: (customerId, paymentData) => {
