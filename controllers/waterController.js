@@ -16,6 +16,9 @@ exports.getAllWaterLogs = async (req, res) => {
             ORDER BY s.stage_id, l.test_session
         `;
         const { rows } = await db.query(query, [date]);
+        if (rows.length === 0) {
+            return res.status(404).json({ message: 'No water test logs found' });
+        }
         res.status(200).json(rows);
     } catch (err) {
         console.error(err.message)
