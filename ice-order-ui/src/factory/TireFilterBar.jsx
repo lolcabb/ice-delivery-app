@@ -14,9 +14,9 @@ const TireFilterBar = ({
     tireSizes = []
 }) => {
     const statuses = [
-        { value: 'In Stock', label: 'In Stock', icon: CheckCircle, color: 'text-green-600' },
-        { value: 'On Vehicle', label: 'On Vehicle', icon: Truck, color: 'text-blue-600' },
-        { value: 'Retired', label: 'Retired', icon: AlertTriangle, color: 'text-red-600' }
+        { value: 'In Stock', label: 'อยู่ในคลัง', icon: CheckCircle, color: 'text-green-600' },
+        { value: 'On Vehicle', label: 'ติดรถ', icon: Truck, color: 'text-blue-600' },
+        { value: 'Retired', label: 'เลิกใช้', icon: AlertTriangle, color: 'text-red-600' }
     ];
 
     const handleSearchChange = (value) => {
@@ -49,13 +49,13 @@ const TireFilterBar = ({
             {/* Header */}
             <div className="flex items-center gap-2 mb-4">
                 <Filter className="w-5 h-5 text-gray-500" />
-                <h3 className="text-lg font-medium text-gray-900">Search & Filter Tires</h3>
+                <h3 className="text-lg font-medium text-gray-900">ค้นหาและกรองยาง</h3>
                 {hasActiveFilters && (
                     <button
                         onClick={clearAllFilters}
                         className="ml-auto text-sm text-green-600 hover:text-green-800 underline"
                     >
-                        Clear all filters
+                        ล้างตัวกรองทั้งหมด
                     </button>
                 )}
             </div>
@@ -65,7 +65,7 @@ const TireFilterBar = ({
                 {/* Search Input */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Search Tires
+                        ค้นหายาง
                     </label>
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -84,14 +84,14 @@ const TireFilterBar = ({
                     {/* Status Filter */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Status
+                            สถานะ
                         </label>
                         <select
                             value={statusFilter}
                             onChange={(e) => handleStatusChange(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         >
-                            <option value="All">All Statuses</option>
+                            <option value="All">ทั้งหมด</option>
                             {statuses.map(status => (
                                 <option key={status.value} value={status.value}>
                                     {status.label}
@@ -103,14 +103,14 @@ const TireFilterBar = ({
                     {/* Brand Filter */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Brand
+                            ยี่ห้อ
                         </label>
                         <select
                             value={brandFilter}
                             onChange={(e) => handleBrandChange(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         >
-                            <option value="All">All Brands</option>
+                            <option value="All">ทุกยี่ห้อ</option>
                             {tireBrands.map(brand => (
                                 <option key={brand} value={brand}>
                                     {brand}
@@ -122,14 +122,14 @@ const TireFilterBar = ({
                     {/* Size Filter */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Sidewall Size
+                            ขนาดแก้มยาง
                         </label>
                         <select
                             value={sizeFilter}
                             onChange={(e) => handleSizeChange(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                         >
-                            <option value="All">All Sizes</option>
+                            <option value="All">ทุกขนาด</option>
                             {tireSizes.map(size => (
                                 <option key={size} value={size}>
                                     <span className="font-mono">{size}</span>
@@ -168,7 +168,7 @@ const TireFilterBar = ({
                                     const IconComponent = status?.icon || Package;
                                     return <IconComponent className="w-3 h-3" />;
                                 })()}
-                                Status: {statusFilter}
+                                สถานะ: {statusFilter}
                                 <button
                                     onClick={() => setStatusFilter('All')}
                                     className="ml-1 hover:text-green-600"
@@ -182,7 +182,7 @@ const TireFilterBar = ({
                         {brandFilter !== 'All' && (
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                                 <Package className="w-3 h-3" />
-                                Brand: {brandFilter}
+                                ยี่ห้อ: {brandFilter}
                                 <button
                                     onClick={() => setBrandFilter('All')}
                                     className="ml-1 hover:text-purple-600"
@@ -195,7 +195,7 @@ const TireFilterBar = ({
                         {/* Size Filter Tag */}
                         {sizeFilter !== 'All' && (
                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                Size: <span className="font-mono">{sizeFilter}</span>
+                                ขนาด: <span className="font-mono">{sizeFilter}</span>
                                 <button
                                     onClick={() => setSizeFilter('All')}
                                     className="ml-1 hover:text-orange-600"
@@ -211,7 +211,7 @@ const TireFilterBar = ({
             {/* Quick Filter Buttons */}
             <div className="mt-4 pt-4 border-t border-gray-200">
                 <div className="flex flex-wrap gap-2">
-                    <span className="text-sm text-gray-600 mr-2">Quick filters:</span>
+                    <span className="text-sm text-gray-600 mr-2">ตัวกรอง:</span>
                     
                     {/* Status Quick Filters */}
                     {statuses.map(status => (

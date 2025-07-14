@@ -80,24 +80,24 @@ const TireFormModal = ({
                         {/* Serial Number */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Serial Number *
+                                หมายเลขรหัสภายใน *
                             </label>
                             <input
                                 type="text"
                                 value={tireForm.serial_number || ''}
                                 onChange={(e) => handleInputChange('serial_number', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="e.g., BR-001-2024"
+                                placeholder="เช่น, BR-001-2024"
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                Unique identifier for tracking this tire
+                                รหัสระบุเฉพาะสำหรับติดตามยางเส้นนี้
                             </p>
                         </div>
 
                         {/* Brand */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Brand *
+                                ยี่ห้อ *
                             </label>
                             <div className="space-y-2">
                                 <select
@@ -105,11 +105,11 @@ const TireFormModal = ({
                                     onChange={(e) => handleInputChange('brand', e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                 >
-                                    <option value="">Select Brand</option>
+                                    <option value="">เลือกยี่ห้อ</option>
                                     {commonBrands.map(brand => (
                                         <option key={brand} value={brand}>{brand}</option>
                                     ))}
-                                    <option value="Other">Other (Custom)</option>
+                                    <option value="Other">อื่นๆ (ระบุ)</option>
                                 </select>
                                 
                                 {/* Custom brand input if "Other" is selected */}
@@ -127,7 +127,7 @@ const TireFormModal = ({
                         {/* Sidewall Size */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Sidewall Size *
+                                ขนาดแก้มยาง *
                             </label>
                             <div className="space-y-2">
                                 <select
@@ -135,32 +135,32 @@ const TireFormModal = ({
                                     onChange={(e) => handleInputChange('sidewall', e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                 >
-                                    <option value="">Select Size</option>
+                                    <option value="">เลือกขนาด</option>
                                     {commonSidewalls.map(size => (
                                         <option key={size} value={size}>{size}</option>
                                     ))}
-                                    <option value="Custom">Custom Size</option>
+                                    <option value="Custom">ขนาดอื่นๆ</option>
                                 </select>
                                 
                                 {/* Custom sidewall input if "Custom" is selected */}
                                 {tireForm.sidewall === 'Custom' && (
                                     <input
                                         type="text"
-                                        placeholder="e.g., 265/70R16"
+                                        placeholder="เช่น, 265/70R16"
                                         onChange={(e) => handleInputChange('sidewall', e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
                                     />
                                 )}
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                                Tire size specification (width/aspect ratio/diameter)
+                                ข้อมูลจำเพาะขนาดยาง (ความกว้าง/อัตราส่วนด้าน/เส้นผ่านศูนย์กลาง)
                             </p>
                         </div>
 
                         {/* Purchase Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Purchase Date (Optional)
+                                วันที่จัดซื้อ (ไม่บังคับ)
                             </label>
                             <input
                                 type="date"
@@ -174,19 +174,19 @@ const TireFormModal = ({
                         {/* Status */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Status
+                                สถานะ
                             </label>
                             <select
                                 value={tireForm.status || 'In Stock'}
                                 onChange={(e) => handleInputChange('status', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                             >
-                                <option value="In Stock">In Stock</option>
-                                <option value="Retired">Retired</option>
+                                <option value="In Stock">ในคลัง</option>
+                                <option value="Retired">เลิกใช้</option>
                                 {/* Note: "On Vehicle" status should be set through assignment, not manually */}
                             </select>
                             <p className="text-xs text-gray-500 mt-1">
-                                Note: "On Vehicle" status is set automatically when tire is assigned
+                                หมายเหตุ: สถานะ "ติดรถ" จะถูกตั้งค่าโดยอัตโนมัติเมื่อมีการกำหนดยาง
                             </p>
                         </div>
                     </div>
@@ -194,8 +194,8 @@ const TireFormModal = ({
                     {/* Required fields notice */}
                     <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                         <p className="text-xs text-yellow-800">
-                            <strong>Note:</strong> Fields marked with * are required. 
-                            Serial numbers should be unique for proper tracking.
+                            <strong>Note:</strong> จำเป็นต้องกรอกช่องที่มีเครื่องหมาย *
+                            หมายเลขรหัสภายในควรไม่ซ้ำกันเพื่อการติดตามที่ถูกต้อง.
                         </p>
                     </div>
 
@@ -205,14 +205,14 @@ const TireFormModal = ({
                             onClick={onClose}
                             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         >
-                            Cancel
+                            ยกเลิก
                         </button>
                         <button
                             onClick={handleSubmit}
                             disabled={loading}
                             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                         >
-                            {loading ? (isEdit ? 'Updating...' : 'Adding...') : (isEdit ? 'Update Tire' : 'Add Tire')}
+                            {loading ? (isEdit ? 'Updating...' : 'Adding...') : (isEdit ? 'แก้ไขยาง' : 'เพิ่มยาง')}
                         </button>
                     </div>
                 </div>

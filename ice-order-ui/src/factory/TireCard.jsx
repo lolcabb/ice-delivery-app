@@ -39,11 +39,11 @@ const TireCard = ({ tire, onEdit, onDelete, onAssign, onUnmount, assignment }) =
                 {/* Tire details */}
                 <div className="space-y-2 mb-4">
                     <div className="flex justify-between">
-                        <span className="text-gray-500">Sidewall:</span>
+                        <span className="text-gray-500">เลข DOT:</span>
                         <span className="text-gray-900 font-mono">{tire.sidewall}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-gray-500">Purchase Date:</span>
+                        <span className="text-gray-500">วันที่จัดซื้อ:</span>
                         <span className="text-gray-900">{formatDate(tire.purchase_date)}</span>
                     </div>
                     
@@ -52,15 +52,15 @@ const TireCard = ({ tire, onEdit, onDelete, onAssign, onUnmount, assignment }) =
                         <>
                             <div className="pt-2 border-t border-gray-200">
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Vehicle:</span>
+                                    <span className="text-gray-500">รถ:</span>
                                     <span className="text-gray-900">{assignment.vehicle_name}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Position:</span>
+                                    <span className="text-gray-500">ตำแหน่ง:</span>
                                     <span className="text-gray-900">{assignment.position}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Mounted:</span>
+                                    <span className="text-gray-500">วันที่ติดตั้ง:</span>
                                     <span className="text-gray-900">{formatDate(assignment.mount_date)}</span>
                                 </div>
                             </div>
@@ -76,7 +76,7 @@ const TireCard = ({ tire, onEdit, onDelete, onAssign, onUnmount, assignment }) =
                             className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors text-sm"
                         >
                             <MapPin className="w-4 h-4" />
-                            Assign
+                            กำหนด
                         </button>
                     )}
                     
@@ -86,7 +86,7 @@ const TireCard = ({ tire, onEdit, onDelete, onAssign, onUnmount, assignment }) =
                             className="flex-1 flex items-center justify-center gap-2 bg-orange-50 text-orange-700 px-3 py-2 rounded-lg hover:bg-orange-100 transition-colors text-sm"
                         >
                             <X className="w-4 h-4" />
-                            Unmount
+                            ถอดออก
                         </button>
                     )}
                     
@@ -95,7 +95,7 @@ const TireCard = ({ tire, onEdit, onDelete, onAssign, onUnmount, assignment }) =
                         className="flex-1 flex items-center justify-center gap-2 bg-green-50 text-green-700 px-3 py-2 rounded-lg hover:bg-green-100 transition-colors text-sm"
                     >
                         <Edit className="w-4 h-4" />
-                        Edit
+                        แก้ไข
                     </button>
                     
                     <button
