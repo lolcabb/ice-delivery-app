@@ -60,7 +60,6 @@ export default function TireStockManager() {
                 // const assignmentsData = await apiService.getTireAssignments();
                 // setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
             } catch (err) {
-                console.log('Tire assignments API not available yet');
                 setAssignments([]);
             }
         } catch (err) {
@@ -212,7 +211,6 @@ export default function TireStockManager() {
             resetAssignmentForm();
             setError(null);
             
-            console.log('Tire assignment data (ready for API):', assignmentData);
         } catch (err) {
             console.error('Failed to assign tire:', err);
             setError('Failed to assign tire. Please try again.');
@@ -379,7 +377,6 @@ export default function TireStockManager() {
                     </div>
                 )}
 
-                {/* Tire Grid - Replace with TireCard components */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {loading ? (
                         Array(6).fill(0).map((_, i) => (

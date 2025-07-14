@@ -20,7 +20,7 @@ export default function FactoryPanelLayout() {
             <header className="bg-white shadow-md sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
-                        <h1 className="text-2xl font-bold text-gray-800">Factory Operations</h1>
+                        <h1 className="text-2xl font-bold text-orange-800">Factory Operations</h1>
                     </div>
                     <nav className="-mb-px flex space-x-6 sm:space-x-8 overflow-x-auto" aria-label="Factory Sections">
                         {factorySubNavItems.map((item) => (
@@ -35,7 +35,7 @@ export default function FactoryPanelLayout() {
                                         item.disabled
                                             ? 'text-gray-400 cursor-not-allowed'
                                             : (isActive || (isBaseFactoryPath && item.path === '/factory/vehicles'))
-                                                ? 'border-blue-500 text-blue-600'
+                                                ? 'border-orange-500 text-orange-600'
                                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                                     }`
                                 }

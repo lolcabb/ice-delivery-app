@@ -192,15 +192,10 @@ export default function VehicleMonitor() {
 
         setLoading(true);
         try {
-            // Assuming you have an API endpoint for maintenance
-            // If not, you can add this to your backend and apiService
-            const maintenanceData = {
-                vehicle_id: selectedVehicle.vehicle_id,
-                ...maintenanceForm
-            };
-            
-            // Replace with actual API call when available
-            console.log('Maintenance data to submit:', maintenanceData);
+            await apiService.addVehicleMaintenance(
+                selectedVehicle.vehicle_id,
+                maintenanceForm
+            );
             
             setShowMaintenanceModal(false);
             setSelectedVehicle(null);
