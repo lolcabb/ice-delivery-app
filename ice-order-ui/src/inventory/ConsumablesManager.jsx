@@ -105,7 +105,7 @@ export default function ConsumablesManager() {
     const fetchItemTypesForConsumables = useCallback(async () => {
         if (itemTypes.length === 0 || isConsumableFormOpen) {
             try {
-                const { data } = await apiService.getInventoryItemTypes();
+                const data = await apiService.getInventoryItemTypes();
                 setItemTypes(Array.isArray(data) ? data.filter(type => type.is_active !== false) : []);
             } catch (err) {
                 console.error("Failed to fetch item types for consumables forms:", err);
