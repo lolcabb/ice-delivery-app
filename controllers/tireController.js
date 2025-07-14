@@ -2,7 +2,7 @@ const db = require('../db/postgres');
 
 /**
  * @desc    Get all tires
- * @route   GET /api/v1/tires
+ * @route   GET /api/tires
  */
 exports.getAllTires = async (req, res) => {
     try {
@@ -16,7 +16,7 @@ exports.getAllTires = async (req, res) => {
 
 /**
  * @desc    Get a single tire by ID
- * @route   GET /api/v1/tires/:id
+ * @route   GET /api/tires/:id
  */
 exports.getTireById = async (req, res) => {
     try {
@@ -33,7 +33,7 @@ exports.getTireById = async (req, res) => {
 
 /**
  * @desc    Add a new tire
- * @route   POST /api/v1/tires
+ * @route   POST /api/tires
  */
 exports.addTire = async (req, res) => {
     const { serial_number, brand, sidewall, status, purchase_date } = req.body;
@@ -54,7 +54,7 @@ exports.addTire = async (req, res) => {
 
 /**
  * @desc    Update a tire
- * @route   PUT /api/v1/tires/:id
+ * @route   PUT /api/tires/:id
  */
 exports.updateTire = async (req, res) => {
     const { serial_number, brand, sidewall, status, purchase_date } = req.body;
@@ -78,7 +78,7 @@ exports.updateTire = async (req, res) => {
 
 /**
  * @desc    Get all tire assignments
- * @route   GET /api/v1/tires/assignments
+ * @route   GET /api/tires/assignments
  */
 exports.getAllAssignments = async (req, res) => {
     try {
@@ -104,7 +104,7 @@ exports.getAllAssignments = async (req, res) => {
 
 /**
  * @desc    Assign a tire to a vehicle
- * @route   POST /api/v1/tires/assign
+ * @route   POST /api/tires/assign
  */
 exports.assignTire = async (req, res) => {
     const { tire_id, vehicle_id, position, mount_date } = req.body;
@@ -135,7 +135,7 @@ exports.assignTire = async (req, res) => {
 
 /**
  * @desc    Unmount a tire from a vehicle
- * @route   PUT /api/v1/tires/unmount/:tireId
+ * @route   PUT /api/tires/unmount/:tireId
  */
 exports.unmountTire = async (req, res) => {
     const { unmount_date, new_status } = req.body; // new_status could be 'In Stock' or 'Retired'

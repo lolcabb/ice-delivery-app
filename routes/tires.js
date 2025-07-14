@@ -7,14 +7,14 @@ router.route('/')
     .get(authMiddleware, tireController.getAllTires)
     .post(authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), tireController.addTire);
 
+// Get all tire assignments
+router.route('/assignments')
+    .get(authMiddleware, tireController.getAllAssignments);
+    
 // Get and update a single tire
 router.route('/:id')
     .get(authMiddleware, tireController.getTireById)
     .put(authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), tireController.updateTire);
-
-// Get all tire assignments
-router.route('/assignments')
-    .get(authMiddleware, tireController.getAllAssignments);
 
 // Assign a tire to a vehicle
 router.route('/assign')

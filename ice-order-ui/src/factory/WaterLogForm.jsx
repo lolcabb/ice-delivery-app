@@ -28,9 +28,7 @@ const WaterLogForm = ({
         }));
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        
+    const handleSubmit = () => {
         // Check if at least one field is filled
         let hasData = false;
         Object.keys(formData).forEach(stageId => {
@@ -75,15 +73,6 @@ const WaterLogForm = ({
         return session === 'morning' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800';
     };
 
-    const getParameterUnit = (parameter) => {
-        switch (parameter) {
-            case 'ph_value': return 'pH';
-            case 'tds_ppm_value': return 'ppm';
-            case 'ec_us_cm_value': return 'µS/cm';
-            default: return '';
-        }
-    };
-
     const getParameterThreshold = (parameter) => {
         if (!dangerThresholds?.[parameter]) return '';
         const threshold = dangerThresholds[parameter];
@@ -113,7 +102,6 @@ const WaterLogForm = ({
                         </button>
                     </div>
 
-                    <form onSubmit={handleSubmit}>
                     {/* Date Selection */}
                     <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center gap-3">
@@ -156,139 +144,118 @@ const WaterLogForm = ({
                         </div>
                     </div>
 
-                    {/* Test Data Form */}
-                    <div>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                                <thead>
-                                    <tr className="bg-gray-50">
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                                            Treatment Stage
-                                        </th>
-                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                                            Session
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                            pH Level {getParameterThreshold('ph_value')}
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                            TDS (ppm) {getParameterThreshold('tds_ppm_value')}
-                                        </th>
-                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                            EC (µS/cm) {getParameterThreshold('ec_us_cm_value')}
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {stages.map((stage) => (
-                                        <React.Fragment key={stage.stage_id}>
-                                            {['morning', 'afternoon'].map((session, sessionIndex) => (
-                                                <tr key={`${stage.stage_id}-${session}`} className="hover:bg-gray-50">
-                                                    {/* Stage Name (only show for first session) */}
-                                                    <td className="px-4 py-3 border border-gray-200">
-                                                        {sessionIndex === 0 ? (
-                                                            <div className="font-medium text-gray-900">
-                                                                {stage.stage_name}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-gray-400 text-sm ml-4">↳</div>
+                    {/* Test Data Table */}
+                    <div className="overflow-x-auto mb-6">
+                        <table className="min-w-full">
+                            <thead>
+                                <tr className="bg-gray-50">
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                                        Treatment Stage
+                                    </th>
+                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                                        Session
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                        pH Level {getParameterThreshold('ph_value')}
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                        TDS (ppm) {getParameterThreshold('tds_ppm_value')}
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                        EC (µS/cm) {getParameterThreshold('ec_us_cm_value')}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {stages.map((stage) => (
+                                    <React.Fragment key={stage.stage_id}>
+                                        {['morning', 'afternoon'].map((session, sessionIndex) => (
+                                            <tr key={`${stage.stage_id}-${session}`} className="hover:bg-gray-50">
+                                                {/* Stage Name (only show for first session) */}
+                                                <td className="px-4 py-3 border border-gray-200">
+                                                    {sessionIndex === 0 ? (
+                                                        <div className="font-medium text-gray-900">
+                                                            {stage.stage_name}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-gray-400 text-sm ml-4">↳</div>
+                                                    )}
+                                                </td>
+
+                                                {/* Session */}
+                                                <td className="px-4 py-3 border border-gray-200">
+                                                    <div className="flex items-center gap-2">
+                                                        {getSessionIcon(session)}
+                                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getSessionColor(session)}`}>
+                                                            {session.charAt(0).toUpperCase() + session.slice(1)}
+                                                        </span>
+                                                    </div>
+                                                </td>
+
+                                                {/* pH Value */}
+                                                <td className="px-4 py-3 border border-gray-200 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            min="0"
+                                                            max="14"
+                                                            value={formData[stage.stage_id]?.[session]?.ph_value || ''}
+                                                            onChange={(e) => handleInputChange(stage.stage_id, session, 'ph_value', e.target.value)}
+                                                            className={getInputClassName('ph_value', formData[stage.stage_id]?.[session]?.ph_value)}
+                                                            placeholder="7.0"
+                                                        />
+                                                        {isValueDangerous('ph_value', formData[stage.stage_id]?.[session]?.ph_value) && (
+                                                            <AlertTriangle className="w-4 h-4 text-red-500" />
                                                         )}
-                                                    </td>
+                                                    </div>
+                                                </td>
 
-                                                    {/* Session */}
-                                                    <td className="px-4 py-3 border border-gray-200">
-                                                        <div className="flex items-center gap-2">
-                                                            {getSessionIcon(session)}
-                                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getSessionColor(session)}`}>
-                                                                {session.charAt(0).toUpperCase() + session.slice(1)}
-                                                            </span>
-                                                        </div>
-                                                    </td>
+                                                {/* TDS Value */}
+                                                <td className="px-4 py-3 border border-gray-200 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            step="1"
+                                                            min="0"
+                                                            value={formData[stage.stage_id]?.[session]?.tds_ppm_value || ''}
+                                                            onChange={(e) => handleInputChange(stage.stage_id, session, 'tds_ppm_value', e.target.value)}
+                                                            className={getInputClassName('tds_ppm_value', formData[stage.stage_id]?.[session]?.tds_ppm_value)}
+                                                            placeholder="50"
+                                                        />
+                                                        {isValueDangerous('tds_ppm_value', formData[stage.stage_id]?.[session]?.tds_ppm_value) && (
+                                                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                        )}
+                                                    </div>
+                                                </td>
 
-                                                    {/* pH Value */}
-                                                    <td className="px-4 py-3 border border-gray-200 text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <input
-                                                                type="number"
-                                                                step="0.1"
-                                                                min="0"
-                                                                max="14"
-                                                                value={formData[stage.stage_id]?.[session]?.ph_value || ''}
-                                                                onChange={(e) => handleInputChange(stage.stage_id, session, 'ph_value', e.target.value)}
-                                                                className={getInputClassName('ph_value', formData[stage.stage_id]?.[session]?.ph_value)}
-                                                                placeholder="7.0"
-                                                            />
-                                                            {isValueDangerous('ph_value', formData[stage.stage_id]?.[session]?.ph_value) && (
-                                                                <AlertTriangle className="w-4 h-4 text-red-500" />
-                                                            )}
-                                                        </div>
-                                                    </td>
-
-                                                    {/* TDS Value */}
-                                                    <td className="px-4 py-3 border border-gray-200 text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <input
-                                                                type="number"
-                                                                step="1"
-                                                                min="0"
-                                                                value={formData[stage.stage_id]?.[session]?.tds_ppm_value || ''}
-                                                                onChange={(e) => handleInputChange(stage.stage_id, session, 'tds_ppm_value', e.target.value)}
-                                                                className={getInputClassName('tds_ppm_value', formData[stage.stage_id]?.[session]?.tds_ppm_value)}
-                                                                placeholder="50"
-                                                            />
-                                                            {isValueDangerous('tds_ppm_value', formData[stage.stage_id]?.[session]?.tds_ppm_value) && (
-                                                                <AlertTriangle className="w-4 h-4 text-red-500" />
-                                                            )}
-                                                        </div>
-                                                    </td>
-
-                                                    {/* EC Value */}
-                                                    <td className="px-4 py-3 border border-gray-200 text-center">
-                                                        <div className="flex items-center justify-center gap-1">
-                                                            <input
-                                                                type="number"
-                                                                step="1"
-                                                                min="0"
-                                                                value={formData[stage.stage_id]?.[session]?.ec_us_cm_value || ''}
-                                                                onChange={(e) => handleInputChange(stage.stage_id, session, 'ec_us_cm_value', e.target.value)}
-                                                                className={getInputClassName('ec_us_cm_value', formData[stage.stage_id]?.[session]?.ec_us_cm_value)}
-                                                                placeholder="100"
-                                                            />
-                                                            {isValueDangerous('ec_us_cm_value', formData[stage.stage_id]?.[session]?.ec_us_cm_value) && (
-                                                                <AlertTriangle className="w-4 h-4 text-red-500" />
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </React.Fragment>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                                {/* EC Value */}
+                                                <td className="px-4 py-3 border border-gray-200 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            step="1"
+                                                            min="0"
+                                                            value={formData[stage.stage_id]?.[session]?.ec_us_cm_value || ''}
+                                                            onChange={(e) => handleInputChange(stage.stage_id, session, 'ec_us_cm_value', e.target.value)}
+                                                            className={getInputClassName('ec_us_cm_value', formData[stage.stage_id]?.[session]?.ec_us_cm_value)}
+                                                            placeholder="100"
+                                                        />
+                                                        {isValueDangerous('ec_us_cm_value', formData[stage.stage_id]?.[session]?.ec_us_cm_value) && (
+                                                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </React.Fragment>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
 
-                    {/* Buttons */}
-                        <div className="flex gap-3 pt-6">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                            >
-                                <Save className="w-5 h-5" />
-                                {loading ? 'Submitting...' : 'Submit All Tests'}
-                            </button>
-                        </div>
-
                     {/* Legend */}
-                    <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="mb-6 p-3 bg-gray-50 rounded-lg">
                         <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
                             <div className="flex items-center gap-1">
                                 <div className="w-3 h-3 bg-green-50 border border-green-300 rounded"></div>
@@ -309,7 +276,26 @@ const WaterLogForm = ({
                             </div>
                         </div>
                     </div>
-                    </form>
+
+                    {/* Buttons */}
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={loading}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                        >
+                            <Save className="w-5 h-5" />
+                            {loading ? 'Submitting...' : 'Submit All Tests'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
