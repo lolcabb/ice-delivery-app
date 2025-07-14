@@ -1,3 +1,7 @@
+// ice-delivery-app/routes/salesOperations.js
+const express = require('express');
+const router = express.Router();
+const { authMiddleware, requireRole } = require('../middleware/auth');
 const salesOpsController = require('../controllers/salesOperationsController');
 
 router.get('/routes/:routeId/customers', authMiddleware, salesOpsController.getRouteCustomers);
