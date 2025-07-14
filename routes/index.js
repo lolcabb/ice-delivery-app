@@ -1,0 +1,17 @@
+module.exports = {
+  authRoutes: require('./authRoutes'),
+  userRoutes: require('./users'),
+  customerRoutes: require('./customers'),
+  containerRoutes: require('./containerRoutes'),
+  orderRoutes: require('./orders'),
+  salesOperationsRoutes: require('./salesOperations'),
+  driverRoutes: require('./drivers'),
+  logRoutes: require('./logs'),
+  inventoryRoutes: require('./inventory'),
+  expenseRoutes: require('./expenses'),
+  reportRoutes: require('./reports'),
+  vehicleRoutes: require('./vehicles'),
+  tireRoutes: require('./tires'),
+  waterRoutes: require('./water'),
+  printBillRoute: require('./printBill'),
+};

@@ -23,63 +23,35 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
 
-// --- Auth & User Routes ---
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/users');
-
-// --- CRM Routes ---
-const customerRoutes = require('./routes/customers');
-const containerRoutes = require('./routes/containerRoutes');
-
-// --- Sales Operations Routes ---
-const orderRoutes = require('./routes/orders');
-const salesOperationsRoutes = require('./routes/salesOperations');
-
-//Driver Management
-const driverRoutes = require('./routes/drivers');
-const logRoutes = require('./routes/logs');
-
-// --- Inventory, Expenses & Reports Routes ---
-const inventoryRoutes = require('./routes/inventory');
-const expenseRoutes = require('./routes/expenses');
-const reportRoutes = require('./routes/reports');
-
-// --- Factory Operations Routes ---
-const vehicleRoutes = require('./routes/vehicles');
-const tireRoutes = require('./routes/tires');
-const waterRoutes = require('./routes/water');
-
-// --- Misc ---
-const printBillRoute = require('./routes/printBill');
+// --- Aggregated Routes ---
+const routes = require('./routes');
 
 // --- Auth & User Routes ---
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/auth', routes.authRoutes);
+app.use('/api/users', routes.userRoutes);
 
 // --- CRM Routes ---
-app.use('/api/customers', customerRoutes);
-app.use('/api/containers', containerRoutes);
+app.use('/api/customers', routes.customerRoutes);
+app.use('/api/containers', routes.containerRoutes);
 
 // --- Sales Operations Routes ---
-app.use('/api/orders', orderRoutes);
-app.use('/api/sales-ops', salesOperationsRoutes);
-app.use('/api/drivers', driverRoutes);
-app.use('/api/logs', logRoutes);
+app.use('/api/orders', routes.orderRoutes);
+app.use('/api/sales-ops', routes.salesOperationsRoutes);
+app.use('/api/drivers', routes.driverRoutes);
+app.use('/api/logs', routes.logRoutes);
 
 // --- Inventory, Expenses & Reports Routes ---
-app.use('/api/inventory', inventoryRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/reports', reportRoutes);
+app.use('/api/inventory', routes.inventoryRoutes);
+app.use('/api/expenses', routes.expenseRoutes);
+app.use('/api/reports', routes.reportRoutes);
 
 // --- Factory Operations Routes ---
-app.use('/api/vehicles', vehicleRoutes);
-app.use('/api/tires', tireRoutes);
-app.use('/api/water', waterRoutes);
+app.use('/api/vehicles', routes.vehicleRoutes);
+app.use('/api/tires', routes.tireRoutes);
+app.use('/api/water', routes.waterRoutes);
 
-// Print Bill
-const printBillRoute = require('./routes/printBill');
 // --- Misc ---
-app.use('/print-bill', printBillRoute);
+app.use('/print-bill', routes.printBillRoute);
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
