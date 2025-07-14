@@ -72,10 +72,15 @@ router.get('/dashboard/consumables/recent-movements', authMiddleware, requireRol
 
 // GET /api/inventory/dashboard/consumables/item-type-movement-trend
 router.get('/dashboard/consumables/item-type-movement-trend', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
-    const { item_type_id, period = 'last_7_days' } = req.query; 
+    const { item_type_id, period = 'last_7_days' } = req.query;
     
     if (!item_type_id) {
         return res.status(400).json({ error: 'item_type_id is required.' });
+    }
+
+    const parsedItemTypeId = parseInt(item_type_id);
+    if (isNaN(parsedItemTypeId)) {
+        return res.status(400).json({ error: 'item_type_id must be a valid number.' });
     }
 
     let startDate;
@@ -107,7 +112,7 @@ router.get('/dashboard/consumables/item-type-movement-trend', authMiddleware, re
             WHERE c.item_type_id = $1 AND m.movement_date >= $2 AND m.movement_date < $3
             GROUP BY TO_CHAR(m.movement_date, 'YYYY-MM-DD')
             ORDER BY date ASC`,
-            [parseInt(item_type_id), startDate.toISOString().split('T')[0], new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] ] 
+            [parsedItemTypeId, startDate.toISOString().split('T')[0], new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] ] 
         );
 
         res.json(result.rows.map(row => ({
@@ -358,7 +363,11 @@ router.get('/consumables', authMiddleware, requireRole(['admin', 'accountant', '
     let mainQuery = `SELECT ic.*, it.type_name FROM inventory_consumables ic JOIN inventory_item_types it ON ic.item_type_id = it.item_type_id`;
     let countQuery = `SELECT COUNT(ic.*) FROM inventory_consumables ic JOIN inventory_item_types it ON ic.item_type_id = it.item_type_id`;
     const conditions = []; const values = []; let paramIndex = 1;
-    if (item_type_id) { conditions.push(`ic.item_type_id = $${paramIndex++}`); values.push(parseInt(item_type_id)); }
+    if (item_type_id) {
+        const parsedTypeId = parseInt(item_type_id);
+        if (isNaN(parsedTypeId)) return res.status(400).json({ error: 'item_type_id must be a number' });
+        conditions.push(`ic.item_type_id = $${paramIndex++}`); values.push(parsedTypeId);
+    }
     if (search) { conditions.push(`(ic.consumable_name ILIKE $${paramIndex} OR ic.notes ILIKE $${paramIndex})`); values.push(`%${search}%`); paramIndex++; }
     if (conditions.length > 0) { const whereClause = ' WHERE ' + conditions.join(' AND '); mainQuery += whereClause; countQuery += whereClause; }
     mainQuery += ` ORDER BY ic.consumable_name ASC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
@@ -386,10 +395,12 @@ router.post('/consumables', authMiddleware, requireRole(['admin', 'accountant', 
     const { item_type_id, consumable_name, unit_of_measure, current_stock_level = 0, reorder_point, notes } = req.body;
     const user_id_created_by = req.user.id;
     if (!item_type_id || !consumable_name || !unit_of_measure) return res.status(400).json({ error: 'Item type, consumable name, and unit of measure are required' });
+    const parsedTypeId = parseInt(item_type_id);
+    if (isNaN(parsedTypeId)) return res.status(400).json({ error: 'item_type_id must be a number' });
     if (current_stock_level !== undefined && isNaN(parseInt(current_stock_level))) return res.status(400).json({ error: 'Current stock level must be a number' });
     if (reorder_point !== undefined && reorder_point !== null && isNaN(parseInt(reorder_point))) return res.status(400).json({ error: 'Reorder point must be a number' });
     try {
-        const result = await query(`INSERT INTO inventory_consumables (item_type_id, consumable_name, unit_of_measure, current_stock_level, reorder_point, notes, user_id_created_by, user_id_last_updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *`, [parseInt(item_type_id), consumable_name, unit_of_measure, parseInt(current_stock_level) || 0, reorder_point ? parseInt(reorder_point) : null, notes, user_id_created_by]);
+        const result = await query(`INSERT INTO inventory_consumables (item_type_id, consumable_name, unit_of_measure, current_stock_level, reorder_point, notes, user_id_created_by, user_id_last_updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *`, [parsedTypeId, consumable_name, unit_of_measure, parseInt(current_stock_level) || 0, reorder_point ? parseInt(reorder_point) : null, notes, user_id_created_by]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505') return handleError(res, err, `Consumable name '${consumable_name}' already exists.`, 409);
@@ -398,15 +409,17 @@ router.post('/consumables', authMiddleware, requireRole(['admin', 'accountant', 
     }
 });
 
-router.put('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res) => { 
+router.put('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res) => {
     const consumableId = parseInt(req.params.id);
     const { item_type_id, consumable_name, unit_of_measure, reorder_point, notes } = req.body;
     const user_id_last_updated_by = req.user.id;
     if (isNaN(consumableId)) return res.status(400).json({ error: 'Invalid consumable ID' });
     if (!item_type_id || !consumable_name || !unit_of_measure) return res.status(400).json({ error: 'Item type, consumable name, and unit of measure are required' });
+    const parsedTypeId = parseInt(item_type_id);
+    if (isNaN(parsedTypeId)) return res.status(400).json({ error: 'item_type_id must be a number' });
     if (reorder_point !== undefined && reorder_point !== null && isNaN(parseInt(reorder_point))) return res.status(400).json({ error: 'Reorder point must be a number' });
     try {
-        const result = await query(`UPDATE inventory_consumables SET item_type_id = $1, consumable_name = $2, unit_of_measure = $3, reorder_point = $4, notes = $5, user_id_last_updated_by = $6, updated_at = NOW() WHERE consumable_id = $7 RETURNING *`, [parseInt(item_type_id), consumable_name, unit_of_measure, reorder_point ? parseInt(reorder_point) : null, notes, user_id_last_updated_by, consumableId]);
+        const result = await query(`UPDATE inventory_consumables SET item_type_id = $1, consumable_name = $2, unit_of_measure = $3, reorder_point = $4, notes = $5, user_id_last_updated_by = $6, updated_at = NOW() WHERE consumable_id = $7 RETURNING *`, [parsedTypeId, consumable_name, unit_of_measure, reorder_point ? parseInt(reorder_point) : null, notes, user_id_last_updated_by, consumableId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Inventory consumable not found' });
         res.json(result.rows[0]);
     } catch (err) {
