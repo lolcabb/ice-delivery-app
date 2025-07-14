@@ -113,6 +113,7 @@ const WaterLogForm = ({
                         </button>
                     </div>
 
+                    <form onSubmit={handleSubmit}>
                     {/* Date Selection */}
                     <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center gap-3">
@@ -308,6 +309,7 @@ const WaterLogForm = ({
                             </div>
                         </div>
                     </div>
+                    </form>
                 </div>
             </div>
         </div>
