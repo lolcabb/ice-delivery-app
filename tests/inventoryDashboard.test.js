@@ -60,3 +60,49 @@ describe('inventory dashboard routes', () => {
     expect(res.body).toEqual([{ date: '2024-01-01', total_in: 1, total_out: 0 }]);
   });
 });
+
+  test('GET /dashboard/consumables/usage-patterns returns patterns', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ consumable_name: 'Ice', current_stock_level: '50', unit_of_measure: 'kg', movement_count: '3', total_used: '20', avg_usage_per_transaction: '5', daily_usage_rate: '2' }] })
+      .mockResolvedValueOnce({ rows: [{ consumable_name: 'Ice', current_stock_level: '50', unit_of_measure: 'kg', daily_usage_rate: '2', estimated_days_remaining: '25' }] });
+
+    const res = await request(app).get('/api/inventory/dashboard/consumables/usage-patterns');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      high_usage_items: [
+        {
+          name: 'Ice',
+          current_stock: 50,
+          unit: 'kg',
+          total_used_30d: 20,
+          daily_usage: 2,
+          avg_per_transaction: 5
+        }
+      ],
+      risk_analysis: [
+        {
+          name: 'Ice',
+          current_stock: 50,
+          unit: 'kg',
+          daily_usage: 2,
+          estimated_days_remaining: 25
+        }
+      ]
+    });
+
+  test('GET /dashboard/consumables/item-type-movement-trend returns seven zero rows when no data', async () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ({
+      date: `2024-01-0${i + 1}`,
+      total_in: '0',
+      total_out: '0'
+    }));
+    db.query.mockResolvedValueOnce({ rows });
+    const res = await request(app).get('/api/inventory/dashboard/consumables/item-type-movement-trend?item_type_id=2');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveLength(7);
+    res.body.forEach(r => {
+      expect(r.total_in).toBe(0);
+      expect(r.total_out).toBe(0);
+    });
+  });
+});
