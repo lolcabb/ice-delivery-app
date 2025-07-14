@@ -365,6 +365,10 @@ export const apiService = {
     addVehicle: (vehicleData) => apiService.post('/vehicles', vehicleData),
     updateVehicle: (vehicleId, vehicleData) => apiService.put(`/vehicles/${vehicleId}`, vehicleData),
     deleteVehicle: (vehicleId) => apiService.delete(`/vehicles/${vehicleId}`),
+    addVehicleMaintenance: (vehicleId, maintenanceData) =>
+        apiService.post(`/vehicles/${vehicleId}/maintenance`, maintenanceData),
+
+    // --- Tire management ---
     getVehicleTires: (filters = {}) => {
         const queryParams = new URLSearchParams(filters).toString();
         return apiService.get(`/tires?${queryParams}`);
@@ -372,9 +376,12 @@ export const apiService = {
     addVehicleTire: (tireData) => apiService.post('/tires', tireData),
     updateVehicleTire: (tireId, tireData) => apiService.put(`/tires/${tireId}`, tireData),
     deleteVehicleTire: (tireId) => apiService.delete(`/tires/${tireId}`),
-    
-    addVehicleMaintenance: (vehicleId, maintenanceData) =>
-        apiService.post(`/vehicles/${vehicleId}/maintenance`, maintenanceData),
+    getTireAssignments: (filters = {}) => {
+        const queryParams = new URLSearchParams(filters).toString();
+        return apiService.get(`/tires/assignments?${queryParams}`);
+    },
+    assignVehicleTire: (assignmentData) => apiService.post('/tires/assign', assignmentData),
+    unmountVehicleTire: (tireId, data) => apiService.put(`/tires/unmount/${tireId}`, data),
     
     getCustomerCreditSales: (customerId) => apiService.get(`/customers/${customerId}/credit-sales`),
     // This is different because it sends FormData

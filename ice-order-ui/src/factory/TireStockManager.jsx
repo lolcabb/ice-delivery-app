@@ -46,22 +46,15 @@ export default function TireStockManager() {
         setLoading(true);
         setError(null);
         try {
-            const [tiresData, vehiclesData] = await Promise.all([
+            const [tiresData, vehiclesData, assignmentsData] = await Promise.all([
                 apiService.getVehicleTires(),
-                apiService.getVehicles()
+                apiService.getVehicles(),
+                apiService.getTireAssignments()
             ]);
             
             setTires(Array.isArray(tiresData) ? tiresData : []);
             setVehicles(Array.isArray(vehiclesData) ? vehiclesData : []);
-            
-            // Try to get tire assignments if API exists
-            try {
-                // This might not exist yet in your API - add when ready
-                // const assignmentsData = await apiService.getTireAssignments();
-                // setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
-            } catch (err) {
-                setAssignments([]);
-            }
+            setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
         } catch (err) {
             console.error('Failed to fetch tire data:', err);
             setError('Failed to fetch tire data. Please try again.');
@@ -188,7 +181,6 @@ export default function TireStockManager() {
 
         setLoading(true);
         try {
-            // When you add tire assignment API, replace this section
             const assignmentData = {
                 tire_id: selectedTire.tire_id,
                 vehicle_id: assignmentForm.vehicle_id,
@@ -196,16 +188,14 @@ export default function TireStockManager() {
                 mount_date: assignmentForm.mount_date
             };
             
-            // For now, just update tire status - replace with actual assignment API
-            await apiService.updateVehicleTire(selectedTire.tire_id, {
-                ...selectedTire,
-                status: 'On Vehicle'
-            });
-            
-            setTires(prev => prev.map(t => 
+            const newAssignment = await apiService.assignVehicleTire(assignmentData);
+
+            setTires(prev => prev.map(t =>
                 t.tire_id === selectedTire.tire_id ? { ...t, status: 'On Vehicle' } : t
             ));
-            
+
+            setAssignments(prev => [newAssignment, ...prev]);
+
             setShowAssignModal(false);
             setSelectedTire(null);
             resetAssignmentForm();
@@ -224,14 +214,17 @@ export default function TireStockManager() {
         
         setLoading(true);
         try {
-            await apiService.updateVehicleTire(tire.tire_id, {
-                ...tire,
-                status: 'In Stock'
+            await apiService.unmountVehicleTire(tire.tire_id, {
+                unmount_date: new Date().toISOString(),
+                new_status: 'In Stock'
             });
             
-            setTires(prev => prev.map(t => 
+            setTires(prev => prev.map(t =>
                 t.tire_id === tire.tire_id ? { ...t, status: 'In Stock' } : t
             ));
+            
+            const assignmentsData = await apiService.getTireAssignments();
+            setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
             setError(null);
         } catch (err) {
             console.error('Failed to unmount tire:', err);
@@ -278,8 +271,8 @@ export default function TireStockManager() {
                                 <Package className="w-6 h-6 text-green-600" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900">Tire Inventory Management</h1>
-                                <p className="text-gray-600">Manage tire stock and vehicle assignments</p>
+                                <h1 className="text-2xl font-bold text-gray-900">การจัดการคลังยางรถยนต์</h1>
+                                <p className="text-gray-600">จัดการสต๊อกยางและการติดตั้ง</p>
                             </div>
                         </div>
                         <button
@@ -300,7 +293,7 @@ export default function TireStockManager() {
                                 <CheckCircle className="w-5 h-5 text-green-600" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">In Stock</p>
+                                <p className="text-sm text-gray-600">ในคลัง</p>
                                 <p className="text-xl font-semibold text-gray-900">
                                     {tires.filter(t => t.status === 'In Stock').length}
                                 </p>
@@ -313,7 +306,7 @@ export default function TireStockManager() {
                                 <Truck className="w-5 h-5 text-blue-600" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">On Vehicle</p>
+                                <p className="text-sm text-gray-600">ติดรถ</p>
                                 <p className="text-xl font-semibold text-gray-900">
                                     {tires.filter(t => t.status === 'On Vehicle').length}
                                 </p>
@@ -326,7 +319,7 @@ export default function TireStockManager() {
                                 <AlertTriangle className="w-5 h-5 text-red-600" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">Retired</p>
+                                <p className="text-sm text-gray-600">เลิกใช้</p>
                                 <p className="text-xl font-semibold text-gray-900">
                                     {tires.filter(t => t.status === 'Retired').length}
                                 </p>
@@ -339,7 +332,7 @@ export default function TireStockManager() {
                                 <Package className="w-5 h-5 text-purple-600" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">Total Tires</p>
+                                <p className="text-sm text-gray-600">ยางทั้งหมด</p>
                                 <p className="text-xl font-semibold text-gray-900">{tires.length}</p>
                             </div>
                         </div>
@@ -390,8 +383,8 @@ export default function TireStockManager() {
                     ) : filteredTires.length === 0 ? (
                         <div className="col-span-full text-center py-12">
                             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-500 text-lg">No tires found</p>
-                            <p className="text-gray-400">Try adjusting your search or filters</p>
+                            <p className="text-gray-500 text-lg">ไม่พบยางในระบบ</p>
+                            <p className="text-gray-400">กรุณาปรับคำค้นหาหรือตัวกรองของคุณ</p>
                         </div>
                     ) : (
                         filteredTires.map((tire) => (
