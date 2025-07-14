@@ -39,26 +39,18 @@ const TireFormModal = ({
         'Michelin',
         'Goodyear',
         'Yokohama',
-        'Continental',
-        'Pirelli',
         'Dunlop',
         'Hankook',
-        'Toyo',
-        'Kumho'
     ];
 
     // Common sidewall sizes for trucks and vehicles
     const commonSidewalls = [
-        '225/75R16',
-        '235/75R15',
-        '245/70R16',
-        '265/70R16',
-        '275/70R18',
-        '285/75R16',
-        '31x10.50R15',
-        '33x12.50R15',
-        '195/65R15',
-        '205/55R16'
+        '225/75R15 XCD2',
+        '205/70R15 R611',
+        '7.50R16 R156',
+        '8.25R16 R156',
+        '9.00R20 M789',
+        '11R22.5 16PR R157'
     ];
 
     return (
