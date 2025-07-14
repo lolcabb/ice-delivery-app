@@ -27,7 +27,7 @@ const SummaryCard = ({ title, value, icon, subValue, valueColor = "text-gray-900
 };
 
 // Production-focused alerts component
-const ProductionAlertsPanel = ({ summaryData, recentMovements, usagePatterns, inventoryValue  }) => {
+const ProductionAlertsPanel = ({ summaryData, recentMovements, usagePatterns, inventoryValue }) => {
     const generateProductionAlerts = () => {
         const alerts = [];
         
@@ -80,13 +80,34 @@ const ProductionAlertsPanel = ({ summaryData, recentMovements, usagePatterns, in
             }
         }
         
-        // High usage alert from original data
-        if (summaryData?.mostActiveConsumable?.movement_count > 10) {
-            alerts.push({
-                type: 'info',
-                message: `${summaryData.mostActiveConsumable.consumable_name} ใช้งานสูงผิดปกติ (${summaryData.mostActiveConsumable.movement_count} ครั้ง)`,
-                priority: 'low'
-            });
+        // Smart high usage alert - calculate dynamic threshold based on usage patterns
+        if (summaryData?.mostActiveConsumable && usagePatterns?.high_usage_items?.length > 0) {
+            const mostActive = summaryData.mostActiveConsumable;
+            const highUsageItems = usagePatterns.high_usage_items;
+            
+            // Calculate average movement count across all high usage items
+            const averageMovements = highUsageItems.reduce((sum, item) => sum + (item.total_used_30d || 0), 0) / highUsageItems.length;
+            
+            // Create dynamic threshold (150% of average, minimum 5, maximum 50)
+            const dynamicThreshold = Math.max(5, Math.min(50, Math.floor(averageMovements * 1.5)));
+            
+            if (mostActive.movement_count > dynamicThreshold) {
+                // Check if this item is actually in our usage patterns to get more context
+                const itemUsageData = highUsageItems.find(item => 
+                    item.name.toLowerCase().includes(mostActive.consumable_name.toLowerCase()) ||
+                    mostActive.consumable_name.toLowerCase().includes(item.name.toLowerCase())
+                );
+                
+                const contextMessage = itemUsageData 
+                    ? `ใช้งาน ${itemUsageData.daily_usage.toFixed(1)} หน่วย/วัน (สูงกว่าปกติ ${((mostActive.movement_count / dynamicThreshold - 1) * 100).toFixed(0)}%)`
+                    : `${mostActive.movement_count} ครั้ง ใน 30 วัน (เกินค่าเฉลี่ย)`;
+                
+                alerts.push({
+                    type: 'info',
+                    message: `${mostActive.consumable_name} ${contextMessage}`,
+                    priority: 'low'
+                });
+            }
         }
         
         return alerts;
@@ -293,7 +314,7 @@ export default function ConsumablesDashboard() {
                     disabled={loadingSummary || loadingRecent}
                     className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
-                    <RefreshIcon className="mr-2" />
+                    <RefreshIcon className="mr-4" />
                     รีเฟรช
                 </button>
             </div>
@@ -304,7 +325,7 @@ export default function ConsumablesDashboard() {
                     <p className="text-gray-500">กำลังโหลดข้อมูลสรุป...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     <SummaryCard 
                         title="รายการทั้งหมด" 
                         value={formatNumber(inventoryValue?.inventory_summary?.total_items || summaryData?.distinctConsumableItems || 0)}
@@ -324,12 +345,6 @@ export default function ConsumablesDashboard() {
                             (inventoryValue?.inventory_summary?.low_stock_count || summaryData?.lowStockItemsCount || 0) > 0 
                                 ? "text-red-600" : "text-green-600"
                         }
-                    />
-                    <SummaryCard 
-                        title="มูลค่าคงคลัง" 
-                        value={`₿${formatNumber(inventoryValue?.inventory_summary?.estimated_value || 0)}`}
-                        icon={<ValueIcon />}
-                        subValue={`${formatNumber(inventoryValue?.inventory_summary?.total_units || 0)} หน่วย`}
                     />
                     <SummaryCard 
                         title="การเคลื่อนไหววันนี้" 
