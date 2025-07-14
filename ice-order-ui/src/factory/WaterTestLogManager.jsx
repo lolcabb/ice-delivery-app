@@ -66,7 +66,12 @@ export default function WaterTestLogManager() {
             setLogs(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error('Error fetching water logs:', err);
-            setError('Failed to fetch water logs. Please try again.');
+            if (err.status === 404) {
+                setLogs([]);
+                setError('No water test log');
+            } else {
+                setError('Failed to fetch water logs. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
