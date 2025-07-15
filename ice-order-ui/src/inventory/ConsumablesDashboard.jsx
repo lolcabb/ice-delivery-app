@@ -255,6 +255,16 @@ export default function ConsumablesDashboard() {
         }
     }, [trendChartFilters, fetchTrendData]);
 
+    // Auto-select first item type when item types are loaded
+    useEffect(() => {
+        if (itemTypes.length > 0 && !trendChartFilters.item_type_id) {
+            setTrendChartFilters(prev => ({
+                ...prev,
+                item_type_id: itemTypes[0].item_type_id.toString()
+            }));
+        }
+    }, [itemTypes, trendChartFilters.item_type_id]);
+
     const handleTrendFilterChange = (e) => {
         const { name, value } = e.target;
         setTrendChartFilters(prev => ({ ...prev, [name]: value }));
@@ -314,8 +324,8 @@ export default function ConsumablesDashboard() {
                     disabled={loadingSummary || loadingRecent}
                     className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
-                    <RefreshIcon className="mr-4" />
-                    รีเฟรช
+                    <RefreshIcon className="mr-3" />
+                    <span>รีเฟรช</span>
                 </button>
             </div>
 
@@ -367,19 +377,90 @@ export default function ConsumablesDashboard() {
                 inventoryValue={inventoryValue}
             />
 
-            {/* Enhanced Main Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Enhanced Movement Trend Chart */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-                        <h2 className="text-xl font-semibold text-gray-700">แนวโน้มการใช้วัสดุสิ้นเปลือง</h2>
+            {/* Usage Insights Section - More Prominent */}
+            {usagePatterns && (usagePatterns.high_usage_items?.length > 0 || usagePatterns.risk_analysis?.length > 0) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                    {/* High Usage Items */}
+                    {usagePatterns.high_usage_items?.length > 0 && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                            <h3 className="text-lg font-semibold text-blue-800 mb-4">
+                                📊 วัสดุที่ใช้บ่อยที่สุด (30 วันที่ผ่านมา)
+                            </h3>
+                            <div className="space-y-4">
+                                {usagePatterns.high_usage_items.slice(0, 5).map((item, index) => (
+                                    <div key={index} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                                        <div>
+                                            <p className="text-sm font-medium text-blue-900">{item.name}</p>
+                                            <p className="text-xs text-blue-700">
+                                                ใช้เฉลี่ย {formatNumber(item.daily_usage)} {item.unit}/วัน
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-semibold text-blue-800">
+                                                คงเหลือ {formatNumber(item.current_stock)}
+                                            </p>
+                                            <p className="text-xs text-blue-600">
+                                                ใช้ทั้งหมด {formatNumber(item.total_used_30d)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Risk Analysis */}
+                    {usagePatterns.risk_analysis?.length > 0 && (
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                            <h3 className="text-lg font-semibold text-yellow-800 mb-4">
+                                ⚠️ รายการเสี่ยงหมดเร็ว
+                            </h3>
+                            <div className="space-y-4">
+                                {usagePatterns.risk_analysis.slice(0, 5).map((item, index) => (
+                                    <div key={index} className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+                                        <div>
+                                            <p className="text-sm font-medium text-yellow-900">{item.name}</p>
+                                            <p className="text-xs text-yellow-700">
+                                                ใช้เฉลี่ย {formatNumber(item.daily_usage)} {item.unit}/วัน
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-semibold text-yellow-800">
+                                                ~{item.estimated_days_remaining} วัน
+                                            </p>
+                                            <p className="text-xs text-yellow-600">
+                                                คงเหลือ {formatNumber(item.current_stock)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Enhanced Main Content - Single Column for Better Chart Size */}
+            <div className="space-y-8">
+                {/* Enhanced Movement Trend Chart - Full Width */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-700">แนวโน้มการใช้วัสดุสิ้นเปลือง</h2>
+                            <p className="text-sm text-gray-500 mt-1">
+                                {trendChartFilters.item_type_id && itemTypes.length > 0 
+                                    ? `ประเภท: ${itemTypes.find(t => t.item_type_id.toString() === trendChartFilters.item_type_id)?.type_name || 'ไม่ทราบ'}`
+                                    : 'เลือกประเภทวัสดุเพื่อดูแนวโน้ม'
+                                }
+                            </p>
+                        </div>
                         <div className="flex items-center gap-4">
                             <select 
                                 name="item_type_id"
                                 value={trendChartFilters.item_type_id} 
                                 onChange={handleTrendFilterChange}
                                 disabled={loadingItemTypes || itemTypes.length === 0}
-                                className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                className="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 min-w-[200px]"
                             >
                                 <option value="">{loadingItemTypes ? "กำลังโหลดประเภท..." : "เลือกประเภทวัสดุ"}</option>
                                 {itemTypes.map(type => (
@@ -400,11 +481,14 @@ export default function ConsumablesDashboard() {
                         </div>
                     </div>
                     {loadingTrend ? (
-                        <div className="text-center py-8 h-[300px] flex items-center justify-center">
-                            <p className="text-gray-500">กำลังโหลดข้อมูลแนวโน้ม...</p>
+                        <div className="text-center py-12 h-[400px] flex items-center justify-center">
+                            <div className="text-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                <p className="text-gray-500">กำลังโหลดข้อมูลแนวโน้ม...</p>
+                            </div>
                         </div>
                     ) : itemTypeMovementTrend.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
+                        <ResponsiveContainer width="100%" height={400}>
                             <AreaChart data={itemTypeMovementTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
                                 <XAxis 
@@ -440,47 +524,42 @@ export default function ConsumablesDashboard() {
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <p className="text-center text-gray-500 py-8 h-[300px] flex items-center justify-center">
-                            {trendChartFilters.item_type_id ? "ไม่มีข้อมูลการเคลื่อนไหวสำหรับประเภท/ช่วงเวลาที่เลือก." : "กรุณาเลือกประเภทวัสดุเพื่อดูแนวโน้ม."}
-                        </p>
-                    )}
-                </div>
-
-                {/* Enhanced Recent Movements with Usage Insights */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h2 className="text-xl font-semibold text-gray-700 mb-4">การเคลื่อนไหวล่าสุด</h2>
-
-                    {/* Usage Insights Section */}
-                    {usagePatterns?.high_usage_items?.length > 0 && (
-                        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                            <h3 className="text-sm font-semibold text-blue-800 mb-2">วัสดุที่ใช้บ่อยที่สุด (30 วันที่ผ่านมา)</h3>
-                            <div className="space-y-2">
-                                {usagePatterns.high_usage_items.slice(0, 3).map((item, index) => (
-                                    <div key={index} className="flex justify-between text-xs">
-                                        <span className="text-blue-700">{item.name}</span>
-                                        <span className="text-blue-600">
-                                            {formatNumber(item.daily_usage)}/วัน • คงเหลือ {formatNumber(item.current_stock)}
-                                        </span>
-                                    </div>
-                                ))}
+                        <div className="text-center text-gray-500 py-12 h-[400px] flex items-center justify-center">
+                            <div className="text-center">
+                                <div className="text-4xl mb-4">📊</div>
+                                <p className="text-lg mb-2">
+                                    {trendChartFilters.item_type_id ? "ไม่มีข้อมูลการเคลื่อนไหว" : "เลือกประเภทวัสดุเพื่อดูแนวโน้ม"}
+                                </p>
+                                <p className="text-sm text-gray-400">
+                                    {trendChartFilters.item_type_id 
+                                        ? "ลองเปลี่ยนช่วงเวลาหรือเลือกประเภทอื่น" 
+                                        : "กราฟจะแสดงเมื่อเลือกประเภทวัสดุแล้ว"
+                                    }
+                                </p>
                             </div>
                         </div>
                     )}
+                </div>
 
+                {/* Recent Movements - Full Width but Compact */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h2 className="text-xl font-semibold text-gray-700 mb-4">การเคลื่อนไหวล่าสุด</h2>
+                    
                     {loadingRecent ? (
                         <div className="text-center py-8">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto mb-2"></div>
                             <p className="text-gray-500">กำลังโหลดรายการเคลื่อนไหวล่าสุด...</p>
                         </div>
                     ) : recentMovements.length > 0 ? (
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {recentMovements.map((movement) => (
-                                <div key={movement.movement_id} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {recentMovements.slice(0, 6).map((movement) => (
+                                <div key={movement.movement_id} className="p-4 bg-gray-50 rounded-lg">
                                     <div className="flex justify-between items-start mb-2">
                                         <div className="flex-1">
                                             <p className="text-sm font-medium text-gray-900">{movement.consumable_name}</p>
                                             <div className="flex items-center text-xs text-gray-500 mt-1">
                                                 <ClockIcon className="mr-1" />
-                                                {new Date(movement.movement_date).toLocaleString('th-TH')}
+                                                {new Date(movement.movement_date).toLocaleDateString('th-TH')}
                                             </div>
                                         </div>
                                         <MovementTypePill type={movement.movement_type} />
@@ -503,33 +582,11 @@ export default function ConsumablesDashboard() {
                                             โดย {movement.recorded_by_username}
                                         </p>
                                     )}
-                                    {movement.notes && (
-                                        <p className="text-xs text-gray-500 italic mt-1">
-                                            หมายเหตุ: {movement.notes}
-                                        </p>
-                                    )}
                                 </div>
                             ))}
                         </div>
                     ) : (
                         <p className="text-center text-gray-500 py-8">ไม่พบการเคลื่อนไหวของสต็อกล่าสุด.</p>
-                    )}
-
-                    {/* Risk Analysis Section */}
-                    {usagePatterns?.risk_analysis?.length > 0 && (
-                        <div className="mt-6 p-4 bg-yellow-50 rounded-lg">
-                            <h3 className="text-sm font-semibold text-yellow-800 mb-2">รายการเสี่ยงหมดเร็ว</h3>
-                            <div className="space-y-2">
-                                {usagePatterns.risk_analysis.slice(0, 3).map((item, index) => (
-                                    <div key={index} className="flex justify-between text-xs">
-                                        <span className="text-yellow-700">{item.name}</span>
-                                        <span className="text-yellow-600">
-                                            ~{item.estimated_days_remaining} วัน
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
                     )}
                 </div>
             </div>
