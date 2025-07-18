@@ -496,11 +496,11 @@ export default function ConsumablesDashboard() {
                                     tickFormatter={(dateStr) => new Date(dateStr + 'T00:00:00').toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} 
                                 />
                                 <YAxis />
-                                <Tooltip 
-                                    formatter={(value, name) => [
-                                        formatNumber(value), 
-                                        name === 'total_in' ? 'รับเข้า' : 'ใช้งาน'
-                                    ]} 
+                                <Tooltip
+                                    formatter={(value, _name, { dataKey }) => [
+                                        formatNumber(value),
+                                        dataKey === 'total_in' ? 'รับเข้า' : 'ใช้งาน',
+                                    ]}
                                 />
                                 <Legend />
                                 <Area 
