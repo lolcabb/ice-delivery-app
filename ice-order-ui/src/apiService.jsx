@@ -148,6 +148,7 @@ export const apiService = {
     },
 
     // --- (Keep other existing specific methods for expenses, inventory, crm, orders (front-office), etc.)
+    getEnhancedDashboardSummary: () => apiService.get('/expenses/dashboard/enhanced-summary'),
     getTodayOrdersWithMetadata: (etag) => { 
         const options = etag ? { headers: { 'If-None-Match': etag } } : {};
         return request('/orders/today', 'GET', null, options); 

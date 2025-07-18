@@ -66,6 +66,236 @@ async function updatePettyCashTotalForDate(logDate, dbQueryFn) {
     }
 }
 
+// GET /api/expenses/dashboard/enhanced-summary
+router.get('/dashboard/enhanced-summary', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+    try {
+        const { todayYYYYMMDD, firstDayCurrentMonth, firstDayLastMonth, lastDayLastMonth, firstDayCurrentYear } = getThailandDateStrings();
+
+        // Calculate quarterly dates (3 months ago)
+        const nowInThailand = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+        const threeMonthsAgo = new Date(nowInThailand.getFullYear(), nowInThailand.getMonth() - 3, 1);
+        const firstDayThreeMonthsAgo = threeMonthsAgo.toLocaleDateString('en-CA');
+
+        // Calculate YoY dates (same month last year)
+        const lastYearSameMonth = new Date(nowInThailand.getFullYear() - 1, nowInThailand.getMonth(), 1);
+        const firstDayLastYearSameMonth = lastYearSameMonth.toLocaleDateString('en-CA');
+        const lastDayLastYearSameMonth = new Date(nowInThailand.getFullYear() - 1, nowInThailand.getMonth() + 1, 0).toLocaleDateString('en-CA');
+
+        // Execute all queries in parallel
+        const [
+            // Current period totals
+            totalExpensesTodayResult,
+            totalExpensesThisMonthResult,
+            totalExpensesLastMonthResult,
+            totalExpensesYearToDateResult,
+
+            // Payment method breakdown for current month
+            bankTransferThisMonthResult,
+            pettyCashThisMonthResult,
+
+            // Petty cash details
+            latestPettyCashResult,
+            pettyCashReconciliationResult,
+
+            // Historical comparisons
+            quarterlyAverageResult,
+            lastYearSameMonthResult,
+
+            // Category analysis
+            categoryAveragesResult,
+            
+            // Additional metrics
+            activeCategoriesResult,
+            totalTransactionsResult,
+            dailyAverageResult
+
+        ] = await Promise.all([
+            // Current totals
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date = $1", [todayYYYYMMDD]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1", [firstDayCurrentMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND expense_date <= $2", [firstDayLastMonth, lastDayLastMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1", [firstDayCurrentYear]),
+
+            // Payment method breakdown
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND is_petty_cash_expense = FALSE", [firstDayCurrentMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND is_petty_cash_expense = TRUE", [firstDayCurrentMonth]),
+
+            // Petty cash status
+            query(`SELECT 
+                    closing_balance,
+                    opening_balance,
+                    cash_received_amount,
+                    total_daily_petty_expenses,
+                    log_date,
+                    (opening_balance + cash_received_amount - total_daily_petty_expenses) as calculated_closing,
+                    ABS(closing_balance - (opening_balance + cash_received_amount - total_daily_petty_expenses)) as variance
+                   FROM petty_cash_log 
+                   ORDER BY log_date DESC LIMIT 1`),
+            query(`SELECT 
+                    COUNT(*) as total_logs,
+                    SUM(CASE WHEN ABS(closing_balance - (opening_balance + cash_received_amount - total_daily_petty_expenses)) <= 1 THEN 1 ELSE 0 END) as reconciled_logs
+                   FROM petty_cash_log 
+                   WHERE log_date >= $1`, [firstDayCurrentMonth]),
+
+            // Historical comparisons
+            query(`SELECT AVG(monthly_total) as quarterly_avg 
+                   FROM (
+                       SELECT DATE_TRUNC('month', expense_date) as month, SUM(amount) as monthly_total
+                       FROM expenses 
+                       WHERE expense_date >= $1 AND expense_date < $2
+                       GROUP BY DATE_TRUNC('month', expense_date)
+                   ) monthly_totals`, [firstDayThreeMonthsAgo, firstDayCurrentMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND expense_date <= $2", [firstDayLastYearSameMonth, lastDayLastYearSameMonth]),
+
+            // Category analysis vs historical averages
+            query(`WITH category_averages AS (
+                       SELECT 
+                           e.category_id,
+                           ec.category_name,
+                           AVG(monthly_amount) as avg_amount
+                       FROM expense_categories ec
+                       LEFT JOIN (
+                           SELECT 
+                               category_id,
+                               DATE_TRUNC('month', expense_date) as month,
+                               SUM(amount) as monthly_amount
+                           FROM expenses 
+                           WHERE expense_date >= $1 AND expense_date < $2
+                           GROUP BY category_id, DATE_TRUNC('month', expense_date)
+                       ) e ON ec.category_id = e.category_id
+                       WHERE ec.is_active = TRUE
+                       GROUP BY e.category_id, ec.category_name
+                   ),
+                   current_month_totals AS (
+                       SELECT 
+                           e.category_id,
+                           ec.category_name,
+                           COALESCE(SUM(e.amount), 0) as current_amount
+                       FROM expense_categories ec
+                       LEFT JOIN expenses e ON ec.category_id = e.category_id AND e.expense_date >= $3
+                       WHERE ec.is_active = TRUE
+                       GROUP BY e.category_id, ec.category_name
+                   )
+                   SELECT 
+                       ca.category_name,
+                       COALESCE(ca.avg_amount, 0) as historical_average,
+                       COALESCE(cmt.current_amount, 0) as current_amount,
+                       CASE 
+                           WHEN ca.avg_amount > 0 THEN 
+                               ((cmt.current_amount - ca.avg_amount) / ca.avg_amount) * 100
+                           ELSE 0 
+                       END as variance_percent
+                   FROM category_averages ca
+                   LEFT JOIN current_month_totals cmt ON ca.category_name = cmt.category_name
+                   WHERE ca.avg_amount > 0 OR cmt.current_amount > 0
+                   ORDER BY ABS(CASE WHEN ca.avg_amount > 0 THEN ((cmt.current_amount - ca.avg_amount) / ca.avg_amount) * 100 ELSE 0 END) DESC`, 
+                   [firstDayThreeMonthsAgo, firstDayCurrentMonth, firstDayCurrentMonth]),
+
+            // Additional metrics
+            query("SELECT COUNT(*) as total FROM expense_categories WHERE is_active = TRUE"),
+            query("SELECT COUNT(*) as total FROM expenses WHERE expense_date >= $1", [firstDayCurrentMonth]),
+            query(`SELECT AVG(daily_total) as avg_daily 
+                   FROM (
+                       SELECT expense_date, SUM(amount) as daily_total 
+                       FROM expenses 
+                       WHERE expense_date >= $1 
+                       GROUP BY expense_date
+                   ) daily_sums`, [firstDayCurrentMonth])
+        ]);
+
+        // Process results
+        const totalExpensesToday = parseFloat(totalExpensesTodayResult.rows[0].total);
+        const totalExpensesThisMonth = parseFloat(totalExpensesThisMonthResult.rows[0].total);
+        const totalExpensesLastMonth = parseFloat(totalExpensesLastMonthResult.rows[0].total);
+        const totalBankTransferThisMonth = parseFloat(bankTransferThisMonthResult.rows[0].total);
+        const totalPettyCashThisMonth = parseFloat(pettyCashThisMonthResult.rows[0].total);
+        const quarterlyAverage = parseFloat(quarterlyAverageResult.rows[0]?.quarterly_avg || 0);
+        const lastYearSameMonthTotal = parseFloat(lastYearSameMonthResult.rows[0].total);
+
+        // Calculate trends
+        const momChange = totalExpensesLastMonth > 0 ? 
+            ((totalExpensesThisMonth - totalExpensesLastMonth) / totalExpensesLastMonth) * 100 : 0;
+        const yoyChange = lastYearSameMonthTotal > 0 ? 
+            ((totalExpensesThisMonth - lastYearSameMonthTotal) / lastYearSameMonthTotal) * 100 : 0;
+
+        // Process petty cash status
+        let pettyCashStatus = 'reconciled';
+        let pettyCashVariance = 0;
+        let pettyCashBalance = 0;
+        let pettyCashDaysRemaining = 0;
+
+        if (latestPettyCashResult.rows.length > 0) {
+            const pettyCashData = latestPettyCashResult.rows[0];
+            pettyCashBalance = parseFloat(pettyCashData.closing_balance);
+            pettyCashVariance = parseFloat(pettyCashData.variance);
+            
+            if (pettyCashVariance > 10) pettyCashStatus = 'discrepancy';
+            else if (pettyCashVariance > 1) pettyCashStatus = 'pending';
+
+            // Calculate days remaining
+            const averageDaily = totalPettyCashThisMonth > 0 ? totalPettyCashThisMonth / nowInThailand.getDate() : 0;
+            pettyCashDaysRemaining = averageDaily > 0 ? Math.floor(pettyCashBalance / averageDaily) : 0;
+        }
+
+        // Process category variances
+        const categoryData = categoryAveragesResult.rows;
+        const categoriesAboveAverage = categoryData
+            .filter(cat => parseFloat(cat.variance_percent) > 10)
+            .map(cat => ({
+                name: cat.category_name,
+                variance: parseFloat(cat.variance_percent),
+                amount: parseFloat(cat.current_amount)
+            }))
+            .slice(0, 5);
+
+        const categoriesBelowAverage = categoryData
+            .filter(cat => parseFloat(cat.variance_percent) < -10)
+            .map(cat => ({
+                name: cat.category_name,
+                variance: parseFloat(cat.variance_percent),
+                amount: parseFloat(cat.current_amount)
+            }))
+            .slice(0, 5);
+
+        // Build response matching your existing structure but with enhancements
+        res.json({
+            // Existing fields (for compatibility)
+            expensesToday: totalExpensesToday,
+            totalExpensesThisMonth: totalExpensesThisMonth,
+            totalExpensesLastMonth: totalExpensesLastMonth,
+            totalCategoriesActive: parseInt(activeCategoriesResult.rows[0].total),
+            recentPettyCashClosing: pettyCashBalance,
+
+            // Enhanced fields
+            totalBankTransferThisMonth: totalBankTransferThisMonth,
+            totalPettyCashThisMonth: totalPettyCashThisMonth,
+            
+            // Trend data
+            momChange: momChange,
+            yoyChange: yoyChange,
+            quarterlyAverage: quarterlyAverage,
+            
+            // Petty cash enhanced data
+            pettyCashBalance: pettyCashBalance,
+            pettyCashReconciliationStatus: pettyCashStatus,
+            pettyCashVariance: pettyCashVariance,
+            pettyCashDaysRemaining: pettyCashDaysRemaining,
+            
+            // Category insights
+            categoriesAboveAverage: categoriesAboveAverage,
+            categoriesBelowAverage: categoriesBelowAverage,
+            
+            // Additional metrics
+            totalTransactionsThisMonth: parseInt(totalTransactionsResult.rows[0].total),
+            averageDailySpend: parseFloat(dailyAverageResult.rows[0]?.avg_daily || 0),
+            totalExpensesYearToDate: parseFloat(totalExpensesYearToDateResult.rows[0].total)
+        });
+
+    } catch (err) {
+        handleError(res, err, "Failed to retrieve enhanced dashboard summary");
+    }
+});
+
 // --- Dashboard Endpoints (with corrected date logic using getThailandDateStrings) ---
 // GET /api/expenses/dashboard/summary-cards
 router.get('/dashboard/summary-cards', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
