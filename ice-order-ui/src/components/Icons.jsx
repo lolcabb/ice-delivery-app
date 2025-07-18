@@ -219,4 +219,39 @@ export const RefreshIcon = () => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
     </svg>
 );
+
+export const TrendingUpIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-green-500">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+    </svg>
+);
+
+export const TrendingDownIcon = () => (
+     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-red-500">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6L9 12.75l4.286-4.286a11.948 11.948 0 014.306 6.43l.776 2.898m0 0l3.182-5.511m-3.182 5.51l-5.511-3.181" />
+    </svg>
+);
+
+export const CategoryIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8 text-blue-500">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.39m3.422 1.659a15.99 0 00-1.622-3.39m3.388 1.621a15.99 0 00-3.388-1.621m-5.043-.025L9.53 16.122m0 0L12.94 12.715m0 0A15.97 15.97 0 0121.88 8.39m-5.042-.024a15.995 15.995 0 01-3.39 1.622m-3.39-1.622a15.995 15.995 0 00-1.621 3.39m5.042.024a15.998 15.998 0 01-3.388 1.621m3.388-1.621L12.94 12.715" />
+    </svg>
+);
+
+export const CashTodayIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-8 h-8 text-indigo-500" strokeMiterlimit="10">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M22 6V8.42C22 10 21 11 19.42 11H16V4.01C16 2.9 16.91 2 18.02 2C19.11 2.01 20.11 2.45 20.83 3.17C21.55 3.9 22 4.9 22 6Z M2 7V21C2 21.83 2.94 22.3 3.6 21.8L5.31 20.52C5.71 20.22 6.27 20.26 6.63 20.62L8.29 22.29C8.68 22.68 9.32 22.68 9.71 22.29L11.39 20.61C11.74 20.26 12.3 20.22 12.69 20.52L14.4 21.8C15.06 22.29 16 21.82 16 21V4C16 2.9 16.9 2 18 2H7H6C3 2 2 3.79 2 6V7Z M9 13.01H12 M9 9.01001H12" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.99561 13H6.00459 M5.99561 9H6.00459" />
+    </svg>
+);
+
+export const CustomWalletIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8 text-purple-500" >
+        <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            d="M21,8.5 C20.582,8.186 20.063,8 19.5,8 L18.95,8 C18.718,6.859 17.709,6 16.5,6 L7.5,6 C6.291,6 5.282,6.859 5.05,8 L4.5,8 C3.671,8 3,7.329 3,6.5 L3,5.5 C3,4.671 3.671,4 4.5,4 L19.5,4 C20.329,4 21,4.671 21,5.5 L21,8.5 Z M6.085,8 C6.291,7.417 6.847,7 7.5,7 L16.5,7 C17.153,7 17.709,7.417 17.915,8 L6.085,8 Z M21,12 L17.5,12 C16.119,12 15,13.119 15,14.5 C15,15.881 16.119,17 17.5,17 L21,17 L21,18.5 C21,19.328 20.329,20 19.5,20 L4.5,20 C3.671,20 3,19.328 3,18.5 L3,8.5 C3.418,8.814 3.937,9 4.5,9 L19.5,9 C20.329,9 21,9.672 21,10.5 L21,12 Z M21,16 L17.5,16 C16.671,16 16,15.328 16,14.5 C16,13.672 16.671,13 17.5,13 L21,13 L21,16 Z M19.5,3 L4.5,3 C3.119,3 2,4.119 2,5.5 L2,18.5 C2,19.881 3.119,21 4.5,21 L19.5,21 C20.881,21 22,19.881 22,18.5 L22,5.5 C22,4.119 20.881,3 19.5,3 L19.5,3 Z"
+        />
+    </svg>
+);
 // Add more icons here as needed
