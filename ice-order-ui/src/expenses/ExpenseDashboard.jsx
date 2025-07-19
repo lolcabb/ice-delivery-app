@@ -169,7 +169,7 @@ export default function ExpenseDashboard() {
         try {
             const [enhancedSummary, byCategory, trend, recent] = await Promise.all([
                 // Use the new enhanced endpoint
-                apiService.getEnhancedDashboardSummary,
+                apiService.getEnhancedDashboardSummary(),
                 apiService.getDashboardExpensesByCategory(categoryChartPeriod),
                 apiService.getDashboardMonthlyTrend(6),
                 apiService.getDashboardRecentExpenses(5)
