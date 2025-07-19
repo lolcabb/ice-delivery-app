@@ -268,7 +268,7 @@ const EnhancedFilterSection = React.memo(({
                                     id="payment_method"
                                     value={filters.payment_method}
                                     onChange={onFilterChange}
-                                    placeholder="เช่น เงินสด, โอน, บัตรเครดิต"
+                                    placeholder="เช่น เงินสด, โอน, เช็ค"
                                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                 />
                             </div>
