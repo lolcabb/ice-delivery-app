@@ -440,6 +440,7 @@ export default function ExpenseListManager() {
     }, [isModalOpen, fetchCategoriesForForm]);
 
     const handlePageChange = (newPage) => {
+        if (newPage < 1 || newPage > pagination.totalPages) return;
         setPagination(prev => ({ ...prev, page: newPage }));
     };
 
@@ -593,6 +594,7 @@ export default function ExpenseListManager() {
                     onEdit={handleOpenModal}
                     onDelete={handleDeleteExpense}
                     isLoading={isLoading} // Pass general isLoading for the list
+                    isFiltering={isFiltering} // Pass specific isFiltering for the list
                     pagination={pagination}
                     onPageChange={handlePageChange}
                 />

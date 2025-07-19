@@ -72,6 +72,7 @@ export default function PettyCashLogManager() {
 
 
     const handlePageChange = (newPage) => {
+        if (newPage < 1 || newPage > pagination.totalPages) return; 
         setPagination(prev => ({ ...prev, page: newPage }));
     };
 

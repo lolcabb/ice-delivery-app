@@ -102,7 +102,7 @@ const EmptyState = ({ isFiltered }) => {
 };
 
 // Pagination Component
-const PaginationControls = ({ pagination, onPageChange }) => {
+const PaginationControls = ({ pagination, onPageChange, disabled = false }) => {
     const { page, totalPages, totalItems } = pagination;
     
     if (totalPages <= 1) return null;
@@ -128,14 +128,14 @@ const PaginationControls = ({ pagination, onPageChange }) => {
             <div className="flex-1 flex justify-between sm:hidden">
                 <button
                     onClick={() => onPageChange(page - 1)}
-                    disabled={page <= 1}
+                    disabled={page <= 1 || disabled}
                     className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     ก่อนหน้า
                 </button>
                 <button
                     onClick={() => onPageChange(page + 1)}
-                    disabled={page >= totalPages}
+                    disabled={page >= totalPages || disabled}
                     className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     ถัดไป
@@ -154,7 +154,7 @@ const PaginationControls = ({ pagination, onPageChange }) => {
                     <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
                         <button
                             onClick={() => onPageChange(page - 1)}
-                            disabled={page <= 1}
+                            disabled={page <= 1 || disabled}
                             className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <span className="sr-only">Previous</span>
@@ -167,11 +167,12 @@ const PaginationControls = ({ pagination, onPageChange }) => {
                             <button
                                 key={pageNum}
                                 onClick={() => onPageChange(pageNum)}
+                                disabled={disabled}
                                 className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                                     pageNum === page
                                         ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
                                         : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                }`}
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                                 {pageNum}
                             </button>
@@ -195,7 +196,7 @@ const PaginationControls = ({ pagination, onPageChange }) => {
 };
 
 // Main Enhanced Expense List Component
-export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, pagination, onPageChange }) {
+export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, isFiltering = false,pagination, onPageChange }) {
     const hasFilters = pagination?.totalItems !== undefined;
 
     return (
@@ -321,6 +322,7 @@ export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, pag
                 <PaginationControls 
                     pagination={pagination} 
                     onPageChange={onPageChange} 
+                    disabled={isFiltering}
                 />
             )}
         </div>

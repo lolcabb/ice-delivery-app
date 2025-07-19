@@ -126,14 +126,14 @@ const PettyCashLogList = ({
                     <div className="flex-1 flex justify-between sm:hidden">
                         <button
                             onClick={() => onPageChange(pagination.page - 1)}
-                            disabled={pagination.page <= 1}
+                            disabled={pagination.page <= 1 || isLoading}
                             className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                         >
                             ก่อนหน้า
                         </button>
                         <button
                             onClick={() => onPageChange(pagination.page + 1)}
-                            disabled={pagination.page >= pagination.totalPages}
+                            disabled={pagination.page >= pagination.totalPages || isLoading}
                             className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                         >
                             ถัดไป
@@ -151,7 +151,7 @@ const PettyCashLogList = ({
                             <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                                 <button
                                     onClick={() => onPageChange(pagination.page - 1)}
-                                    disabled={pagination.page <= 1}
+                                    disabled={pagination.page <= 1 || isLoading}
                                     className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                                     title="Previous"
                                 >
@@ -163,7 +163,7 @@ const PettyCashLogList = ({
                                 </span>
                                 <button
                                     onClick={() => onPageChange(pagination.page + 1)}
-                                    disabled={pagination.page >= pagination.totalPages}
+                                    disabled={pagination.page >= pagination.totalPages || isLoading}
                                     className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                                     title="Next"
                                 >
