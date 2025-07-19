@@ -1,11 +1,7 @@
 // Enhanced ExpenseList.jsx - Building on your existing structure
 import React from 'react';
-
-// Enhanced formatting functions
-const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined || isNaN(parseFloat(amount))) return '฿0.00';
-    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 2 }).format(amount);
-};
+import { formatCurrency } from '../utils/currency';
+import PaymentMethodBadge from '../components/PaymentMethodBadge';
 
 const formatDate = (dateString) => {
     if (!dateString) return 'ไม่มีข้อมูล';
@@ -16,25 +12,6 @@ const formatDate = (dateString) => {
     });
 };
 
-// Payment Method Badge Component
-const PaymentMethodBadge = ({ paymentMethod, isPettyCash }) => {
-    if (isPettyCash) {
-        return (
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                เงินสดย่อย
-            </div>
-        );
-    } else {
-        // Bank transfer or other methods
-        return (
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
-                {paymentMethod || 'โอนธนาคาร'}
-            </div>
-        );
-    }
-};
 
 // Amount Display Component with visual emphasis
 const AmountDisplay = ({ amount, isPettyCash }) => {

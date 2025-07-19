@@ -1,5 +1,6 @@
 // Suggested path: src/expenses/PettyCashLogList.jsx
 import React from 'react';
+import { formatCurrency } from '../utils/currency';
 
 // --- Icon Components (can be moved to a shared icons file) ---
 const EditIcon = () => (
@@ -37,11 +38,6 @@ const formatDate = (dateString) => {
     return date.toLocaleDateString('en-CA'); // YYYY-MM-DD, or choose preferred locale
 };
 
-// Helper to format currency (Thai Baht)
-const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined || isNaN(parseFloat(amount))) return '0.00'; // Default to 0.00 if N/A
-    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 2 }).format(amount);
-};
 
 const PettyCashLogList = ({
     logs,
