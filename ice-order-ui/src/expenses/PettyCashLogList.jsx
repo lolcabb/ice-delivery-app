@@ -125,6 +125,13 @@ const PettyCashLogList = ({
                 <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 bg-white rounded-b-lg">
                     <div className="flex-1 flex justify-between sm:hidden">
                         <button
+                            onClick={() => onPageChange(1)}
+                            disabled={pagination.page === 1}
+                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                        >
+                            หน้าแรก
+                        </button>
+                        <button
                             onClick={() => onPageChange(pagination.page - 1)}
                             disabled={pagination.page <= 1 || isLoading}
                             className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
@@ -134,9 +141,16 @@ const PettyCashLogList = ({
                         <button
                             onClick={() => onPageChange(pagination.page + 1)}
                             disabled={pagination.page >= pagination.totalPages || isLoading}
-                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                         >
                             ถัดไป
+                        </button>
+                        <button
+                            onClick={() => onPageChange(pagination.totalPages)}
+                            disabled={pagination.page === pagination.totalPages}
+                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                        >
+                            สุดท้าย
                         </button>
                     </div>
                     <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
@@ -150,9 +164,16 @@ const PettyCashLogList = ({
                         <div>
                             <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                                 <button
+                                    onClick={() => onPageChange(1)}
+                                    disabled={pagination.page === 1}
+                                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    หน้าแรก
+                                </button>
+                                <button
                                     onClick={() => onPageChange(pagination.page - 1)}
                                     disabled={pagination.page <= 1 || isLoading}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                    className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                                     title="Previous"
                                 >
                                     <span className="sr-only">ก่อนหน้า</span>
@@ -164,11 +185,18 @@ const PettyCashLogList = ({
                                 <button
                                     onClick={() => onPageChange(pagination.page + 1)}
                                     disabled={pagination.page >= pagination.totalPages || isLoading}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                    className="relative inline-flex items-center px-2 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                                     title="Next"
                                 >
                                     <span className="sr-only">ถัดไป</span>
                                     <ChevronRightIcon />
+                                </button>
+                                <button
+                                    onClick={() => onPageChange(pagination.totalPages)}
+                                    disabled={pagination.page === pagination.totalPages}
+                                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                                >
+                                    สุดท้าย
                                 </button>
                             </nav>
                         </div>
