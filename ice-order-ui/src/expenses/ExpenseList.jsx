@@ -1,190 +1,351 @@
-// Suggested path: src/expenses/ExpenseList.jsx
+// Enhanced ExpenseList.jsx - Building on your existing structure
 import React from 'react';
 
-// --- Icon Components (can be moved to a shared icons file) ---
-const EditIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-    </svg>
-);
-
-const DeleteIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12.56 0c1.153 0 2.24.032 3.287.094M5.116 5.79l-.004-.004M5.116 5.79l-.004-.004m0 0L4.695 4.503M18.884 5.79l.004-.004M18.884 5.79l.004-.004m0 0L19.305 4.503M12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-    </svg>
-);
-
-const ChevronLeftIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-    </svg>
-);
-
-const ChevronRightIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-    </svg>
-);
-// --- End Icon Components ---
-
-// Helper to format date
-const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    // Handles potential time zone issues by only considering the date part
-    const date = new Date(dateString.split('T')[0] + 'T00:00:00'); // Treat as local date
-    return date.toLocaleDateString('en-CA'); // YYYY-MM-DD format, or choose your preferred locale
-};
-
-// Helper to format currency (Thai Baht)
+// Enhanced formatting functions
 const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined || isNaN(parseFloat(amount))) return 'N/A';
+    if (amount === null || amount === undefined || isNaN(parseFloat(amount))) return '฿0.00';
     return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 2 }).format(amount);
 };
 
+const formatDate = (dateString) => {
+    if (!dateString) return 'ไม่มีข้อมูล';
+    return new Date(dateString).toLocaleDateString('th-TH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+};
 
-const ExpenseList = ({
-    expenses,
-    onEdit,
-    onDelete,
-    isLoading,
-    pagination, // { page, limit, totalItems, totalPages }
-    onPageChange,
-}) => {
-    if (isLoading && (!expenses || expenses.length === 0)) {
+// Payment Method Badge Component
+const PaymentMethodBadge = ({ paymentMethod, isPettyCash }) => {
+    if (isPettyCash) {
         return (
-            <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                <p className="mt-4 text-gray-500">กำลังโหลดค่าใช้จ่าย...</p>
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                เงินสดย่อย
+            </div>
+        );
+    } else {
+        // Bank transfer or other methods
+        return (
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
+                {paymentMethod || 'โอนธนาคาร'}
             </div>
         );
     }
+};
 
-    if (!isLoading && (!expenses || expenses.length === 0)) {
-        return (
-            <div className="bg-white shadow rounded-lg p-8 text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h15.75c.621 0 1.125.504 1.125 1.125v6.75c0 .621-.504 1.125-1.125 1.125H4.125A1.125 1.125 0 013 19.875v-6.75zM3 8.625c0-.621.504-1.125 1.125-1.125h15.75c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125H4.125A1.125 1.125 0 013 12.375V8.625zM3 4.125c0-.621.504-1.125 1.125-1.125h15.75c.621 0 1.125.504 1.125 1.125V6c0 .621-.504 1.125-1.125 1.125H4.125A1.125 1.125 0 013 6V4.125z" />
-                </svg>
-                <h3 className="mt-2 text-lg font-medium text-gray-900">ไม่มีรายการค่าใช้จ่ายที่บันทึกไว้</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                    เริ่มต้นโดยการบันทึกค่าใช้จ่ายใหม่
-                </p>
-            </div>
-        );
-    }
-
+// Amount Display Component with visual emphasis
+const AmountDisplay = ({ amount, isPettyCash }) => {
+    const textColor = isPettyCash ? 'text-green-700' : 'text-blue-700';
+    const bgColor = isPettyCash ? 'bg-green-50' : 'bg-blue-50';
+    
     return (
-        <div className="bg-white shadow border-b border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">หมวดหมู่</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รายละเอียด</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">จำนวนเงิน</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วิธีการชำระเงิน</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เงินสดย่อย?</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">การดำเนินการ</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {expenses.map((expense) => (
-                            <tr key={expense.expense_id} className="hover:bg-gray-50 transition-colors duration-150 ease-in-out">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatDate(expense.expense_date)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{expense.category_name || 'ไม่มีข้อมูล'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-700 max-w-xs xl:max-w-sm break-words">{expense.description}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold text-right">{formatCurrency(expense.amount)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{expense.payment_method || <span className="italic text-gray-400">ไม่มีข้อมูล</span>}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                    {expense.is_petty_cash_expense ? 
-                                        <span className="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">ใช่</span> : 
-                                        <span className="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-700">ไม่</span>
-                                    }
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                    <button
-                                        onClick={() => onEdit(expense)}
-                                        className="text-indigo-600 hover:text-indigo-800 transition-colors p-1 rounded hover:bg-indigo-50"
-                                        title="แก้ไขค่าใช้จ่าย"
-                                    >
-                                        <EditIcon />
-                                    </button>
-                                    <button
-                                        onClick={() => onDelete(expense.expense_id)}
-                                        className="text-red-500 hover:text-red-700 transition-colors p-1 rounded hover:bg-red-50"
-                                        title="ลบค่าใช้จ่าย"
-                                    >
-                                        <DeleteIcon />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Pagination Controls */}
-            {pagination && pagination.totalPages > 1 && (
-                <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 bg-white rounded-b-lg">
-                    <div className="flex-1 flex justify-between sm:hidden">
-                        <button
-                            onClick={() => onPageChange(pagination.page - 1)}
-                            disabled={pagination.page <= 1}
-                            className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                        >
-                            ก่อนหน้า
-                        </button>
-                        <button
-                            onClick={() => onPageChange(pagination.page + 1)}
-                            disabled={pagination.page >= pagination.totalPages}
-                            className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                        >
-                            ถัดไป
-                        </button>
-                    </div>
-                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                        <div>
-                            <p className="text-sm text-gray-700">
-                                แสดง <span className="font-medium">{(pagination.page - 1) * pagination.limit + 1}</span>
-                                {' '}ถึง <span className="font-medium">{Math.min(pagination.page * pagination.limit, pagination.totalItems)}</span>
-                                {' '}จากทั้งหมด <span className="font-medium">{pagination.totalItems}</span> รายการ
-                            </p>
-                        </div>
-                        <div>
-                            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                                <button
-                                    onClick={() => onPageChange(pagination.page - 1)}
-                                    disabled={pagination.page <= 1}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                                    title="Previous"
-                                >
-                                    <span className="sr-only">ก่อนหน้า</span>
-                                    <ChevronLeftIcon />
-                                </button>
-                                {/* Page numbers can be added here if complex pagination is needed */}
-                                <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                                    หน้า {pagination.page} จาก {pagination.totalPages}
-                                </span>
-                                <button
-                                    onClick={() => onPageChange(pagination.page + 1)}
-                                    disabled={pagination.page >= pagination.totalPages}
-                                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
-                                    title="ถัดไป"
-                                >
-                                    <span className="sr-only">ถัดไป</span>
-                                    <ChevronRightIcon />
-                                </button>
-                            </nav>
-                        </div>
-                    </div>
-                </div>
-            )}
-             {isLoading && expenses && expenses.length > 0 && (
-                <div className="py-4 text-center text-sm text-gray-500">กำลังอัปเดตรายการ...</div>
-            )}
+        <div className={`text-right px-3 py-1 rounded-lg ${bgColor}`}>
+            <span className={`text-sm font-semibold ${textColor}`}>
+                {formatCurrency(amount)}
+            </span>
         </div>
     );
 };
 
-export default ExpenseList;
+// Category Badge Component
+const CategoryBadge = ({ categoryName }) => {
+    return (
+        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
+            {categoryName || 'ไม่มีหมวดหมู่'}
+        </span>
+    );
+};
+
+// Action Buttons Component
+const ActionButtons = ({ expense, onEdit, onDelete }) => {
+    return (
+        <div className="flex items-center space-x-2">
+            <button
+                onClick={() => onEdit(expense)}
+                className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
+            >
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                แก้ไข
+            </button>
+            <button
+                onClick={() => onDelete(expense.expense_id)}
+                className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-150"
+            >
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                ลบ
+            </button>
+        </div>
+    );
+};
+
+// Loading Row Component
+const LoadingRow = () => {
+    return (
+        <tr className="animate-pulse">
+            {[...Array(7)].map((_, index) => (
+                <td key={index} className="px-6 py-4 whitespace-nowrap">
+                    <div className="h-4 bg-gray-200 rounded"></div>
+                </td>
+            ))}
+        </tr>
+    );
+};
+
+// Empty State Component
+const EmptyState = ({ isFiltered }) => {
+    return (
+        <tr>
+            <td colSpan="7" className="px-6 py-12 text-center">
+                <div className="flex flex-col items-center">
+                    <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v11a2 2 0 002 2h2m0-13v13m0-13h2a2 2 0 012 2v11a2 2 0 01-2 2h-2m-6-9h6m-6 4h6" />
+                    </svg>
+                    <p className="text-gray-500 text-sm">
+                        {isFiltered 
+                            ? 'ไม่พบรายการค่าใช้จ่ายที่ตรงกับเงื่อนไขการค้นหา' 
+                            : 'ยังไม่มีรายการค่าใช้จ่าย'
+                        }
+                    </p>
+                    {isFiltered && (
+                        <p className="text-gray-400 text-xs mt-1">
+                            ลองปรับเงื่อนไขการค้นหาใหม่
+                        </p>
+                    )}
+                </div>
+            </td>
+        </tr>
+    );
+};
+
+// Pagination Component
+const PaginationControls = ({ pagination, onPageChange }) => {
+    const { page, totalPages, totalItems } = pagination;
+    
+    if (totalPages <= 1) return null;
+
+    const getPageNumbers = () => {
+        const pages = [];
+        const showPages = 5; // Show 5 page numbers
+        let start = Math.max(1, page - Math.floor(showPages / 2));
+        let end = Math.min(totalPages, start + showPages - 1);
+        
+        if (end - start + 1 < showPages) {
+            start = Math.max(1, end - showPages + 1);
+        }
+        
+        for (let i = start; i <= end; i++) {
+            pages.push(i);
+        }
+        return pages;
+    };
+
+    return (
+        <div className="bg-white px-6 py-3 flex items-center justify-between border-t border-gray-200">
+            <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                    onClick={() => onPageChange(page - 1)}
+                    disabled={page <= 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    ก่อนหน้า
+                </button>
+                <button
+                    onClick={() => onPageChange(page + 1)}
+                    disabled={page >= totalPages}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    ถัดไป
+                </button>
+            </div>
+            
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p className="text-sm text-gray-700">
+                        แสดง <span className="font-medium">{((page - 1) * 20) + 1}</span> ถึง{' '}
+                        <span className="font-medium">{Math.min(page * 20, totalItems)}</span> จาก{' '}
+                        <span className="font-medium">{totalItems}</span> รายการ
+                    </p>
+                </div>
+                <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                        <button
+                            onClick={() => onPageChange(page - 1)}
+                            disabled={page <= 1}
+                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span className="sr-only">Previous</span>
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                        
+                        {getPageNumbers().map((pageNum) => (
+                            <button
+                                key={pageNum}
+                                onClick={() => onPageChange(pageNum)}
+                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                    pageNum === page
+                                        ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                }`}
+                            >
+                                {pageNum}
+                            </button>
+                        ))}
+                        
+                        <button
+                            onClick={() => onPageChange(page + 1)}
+                            disabled={page >= totalPages}
+                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span className="sr-only">Next</span>
+                            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Main Enhanced Expense List Component
+export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, pagination, onPageChange }) {
+    const hasFilters = pagination?.totalItems !== undefined;
+
+    return (
+        <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+            {/* Header with summary */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium text-gray-900">รายการค่าใช้จ่าย</h3>
+                    {pagination?.totalItems !== undefined && (
+                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <div className="flex items-center">
+                                <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                                <span>เงินสดย่อย</span>
+                            </div>
+                            <div className="flex items-center">
+                                <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                                <span>โอนธนาคาร</span>
+                            </div>
+                            <span className="text-gray-400">|</span>
+                            <span>รวม {pagination.totalItems} รายการ</span>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                วันที่
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                หมวดหมู่
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                รายละเอียด
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                จำนวนเงิน
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                ประเภทการจ่าย
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                อ้างอิง
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                การดำเนินการ
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {isLoading ? (
+                            // Show loading rows
+                            [...Array(5)].map((_, index) => <LoadingRow key={index} />)
+                        ) : expenses.length === 0 ? (
+                            // Show empty state
+                            <EmptyState isFiltered={hasFilters} />
+                        ) : (
+                            // Show actual expense data
+                            expenses.map((expense) => (
+                                <tr 
+                                    key={expense.expense_id} 
+                                    className={`hover:bg-gray-50 transition-colors duration-150 ${
+                                        expense.is_petty_cash_expense ? 'border-l-4 border-green-300' : 'border-l-4 border-blue-300'
+                                    }`}
+                                >
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {formatDate(expense.expense_date)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <CategoryBadge categoryName={expense.category_name} />
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-700 max-w-xs xl:max-w-sm">
+                                        <div className="break-words">
+                                            <span className="font-medium">{expense.description}</span>
+                                            {expense.reference_details && (
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {expense.reference_details}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <AmountDisplay 
+                                            amount={expense.amount} 
+                                            isPettyCash={expense.is_petty_cash_expense} 
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                        <PaymentMethodBadge 
+                                            paymentMethod={expense.payment_method}
+                                            isPettyCash={expense.is_petty_cash_expense}
+                                        />
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {expense.reference_details ? (
+                                            <span className="truncate max-w-24 block" title={expense.reference_details}>
+                                                {expense.reference_details}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400 italic">ไม่มี</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                        <ActionButtons 
+                                            expense={expense}
+                                            onEdit={onEdit}
+                                            onDelete={onDelete}
+                                        />
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Pagination */}
+            {pagination && !isLoading && (
+                <PaginationControls 
+                    pagination={pagination} 
+                    onPageChange={onPageChange} 
+                />
+            )}
+        </div>
+    );
+}
