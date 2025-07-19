@@ -1,6 +1,7 @@
 // Suggested path: src/expenses/ExpenseReports.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../apiService'; // Adjust path if needed
+import { formatCurrency } from '../utils/currency';
 
 // Helper to format date
 const formatDate = (dateString) => {
@@ -9,11 +10,6 @@ const formatDate = (dateString) => {
     return date.toLocaleDateString('en-CA'); // YYYY-MM-DD, or choose preferred locale
 };
 
-// Helper to format currency (Thai Baht)
-const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined || isNaN(parseFloat(amount))) return 'N/A';
-    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 2 }).format(amount);
-};
 
 // --- Icon for Download (Placeholder) ---
 const DownloadIcon = () => (

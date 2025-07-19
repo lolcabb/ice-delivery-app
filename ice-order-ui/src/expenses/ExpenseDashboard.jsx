@@ -3,12 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../apiService'; // Adjust path if needed
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { TrendingUpIcon, TrendingDownIcon, CategoryIcon, CashTodayIcon, CustomWalletIcon } from '../components/Icons';
+import { formatCurrency } from '../utils/currency';
+import PaymentMethodBadge from '../components/PaymentMethodBadge';
 
-// --- Helper to format currency ---
-const formatCurrency = (amount, currency = 'THB') => {
-    if (amount === null || amount === undefined || isNaN(parseFloat(amount))) return 'N/A';
-    return new Intl.NumberFormat('th-TH', { style: 'currency', currency: currency, minimumFractionDigits: 2 }).format(amount);
-};
 
 // --- Helper for Pie Chart ---
 const processPieChartData = (data, topN = 6) => {
@@ -51,23 +48,6 @@ const StatusIndicator = ({ status, size = 'sm' }) => {
     );
 };
 
-const PaymentMethodBadge = ({ isPettyCash, amount }) => {
-    if (isPettyCash) {
-        return (
-            <div className="flex items-center text-xs">
-                <span className="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
-                <span className="text-green-700 font-medium">เงินสดย่อย</span>
-            </div>
-        );
-    } else {
-        return (
-            <div className="flex items-center text-xs">
-                <span className="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
-                <span className="text-blue-700 font-medium">โอนธนาคาร</span>
-            </div>
-        );
-    }
-};
 
 // --- Enhanced Summary Card Component ---
 const EnhancedSummaryCard = ({ title, value, icon, trendValue, trendDirection, subtitle, details = [], status }) => {
