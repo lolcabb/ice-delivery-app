@@ -177,7 +177,7 @@ export default function WaterTestLogManager() {
                         logsToSubmit.push({
                             stage_id: parseInt(stageId),
                             test_session: session.charAt(0).toUpperCase() + session.slice(1),
-                            test_timestamp: `${selectedDate}T${session === 'morning' ? '08:00:00' : '14:00:00'}Z`,
+                            test_timestamp: new Date(`${selectedDate}T${session === 'morning' ? '08:00:00' : '14:00:00'}Z`).toISOString(),
                             ph_value: sessionData.ph_value || null,
                             tds_ppm_value: sessionData.tds_ppm_value || null,
                             ec_us_cm_value: sessionData.ec_us_cm_value || null
