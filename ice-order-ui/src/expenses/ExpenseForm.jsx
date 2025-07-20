@@ -1,14 +1,14 @@
 // Suggested path: src/expenses/ExpenseForm.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import Modal from '../Modal'; // Assuming Modal.jsx is in the same directory
-import { formatDateForInput, getCurrentLocalDateISO } from '../utils/dateUtils'; // Adjust path
+import Modal from '../Modal';
+import { formatDateForInput, getCurrentLocalDateISO } from '../utils/dateUtils';
 
 const ExpenseForm = ({
     isOpen,
     onClose,
-    onSave, // Function from ExpenseListManager to handle API call
-    expense, // Current expense being edited (null if adding new)
-    categories = [] // Array of active category objects
+    onSave,
+    expense,
+    categories = []
 }) => {
     const getInitialFormState = useCallback(() => ({
         expense_date: getCurrentLocalDateISO(), // Default to today
@@ -18,15 +18,18 @@ const ExpenseForm = ({
         payment_method: '',
         reference_details: '',
         is_petty_cash_expense: false,
-        related_document_url: '' // For future file uploads
-    }), [categories]); // Memoize initial state to avoid unnecessary re-renders
+        related_document_url: ''
+    }), [categories]);
 
     const [formData, setFormData] = useState(getInitialFormState);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    const [receiptFile, setReceiptFile] = useState(null);
+    const [filePreview, setFilePreview] = useState(null);
+
     useEffect(() => {
-        if (isOpen) { // Only reset/populate when modal becomes visible
+        if (isOpen) {
             if (expense) {
                 setFormData({
                     expense_date: formatDateForInput(expense.expense_date),
@@ -38,8 +41,15 @@ const ExpenseForm = ({
                     is_petty_cash_expense: expense.is_petty_cash_expense || false,
                     related_document_url: expense.related_document_url || ''
                 });
+
+                if (expense.related_document_url) {
+                    setFilePreview(expense.related_document_url)
+                }
+
             } else {
-                setFormData(getInitialFormState()); // Reset to initial state                
+                setFormData(getInitialFormState());
+                setReceiptFile(null);
+                setFilePreview(null);              
             }
             setError(''); // Clear any previous errors
         }
@@ -51,6 +61,34 @@ const ExpenseForm = ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }));
+    };
+
+    // FILE HANDLING FUNCTIONS
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file && (file.type === 'image/jpeg' || file.type === 'image/png')) {
+            setReceiptFile(file);
+            setFilePreview(URL.createObjectURL(file));
+        } else if (file) {
+            alert('กรุณาเลือกไฟล์รูปภาพ (JPG หรือ PNG) เท่านั้น');
+            e.target.value = null;
+            setReceiptFile(null);
+            setFilePreview(null);
+        }
+    };
+
+    const handleRemoveFile = () => {
+        setReceiptFile(null);
+        setFilePreview(null);
+        // Clear the file input
+        const fileInput = document.getElementById('receipt_file_input');
+        if (fileInput) {
+            fileInput.value = null;
+        }
+        // If editing an existing expense, we should also clear the related_document_url
+        if (expense) {
+            setFormData(prev => ({ ...prev, related_document_url: '' }));
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -67,20 +105,27 @@ const ExpenseForm = ({
 
         setIsLoading(true);
         try {
-            const payload = {
-                ...formData,
-                amount: parseFloat(formData.amount),
-                category_id: parseInt(formData.category_id),
-                // is_petty_cash_expense is already a boolean from checkbox
-            };
-            // Remove empty optional fields if backend prefers null or not present
-            if (!payload.payment_method) delete payload.payment_method;
-            if (!payload.reference_details) delete payload.reference_details;
-            if (!payload.related_document_url) delete payload.related_document_url;
+            // === PREPARE FORM DATA FOR FILE UPLOAD ===
+            const submitData = new FormData();
+            
+            // Add all form fields
+            Object.keys(formData).forEach(key => {
+                if (formData[key] !== '' && formData[key] !== null && formData[key] !== undefined) {
+                    submitData.append(key, formData[key]);
+                }
+            });
+            
+            // Add parsed amount and category_id as numbers
+            submitData.set('amount', parseFloat(formData.amount));
+            submitData.set('category_id', parseInt(formData.category_id));
+            submitData.set('is_petty_cash_expense', formData.is_petty_cash_expense);
+            
+            // Add file if present
+            if (receiptFile) {
+                submitData.append('receipt_file', receiptFile);
+            }
 
-
-            await onSave(payload); // Call the save handler from ExpenseListManager
-            // Parent (ExpenseListManager) will handle closing modal and re-fetching data on success
+            await onSave(submitData, expense?.expense_id); // Pass FormData instead of JSON
         } catch (err) {
             console.error("Error in ExpenseForm submit:", err);
             setError(err.message || 'บันทึกค่าใช้จ่ายไม่สำเร็จ.');
@@ -201,6 +246,71 @@ const ExpenseForm = ({
                     />
                 </div>
 
+                {/* === FILE UPLOAD SECTION === */}
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        แนบใบเสร็จ/ใบสำคัญ (ถ้ามี)
+                    </label>
+                    <div className="mt-1 flex items-center space-x-3">
+                        {/* File Input Button */}
+                        <label htmlFor="receipt_file_input" className="cursor-pointer px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-100 border border-transparent rounded-md shadow-sm hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
+                            <span>เลือกไฟล์</span>
+                        </label>
+
+                        {/* Hidden File Input */}
+                        <input
+                            type="file"
+                            id="receipt_file_input"
+                            name="receipt_file"
+                            onChange={handleFileChange}
+                            className="hidden"
+                            accept="image/jpeg, image/png"
+                            disabled={isLoading}
+                        />
+
+                        {/* File Info Display */}
+                        {receiptFile && (
+                            <div className="flex items-center text-sm text-gray-600">
+                                <span className="truncate max-w-40">{receiptFile.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveFile}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                    title="ลบไฟล์"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        )}
+                        
+                        {/* Show existing file URL if editing */}
+                        {!receiptFile && expense?.related_document_url && (
+                            <div className="flex items-center text-sm text-gray-600">
+                                <span>ไฟล์เดิม</span>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveFile}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                    title="ลบไฟล์"
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* File Preview */}
+                    {filePreview && (
+                        <div className="mt-2">
+                            <img
+                                src={filePreview}
+                                alt="ตัวอย่างใบเสร็จ"
+                                className="rounded-md border p-1 max-h-40 object-contain"
+                            />
+                        </div>
+                    )}
+                </div>
+
                 <div className="flex items-center">
                     <input
                         id="is_petty_cash_expense"
@@ -212,25 +322,9 @@ const ExpenseForm = ({
                         disabled={isLoading}
                     />
                     <label htmlFor="is_petty_cash_expense" className="ml-2 block text-sm text-gray-900">
-                        จ่ายจากเงินสดย่อยหรือไม่?
+                        ค่าใช้จ่ายเงินสดย่อย
                     </label>
                 </div>
-
-                {/* Placeholder for file upload in the future
-                <div>
-                    <label htmlFor="related_document_url" className="block text-sm font-medium text-gray-700 mb-1">
-                        Attach Receipt (Optional)
-                    </label>
-                    <input
-                        type="file"
-                        name="related_document_url_file" // Name for file input
-                        id="related_document_url_file"
-                        // onChange={handleFileChange} // You'd need a handleFileChange function
-                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50"
-                        disabled={isLoading}
-                    />
-                </div>
-                */}
 
                 {error && (
                     <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">

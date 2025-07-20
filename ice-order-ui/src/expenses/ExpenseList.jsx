@@ -12,6 +12,95 @@ const formatDate = (dateString) => {
     });
 };
 
+// === NEW RECEIPT MODAL COMPONENT ===
+const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                {/* Backdrop */}
+                <div 
+                    className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                    onClick={onClose}
+                ></div>
+
+                {/* Modal */}
+                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    {/* Header */}
+                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg leading-6 font-medium text-gray-900">
+                                ใบเสร็จ/หลักฐาน
+                            </h3>
+                            <button
+                                onClick={onClose}
+                                className="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
+                            >
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        {expenseDescription && (
+                            <p className="mt-2 text-sm text-gray-600">{expenseDescription}</p>
+                        )}
+                    </div>
+
+                    {/* Image */}
+                    <div className="px-4 pb-4 sm:px-6 sm:pb-6">
+                        <div className="bg-gray-50 rounded-lg p-4">
+                            <img
+                                src={imageUrl}
+                                alt="ใบเสร็จ"
+                                className="w-full h-auto max-h-96 object-contain rounded"
+                                onError={(e) => {
+                                    e.target.src = '/placeholder-receipt.jpg'; // Fallback image
+                                }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        >
+                            ปิด
+                        </button>
+                        <a
+                            href={imageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                        >
+                            เปิดในแท็บใหม่
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// === UPDATED RECEIPT ICON COMPONENT ===
+const ReceiptIcon = ({ hasReceipt, onClick }) => {
+    if (!hasReceipt) return null;
+
+    return (
+        <button
+            onClick={onClick}
+            className="inline-flex items-center text-indigo-600 hover:text-indigo-800 transition-colors duration-150"
+            title="ดูใบเสร็จ"
+        >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+        </button>
+    );
+};
 
 // Amount Display Component with visual emphasis
 const AmountDisplay = ({ amount, isPettyCash }) => {
@@ -227,6 +316,32 @@ const PaginationControls = ({ pagination, onPageChange, disabled = false }) => {
 export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, isFiltering = false,pagination, onPageChange }) {
     const hasFilters = pagination?.totalItems !== undefined;
 
+    // === RECEIPT MODAL STATE ===
+    const [receiptModal, setReceiptModal] = useState({
+        isOpen: false,
+        imageUrl: '',
+        expenseDescription: ''
+    });
+
+    // === RECEIPT VIEWING HANDLER ===
+    const handleViewReceipt = (expense) => {
+        if (expense.related_document_url) {
+            setReceiptModal({
+                isOpen: true,
+                imageUrl: expense.related_document_url,
+                expenseDescription: expense.description
+            });
+        }
+    };
+
+    const closeReceiptModal = () => {
+        setReceiptModal({
+            isOpen: false,
+            imageUrl: '',
+            expenseDescription: ''
+        });
+    };
+
     return (
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
             {/* Header with summary */}
@@ -322,22 +437,20 @@ export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, isF
                                             isPettyCash={expense.is_petty_cash_expense}
                                         />
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {expense.reference_details ? (
-                                            <span className="truncate max-w-24 block" title={expense.reference_details}>
-                                                {expense.reference_details}
-                                            </span>
-                                        ) : (
-                                            <span className="text-gray-400 italic">ไม่มี</span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                        <ActionButtons 
-                                            expense={expense}
-                                            onEdit={onEdit}
-                                            onDelete={onDelete}
-                                        />
-                                    </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {expense.reference_details ? 
+                                                `${expense.reference_details.substring(0, 20)}${expense.reference_details.length > 20 ? '...' : ''}` 
+                                                : '-'
+                                            }
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <ActionButtons 
+                                                expense={expense}
+                                                onEdit={onEdit}
+                                                onDelete={onDelete}
+                                                onViewReceipt={handleViewReceipt}
+                                            />
+                                        </td>
                                 </tr>
                             ))
                         )}
@@ -353,6 +466,14 @@ export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, isF
                     disabled={isFiltering}
                 />
             )}
+
+            {/* === RECEIPT MODAL === */}
+            <ReceiptModal
+                isOpen={receiptModal.isOpen}
+                onClose={closeReceiptModal}
+                imageUrl={receiptModal.imageUrl}
+                expenseDescription={receiptModal.expenseDescription}
+            />
         </div>
     );
 }

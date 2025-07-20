@@ -7,7 +7,7 @@ const { GCS_BUCKET_NAME } = require('../config');
 
 const { Storage } = require('@google-cloud/storage');
 const sharp = require('sharp');
-const { v4: uuidv4 } = require('uuid'); // You might need to install uuid: npm install uuid
+const { v4: uuidv4 } = require('uuid');
 
 const multer = require('multer');
 const storage = multer.memoryStorage();

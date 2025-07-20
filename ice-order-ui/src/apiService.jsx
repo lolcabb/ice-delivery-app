@@ -156,6 +156,46 @@ export const apiService = {
     updateOrderStatusAndDriver: (orderId, data) => { 
         return apiService.put(`/orders/${orderId}`, data);
     },
+    addExpenseWithFile: (formData) => {
+        return fetch(`${BASE_URL}/expenses`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+                // Don't set Content-Type - let browser set it with boundary for FormData
+            },
+            body: formData // Send FormData directly
+        }).then(async response => {
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const error = new Error(errorData.error || `HTTP ${response.status}`);
+                error.status = response.status;
+                error.data = errorData;
+                throw error;
+            }
+            return response.json();
+        });
+    },
+
+    // New method for updating expense with file upload
+    updateExpenseWithFile: (expenseId, formData) => {
+        return fetch(`${BASE_URL}/expenses/${expenseId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+                // Don't set Content-Type - let browser set it with boundary for FormData
+            },
+            body: formData // Send FormData directly
+        }).then(async response => {
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                const error = new Error(errorData.error || `HTTP ${response.status}`);
+                error.status = response.status;
+                error.data = errorData;
+                throw error;
+            }
+            return response.json();
+        });
+    },
     getExpenseCategories: () => apiService.get('/expenses/expense-categories'),
     addExpenseCategory: (categoryData) => apiService.post('/expenses/expense-categories', categoryData),
     updateExpenseCategory: (categoryId, categoryData) => apiService.put(`/expenses/expense-categories/${categoryId}`, categoryData),

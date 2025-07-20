@@ -1,15 +1,68 @@
 // ice-delivery-app/routes/expenses.js
-
 const express = require('express');
 const router = express.Router();
 const { query, getClient } = require('../db/postgres'); // Ensure getClient is exported for transactions
 const { authMiddleware, requireRole } = require('../middleware/auth');
+
+const { Storage } = require('@google-cloud/storage');
+const sharp = require('sharp');
+const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+
+const { GCS_BUCKET_NAME } = require('../config');
+
+const storage = multer.memoryStorage();
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+// Initialize Google Cloud Storage (reuse existing bucket)
+const gcs = new Storage();
+const bucket = gcs.bucket(GCS_BUCKET_NAME);
 
 // --- Helper function for error handling ---
 const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
     console.error(message, error);
     const errorMessage = process.env.NODE_ENV === 'production' ? message : `${message}: ${error.message || error}`;
     res.status(statusCode).json({ error: errorMessage });
+};
+
+// Helper function for uploading expense receipts to GCS
+const uploadExpenseReceiptToGCS = (file) => {
+    return new Promise((resolve, reject) => {
+        if (!file) {
+            return resolve(null);
+        }
+
+        // Create a unique filename with expense folder structure
+        const fileName = `expenses/receipts/receipt-${Date.now()}-${uuidv4()}.jpeg`;
+        const blob = bucket.file(fileName);
+        const blobStream = blob.createWriteStream({
+            resumable: false,
+            contentType: 'image/jpeg'
+        });
+
+        blobStream.on('error', (err) => reject(err));
+
+        blobStream.on('finish', () => {
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+            console.log(`Successfully uploaded expense receipt to GCS: ${publicUrl}`);
+            resolve(publicUrl);
+        });
+
+        // Image optimization with Sharp
+        sharp(file.buffer)
+            .resize({ width: 800, withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer()
+            .then(processedBuffer => {
+                blobStream.end(processedBuffer);
+            })
+            .catch(err => {
+                reject(err);
+            });
+    });
 };
 
 // --- Helper function to get dates based on Thailand timezone ---
@@ -408,14 +461,21 @@ router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', '
     const limit = parseInt(req.query.limit) || 5;
     try {
         const result = await query(
-            `SELECT e.expense_id, e.expense_date, e.description, e.amount, ec.category_name
+            `SELECT
+                e.expense_id,
+                e.expense_date,
+                e.description,
+                e.amount,
+                e.payment_method,
+                e.is_petty_cash_expense,
+                ec.category_name
              FROM expenses e
              JOIN expense_categories ec ON e.category_id = ec.category_id
              ORDER BY e.expense_date DESC, e.created_at DESC
              LIMIT $1`,
             [limit]
         );
-        res.json(result.rows.map(row => ({...row, amount: parseFloat(row.amount)})));
+        res.json(result.rows.map(row => ({ ...row, amount: parseFloat(row.amount)})));
     } catch (err) {
         handleError(res, err, "Failed to retrieve recent expenses");
     }
@@ -682,20 +742,40 @@ router.post('/petty-cash/:log_date/reconcile', authMiddleware, requireRole(['adm
 
 // --- Expenses Endpoints (Modified for Petty Cash Reconciliation) ---
 // POST /api/expenses
-router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res) => {
     const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
     const user_id_who_recorded = req.user.id;
-    if (!expense_date || !category_id || !description || amount === undefined) return res.status(400).json({ error: 'Expense date, category, description, and amount are required' });
-    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Invalid amount' });
+
+    if (!expense_date || !category_id || !description || amount === undefined) {
+        return res.status(400).json({ error: 'Expense date, category, description, and amount are required' });
+    }
+    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) { 
+        return res.status(400).json({ error: 'Invalid amount' });
+    }
 
     const client = await getClient();
     try {
         await client.query('BEGIN');
+
+        //Upload File to GCS if provided
+        const receipt_file_url = await uploadExpenseReceiptToGCS(req.file);
+        
         const result = await client.query(
             `INSERT INTO expenses (expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url, user_id)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-            [expense_date, parseInt(category_id), description, parseFloat(amount), payment_method, reference_details, is_petty_cash_expense === true, related_document_url, user_id_who_recorded]
+            [
+                expense_date, 
+                parseInt(category_id), 
+                description, 
+                parseFloat(amount), 
+                payment_method, 
+                reference_details, 
+                is_petty_cash_expense === true, 
+                receipt_file_url || related_document_url,
+                user_id_who_recorded
+            ]
         );
+
         const newExpense = result.rows[0];
         if (newExpense.is_petty_cash_expense) {
             await updatePettyCashTotalForDate(newExpense.expense_date, client.query.bind(client));
@@ -722,7 +802,7 @@ router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
 });
 
 // PUT /api/expenses/:id
-router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res) => {
     const expenseId = parseInt(req.params.id);
     const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
     if (isNaN(expenseId)) return res.status(400).json({ error: 'Invalid expense ID' });
@@ -732,18 +812,36 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
     const client = await getClient();
     try {
         await client.query('BEGIN');
-        const oldExpenseResult = await client.query('SELECT expense_date, is_petty_cash_expense FROM expenses WHERE expense_id = $1', [expenseId]);
+        const oldExpenseResult = await client.query('SELECT expense_date, is_petty_cash_expense, related_document_url FROM expenses WHERE expense_id = $1', [expenseId]);
         if (oldExpenseResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Expense not found' }); }
         const oldExpense = oldExpenseResult.rows[0];
         const oldExpenseDate = oldExpense.expense_date.toISOString().split('T')[0];
         const oldIsPettyCash = oldExpense.is_petty_cash_expense;
+
+        // Upload new file if provided, otherwise keep existing url or ise provided url
+        let final_document_url = oldExpense.related_document_url;
+        if(req.file) {
+            final_document_url = await uploadExpenseReceiptToGCS(req.file);
+        } else if(related_document_url !== undefined) {
+            final_document_url = related_document_url;
+        }
 
         const result = await client.query(
             `UPDATE expenses 
              SET expense_date = $1, category_id = $2, description = $3, amount = $4, payment_method = $5, 
                  reference_details = $6, is_petty_cash_expense = $7, related_document_url = $8, updated_at = NOW()
              WHERE expense_id = $9 RETURNING *`,
-            [expense_date, parseInt(category_id), description, parseFloat(amount), payment_method, reference_details, is_petty_cash_expense === true, related_document_url, expenseId]
+            [
+                expense_date, 
+                parseInt(category_id), 
+                description, 
+                parseFloat(amount), 
+                payment_method, 
+                reference_details, 
+                is_petty_cash_expense === true, 
+                final_document_url, 
+                expenseId
+            ]
         );
         const updatedExpense = result.rows[0];
         const newIsPettyCash = updatedExpense.is_petty_cash_expense;

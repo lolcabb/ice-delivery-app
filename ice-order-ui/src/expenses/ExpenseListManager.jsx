@@ -1,14 +1,17 @@
 // src/expenses/ExpenseListManager.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiService } from '../apiService'; 
+import { PlusIcon } from '../components/Icons';
+
 import ExpenseList from './ExpenseList'; 
 import ExpenseForm from './ExpenseForm'; 
 
-const PlusIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mr-2">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-    </svg>
-);
+const getDescriptionFromFormData = (formData) => {
+    if (formData instanceof FormData) {
+        return (formData.get('description') || 'รายการใหม่').substring(0, 20);
+    }
+    return (formData.description || 'รายการใหม่').substring(0, 20);
+};
 
 // Filter Badge Component for quick selection
 const FilterBadge = ({ label, isActive, onClick, color = 'indigo' }) => {
@@ -487,15 +490,16 @@ export default function ExpenseListManager() {
     const handleSaveExpense = useCallback(async (expenseDataFromForm) => {
         let operationError = null;
         let successMsg = '';
-        // Form itself will show its own loading state. Manager can show global loading if desired.
-        // setIsLoading(true); 
+
         try {
             if (editingExpense && editingExpense.expense_id) {
-                await apiService.updateExpense(editingExpense.expense_id, expenseDataFromForm);
-                successMsg = `ค่าใช้จ่าย "${expenseDataFromForm.description.substring(0,20)}..." แก้ไขเรียบร้อยแล้ว.`;
+                // UPDATE EXISTING EXPENSE
+                await apiService.updateExpenseWithFile(editingExpense.expense_id, expenseDataFromForm);
+                successMsg = `ค่าใช้จ่าย "${getDescriptionFromFormData(expenseDataFromForm)}..." แก้ไขเรียบร้อยแล้ว.`;
             } else {
-                await apiService.addExpense(expenseDataFromForm);
-                successMsg = `ค่าใช้จ่าย "${expenseDataFromForm.description.substring(0,20)}..." เพิ่มเรียบร้อยแล้ว.`;
+                // ADDING NEW EXPENSE
+                await apiService.addExpenseWithFile(expenseDataFromForm);
+                successMsg = `ค่าใช้จ่าย "${getDescriptionFromFormData(expenseDataFromForm)}..." เพิ่มเรียบร้อยแล้ว.`;
             }
             setSuccessMessage(successMsg);
             handleCloseModal(); 

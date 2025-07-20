@@ -379,7 +379,7 @@ export default function ExpenseDashboard() {
                                         <p className="text-sm font-medium text-indigo-600">{expense.description}</p>
                                         <PaymentMethodBadge 
                                             isPettyCash={expense.is_petty_cash_expense} 
-                                            amount={expense.amount} 
+                                            paymentMethod={expense.payment_method} 
                                         />
                                     </div>
                                     <p className="text-xs text-gray-500">
