@@ -744,6 +744,7 @@ router.post('/petty-cash/:log_date/reconcile', authMiddleware, requireRole(['adm
 // POST /api/expenses
 router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res) => {
     const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
+    const pettyCash = String(is_petty_cash_expense).toLowerCase() === 'true';
     const user_id_who_recorded = req.user.id;
 
     if (!expense_date || !category_id || !description || amount === undefined) {
@@ -769,8 +770,8 @@ router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager'])
                 description, 
                 parseFloat(amount), 
                 payment_method, 
-                reference_details, 
-                is_petty_cash_expense === true, 
+                reference_details,
+                pettyCash,
                 receipt_file_url || related_document_url,
                 user_id_who_recorded
             ]
@@ -805,6 +806,8 @@ router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
 router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res) => {
     const expenseId = parseInt(req.params.id);
     const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
+    const pettyCash = String(is_petty_cash_expense).toLowerCase() === 'true';
+
     if (isNaN(expenseId)) return res.status(400).json({ error: 'Invalid expense ID' });
     if (!expense_date || !category_id || !description || amount === undefined) return res.status(400).json({ error: 'Expense date, category, description, and amount are required' });
     if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Invalid amount' });
@@ -837,9 +840,9 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
                 description, 
                 parseFloat(amount), 
                 payment_method, 
-                reference_details, 
-                is_petty_cash_expense === true, 
-                final_document_url, 
+                reference_details,
+                pettyCash, 
+                final_document_url,
                 expenseId
             ]
         );
