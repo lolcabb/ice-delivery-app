@@ -1,7 +1,9 @@
 // src/apiService.jsx
 // Legacy API wrapper. Gradually delegates to new modular API in ./api.
-import { request } from './api/base.js';
+import { request, API_BASE_URL } from './api/base.js';
 import { login as authLogin, register as authRegister } from './api/auth.js';
+
+const TOKEN_KEY = 'authToken';
 
 export const apiService = {
     get: async (endpoint, options = {}) => {
@@ -157,7 +159,7 @@ export const apiService = {
         return apiService.put(`/orders/${orderId}`, data);
     },
     addExpenseWithFile: (formData) => {
-        return fetch(`${BASE_URL}/expenses`, {
+        return fetch(`${API_BASE_URL}/expenses`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
@@ -178,7 +180,7 @@ export const apiService = {
 
     // New method for updating expense with file upload
     updateExpenseWithFile: (expenseId, formData) => {
-        return fetch(`${BASE_URL}/expenses/${expenseId}`, {
+        return fetch(`${API_BASE_URL}/expenses/${expenseId}`, {
             method: 'PUT',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
