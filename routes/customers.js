@@ -36,7 +36,7 @@ const uploadToGCS = (file) => {
         }
 
         // Create a unique filename
-        const fileName = `${Date.now()}-${uuidv4()}.jpeg`;
+        const fileName = `customers/sales/slip-${Date.now()}-${uuidv4()}.jpeg`;
         const blob = bucket.file(fileName);
         const blobStream = blob.createWriteStream({
             resumable: false,
