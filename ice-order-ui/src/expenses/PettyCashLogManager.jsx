@@ -45,7 +45,16 @@ export default function PettyCashLogManager() {
             });
             const response = await apiService.getPettyCashLogs(params);
             setLogs(Array.isArray(response.data) ? response.data : []);
-            setPagination(response.pagination || { page: 1, limit: pagination.limit, totalPages: 1, totalItems: 0 });
+            //setPagination(response.pagination || { page: 1, limit: pagination.limit, totalPages: 1, totalItems: 0 });
+            const safeTotalPages = Math.max(1, response.pagination?.totalPages || 1);
+            const safePage = Math.min(Math.max(1, response.pagination?.page || 1), safeTotalPages);
+            setPagination(prev => ({
+                ...prev,
+                page: safePage,
+                limit: pagination.limit,
+                totalPages: safeTotalPages,
+                totalItems: response.pagination?.totalItems || 0
+            }));
         } catch (err) {
             console.error("Failed to fetch petty cash logs:", err);
             setError(err.data?.error || err.message || 'ไม่สามารถโหลดบันทึกเงินสดย่อยได้.');

@@ -392,8 +392,16 @@ export default function ExpenseListManager() {
             });
             const response = await apiService.getExpenses(params);
             setExpenses(Array.isArray(response.data) ? response.data : []);
-            //setPagination(response.pagination || { page: 1, limit: pagination.limit, totalPages: 1, totalItems: 0 });
-            setPagination(prev => ({ ...prev, ...(response.pagination || { page: 1, totalPages: 1, totalItems: 0 }) }));
+            //setPagination(prev => ({ ...prev, ...(response.pagination || { page: 1, totalPages: 1, totalItems: 0 }) }));
+            const safeTotalPages = Math.max(1, response.pagination?.totalPages || 1);
+            const safePage = Math.min(Math.max(1, response.pagination?.page || 1), safeTotalPages);
+            setPagination(prev => ({
+                ...prev,
+                page: safePage,
+                limit: pagination.limit,
+                totalPages: safeTotalPages,
+                totalItems: response.pagination?.totalItems || 0
+            }));
         } catch (err) {
             console.error("Failed to fetch expenses:", err);
             setError(err.data?.error || err.message || 'ไม่สามารถโหลดค่าใช้จ่ายได้.');
