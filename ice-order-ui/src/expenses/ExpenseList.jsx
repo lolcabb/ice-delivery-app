@@ -1,5 +1,5 @@
 // Enhanced ExpenseList.jsx - Building on your existing structure
-import React from 'react';
+import React, { useState } from 'react';
 import { formatCurrency } from '../utils/currency';
 import PaymentMethodBadge from '../components/PaymentMethodBadge';
 
@@ -126,9 +126,17 @@ const CategoryBadge = ({ categoryName }) => {
 };
 
 // Action Buttons Component
-const ActionButtons = ({ expense, onEdit, onDelete }) => {
+const ActionButtons = ({ expense, onEdit, onDelete, onViewReceipt }) => {
     return (
         <div className="flex items-center space-x-2">
+            {/* Receipt View Button */}
+            {expense.related_document_url && (
+                <ReceiptIcon
+                    hasReceipt={true}
+                    onClick={() => onViewReceipt(expense)}
+                />
+            )}
+            {/* Edit Button */}
             <button
                 onClick={() => onEdit(expense)}
                 className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-150"
@@ -138,6 +146,7 @@ const ActionButtons = ({ expense, onEdit, onDelete }) => {
                 </svg>
                 แก้ไข
             </button>
+            {/* Delete Button */}
             <button
                 onClick={() => onDelete(expense.expense_id)}
                 className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-150"
