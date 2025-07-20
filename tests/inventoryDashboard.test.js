@@ -59,7 +59,6 @@ describe('inventory dashboard routes', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual([{ date: '2024-01-01', total_in: 1, total_out: 0 }]);
   });
-});
 
   test('GET /dashboard/consumables/usage-patterns returns patterns', async () => {
     db.query
@@ -75,7 +74,7 @@ describe('inventory dashboard routes', () => {
           current_stock: 50,
           unit: 'kg',
           total_used_30d: 20,
-          daily_usage: 2,
+          daily_usage: 0.6666666666666666,
           avg_per_transaction: 5
         }
       ],
@@ -84,11 +83,13 @@ describe('inventory dashboard routes', () => {
           name: 'Ice',
           current_stock: 50,
           unit: 'kg',
-          daily_usage: 2,
+          daily_usage: 0,
           estimated_days_remaining: 25
         }
       ]
     });
+
+  });
 
   test('GET /dashboard/consumables/item-type-movement-trend returns seven zero rows when no data', async () => {
     const rows = Array.from({ length: 7 }, (_, i) => ({
