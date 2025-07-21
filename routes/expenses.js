@@ -65,6 +65,8 @@ const uploadExpenseReceiptToGCS = (file) => {
     });
 };
 
+router.uploadExpenseReceiptToGCS = uploadExpenseReceiptToGCS;
+
 // --- Helper function to get dates based on Thailand timezone ---
 const getThailandDateStrings = () => {
     //toLocaleString with en-US and Asia/Bangkok gets the current time in Thailand
@@ -759,7 +761,7 @@ router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager'])
         await client.query('BEGIN');
 
         //Upload File to GCS if provided
-        const receipt_file_url = await uploadExpenseReceiptToGCS(req.file);
+        const receipt_file_url = await router.uploadExpenseReceiptToGCS(req.file);
         
         const result = await client.query(
             `INSERT INTO expenses (expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url, user_id)
@@ -824,7 +826,7 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
         // Upload new file if provided, otherwise keep existing url or ise provided url
         let final_document_url = oldExpense.related_document_url;
         if(req.file) {
-            final_document_url = await uploadExpenseReceiptToGCS(req.file);
+            final_document_url = await router.uploadExpenseReceiptToGCS(req.file);
         } else if(related_document_url !== undefined) {
             final_document_url = related_document_url;
         }
@@ -936,3 +938,4 @@ router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']),
 });
 
 module.exports = router;
+module.exports.uploadExpenseReceiptToGCS = uploadExpenseReceiptToGCS;
