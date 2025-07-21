@@ -81,4 +81,103 @@ describe('expense file upload', () => {
     expect(expensesRoutes.uploadExpenseReceiptToGCS).toHaveBeenCalledWith(undefined);
     expect(res.body.related_document_url).toBe('http://existing.url/doc.pdf');
   });
+
+  test('PUT /api/expenses/:id updates expense with file', async () => {
+    const oldRow = {
+      expense_date: new Date('2024-02-01T00:00:00Z'),
+      is_petty_cash_expense: false,
+      related_document_url: 'old'
+    };
+    const updatedRow = {
+      expense_id: 3,
+      is_petty_cash_expense: false,
+      expense_date: '2024-02-01',
+      related_document_url: 'http://fake.url/new.jpg'
+    };
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rows: [oldRow] })
+      .mockResolvedValueOnce({ rows: [updatedRow] })
+      .mockResolvedValueOnce({});
+
+    jest
+      .spyOn(expensesRoutes, 'uploadExpenseReceiptToGCS')
+      .mockResolvedValue('http://fake.url/new.jpg');
+
+    const res = await request(app)
+      .put('/api/expenses/3')
+      .field('expense_date', '2024-02-01')
+      .field('category_id', '1')
+      .field('description', 'Upd')
+      .field('amount', '15')
+      .field('payment_method', 'cash')
+      .field('reference_details', 'ref')
+      .field('is_petty_cash_expense', 'false')
+      .attach('receipt_file', Buffer.from('data'), 'r.jpg');
+
+    expect(res.statusCode).toBe(200);
+    expect(expensesRoutes.uploadExpenseReceiptToGCS).toHaveBeenCalled();
+    expect(mockClient.query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('UPDATE expenses'),
+      [
+        '2024-02-01',
+        1,
+        'Upd',
+        15,
+        'cash',
+        'ref',
+        false,
+        'http://fake.url/new.jpg',
+        3
+      ]
+    );
+    expect(res.body.related_document_url).toBe('http://fake.url/new.jpg');
+  });
+
+  test('DELETE /api/expenses/:id removes petty cash expense', async () => {
+    const selectRow = {
+      expense_date: new Date('2024-02-02T00:00:00Z'),
+      is_petty_cash_expense: true
+    };
+    const deletedRow = { expense_id: 4 };
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rows: [selectRow] })
+      .mockResolvedValueOnce({ rows: [deletedRow] })
+      .mockResolvedValueOnce({ rows: [{ total_expenses: 0 }] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({});
+
+    const res = await request(app).delete('/api/expenses/4');
+
+    expect(res.statusCode).toBe(200);
+    expect(mockClient.query).toHaveBeenNthCalledWith(
+      3,
+      'DELETE FROM expenses WHERE expense_id = $1 RETURNING *',
+      [4]
+    );
+    expect(res.body.message).toBe('Expense deleted successfully');
+  });
+
+  test('POST /api/expenses/petty-cash/:date/reconcile recalculates totals', async () => {
+    const finalLog = { log_id: 5, log_date: '2024-02-03' };
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rows: [{ log_id: 5 }] })
+      .mockResolvedValueOnce({ rows: [{ total_expenses: 10 }] })
+      .mockResolvedValueOnce({ rows: [{}] })
+      .mockResolvedValueOnce({});
+    db.query.mockResolvedValueOnce({ rows: [finalLog] });
+
+    const res = await request(app).post(
+      '/api/expenses/petty-cash/2024-02-03/reconcile'
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      message: 'Petty cash log reconciled successfully',
+      log: finalLog
+    });
+  });
 });
