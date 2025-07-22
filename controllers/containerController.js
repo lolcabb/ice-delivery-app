@@ -1,0 +1,20 @@
+module.exports = {
+  getContainerSizes: (req, res) => res.status(200).end(),
+  createContainerSize: (req, res) => res.status(201).end(),
+  updateContainerSize: (req, res) => res.status(200).end(),
+  deleteContainerSize: (req, res) => res.status(200).end(),
+  getReturnReasons: (req, res) => res.status(200).end(),
+  createReturnReason: (req, res) => res.status(201).end(),
+  updateReturnReason: (req, res) => res.status(200).end(),
+  deleteReturnReason: (req, res) => res.status(200).end(),
+  addContainerItem: (req, res) => res.status(201).end(),
+  listContainerItems: (req, res) => res.status(200).end(),
+  getContainerById: (req, res) => res.status(200).end(),
+  updateContainer: (req, res) => res.status(200).end(),
+  deleteContainer: (req, res) => res.status(200).end(),
+  assignContainer: (req, res) => res.status(201).end(),
+  updateAssignment: (req, res) => res.status(200).end(),
+  returnContainer: (req, res) => res.status(200).end(),
+  getAssignmentsForContainer: (req, res) => res.status(200).end(),
+  listAssignments: (req, res) => res.status(200).end()
+};
