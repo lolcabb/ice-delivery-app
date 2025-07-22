@@ -4,7 +4,7 @@ const router = express.Router();
 const { query, getClient } = require('../db/postgres');
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const errorHandler = require('../middleware/errorHandler');
-const { GCS_BUCKET_NAME } = require('../config');
+const { GCS_BUCKET_NAME } = require('../config/index.js');
 
 const { Storage } = require('@google-cloud/storage');
 const sharp = require('sharp');
