@@ -37,9 +37,17 @@ describe('customer routes', () => {
   });
 
   test('POST /api/customers uses createCustomer', async () => {
-    const res = await request(app).post('/api/customers');
+    const res = await request(app)
+      .post('/api/customers')
+      .send({ name: 'Acme' });
     expect(res.statusCode).toBe(200);
     expect(customerController.createCustomer).toHaveBeenCalled();
+  });
+
+  test('POST /api/customers missing name returns 400', async () => {
+    const res = await request(app).post('/api/customers');
+    expect(res.statusCode).toBe(400);
+    expect(customerController.createCustomer).not.toHaveBeenCalled();
   });
 
 

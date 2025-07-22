@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware, requireRole } = require('../middleware/auth');
+const validate = require('../middleware/validate');
+const { body } = require('express-validator');
 const customerController = require('../controllers/customerController');
 const { GCS_BUCKET_NAME } = require('../config/index.js');
 
@@ -18,7 +20,12 @@ router.get('/:customerId/credit-payments', authMiddleware, requireRole(['admin',
 router.post('/credit-payments/:paymentId/void', authMiddleware, requireRole(['admin','manager']), customerController.voidCreditPayment);
 router.put('/credit-payments/:paymentId', authMiddleware, requireRole(['admin','manager']), customerController.editCreditPayment);
 
-router.post('/', authMiddleware, requireRole(['admin','accountant','manager','staff']), customerController.createCustomer);
+router.post('/',
+  authMiddleware,
+  requireRole(['admin','accountant','manager','staff']),
+  validate([body('name').notEmpty().withMessage('Name is required')]),
+  customerController.createCustomer
+);
 router.get('/', authMiddleware, requireRole(['admin','accountant','manager','staff']), customerController.listCustomers);
 router.get('/:id', authMiddleware, requireRole(['admin','accountant','manager','staff']), customerController.getCustomer);
 router.put('/:id', authMiddleware, requireRole(['admin','accountant','manager','staff']), customerController.updateCustomer);

@@ -3,6 +3,8 @@ const router = express.Router();
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const containerController = require('../controllers/containerController');
 const { SOME_CONFIG } = require('../config/index.js');
+const validate = require('../middleware/validate');
+const { body, param } = require('express-validator');
 
 router.get('/sizes', authMiddleware, requireRole(['admin','accountant','staff','manager']), containerController.getContainerSizes);
 router.post('/sizes', authMiddleware, requireRole(['admin','accountant','manager']), containerController.createContainerSize);
@@ -20,7 +22,16 @@ router.get('/items/:id', authMiddleware, requireRole(['admin','accountant','staf
 router.put('/items/:id', authMiddleware, requireRole(['admin','accountant','staff','manager']), containerController.updateContainer);
 router.delete('/items/:id', authMiddleware, requireRole(['admin','accountant']), containerController.deleteContainer);
 
-router.post('/items/:containerId/assign', authMiddleware, requireRole(['admin','accountant','staff','manager']), containerController.assignContainer);
+router.post(
+  '/items/:containerId/assign',
+  authMiddleware,
+  requireRole(['admin','accountant','staff','manager']),
+  validate([
+    param('containerId').isInt().withMessage('containerId must be an integer'),
+    body('customerId').isInt().withMessage('customerId is required')
+  ]),
+  containerController.assignContainer
+);
 router.put('/assignments/:assignmentId', authMiddleware, requireRole(['admin','manager','accountant','staff']), containerController.updateAssignment);
 router.put('/assignments/:assignmentId/return', authMiddleware, requireRole(['admin','accountant','staff','manager']), containerController.returnContainer);
 router.get('/items/:containerId/assignments', authMiddleware, requireRole(['admin','accountant','staff','manager']), containerController.getAssignmentsForContainer);
