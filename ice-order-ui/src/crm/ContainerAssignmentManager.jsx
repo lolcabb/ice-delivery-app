@@ -1,5 +1,13 @@
 // src/crm/ContainerAssignmentManager.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+    getAllAssignments,
+    getReturnReasons,
+    getIceContainers,
+    returnIceContainer,
+    assignIceContainer,
+    updateAssignmentDetails,
+} from '../api/containers.js';
 import { apiService } from '../apiService';
 import ContainerAssignmentList from './ContainerAssignmentList';
 import ReturnContainerForm from './ReturnContainerForm';
@@ -121,7 +129,7 @@ export default function ContainerAssignmentManager() {
                     delete params[key];
                 }
             });
-            const response = await apiService.getAllAssignments(params);
+            const response = await getAllAssignments(params);
             setAssignments(Array.isArray(response.data) ? response.data : []);
             setPagination(prevPagination => ({
                 ...prevPagination,
@@ -160,7 +168,7 @@ export default function ContainerAssignmentManager() {
     const fetchReturnReasons = useCallback(async () => {
         if (returnReasons.length === 0 || isReturnModalOpen) {
             try {
-                const data = await apiService.getReturnReasons();
+                const data = await getReturnReasons();
                 setReturnReasons(Array.isArray(data) ? data.filter(r => r.is_active !== false) : []);
             } catch (err) {
                 console.error("Failed to fetch return reasons:", err);
@@ -175,7 +183,7 @@ export default function ContainerAssignmentManager() {
 
         try {
             const containerParams = { status: 'In Stock', limit: 1000 };
-            const containerResponse = await apiService.getIceContainers(containerParams);
+            const containerResponse = await getIceContainers(containerParams);
             const activeContainers = Array.isArray(containerResponse.data) ? containerResponse.data : [];
             setAvailableContainers(activeContainers);
             if (activeContainers.length === 0) {
@@ -246,7 +254,7 @@ export default function ContainerAssignmentManager() {
     const handleConfirmReturn = useCallback(async (assignmentId, returnData) => {
         setIsLoading(true); setError(null); setSuccessMessage('');
         try {
-            await apiService.returnIceContainer(assignmentId, returnData);
+            await returnIceContainer(assignmentId, returnData);
             setSuccessMessage(`ดำเนินการคืนถังน้ำแข็งสำหรับการมอบหมาย #${assignmentId} สำเร็จแล้ว`);
             handleCloseReturnModal();
             fetchAssignments(pagination.page, filters);
@@ -276,7 +284,7 @@ export default function ContainerAssignmentManager() {
     const handleConfirmCreateAssignment = useCallback(async (newAssignmentData) => {
         setIsLoading(true); setError(null); setSuccessMessage('');
         try {
-            await apiService.assignIceContainer(newAssignmentData.container_id, {
+            await assignIceContainer(newAssignmentData.container_id, {
                 customer_id: newAssignmentData.customer_id,
                 assigned_date: newAssignmentData.assigned_date,
                 expected_return_date: newAssignmentData.expected_return_date,
@@ -308,7 +316,7 @@ export default function ContainerAssignmentManager() {
     const handleConfirmEditAssignment = useCallback(async (assignmentId, editedData) => {
         setIsLoading(true); setError(null); setSuccessMessage('');
         try {
-            await apiService.updateAssignmentDetails(assignmentId, editedData);
+            await updateAssignmentDetails(assignmentId, editedData);
             setSuccessMessage(`อัปเดตการมอบหมาย #${assignmentId} สำเร็จแล้ว`);
             handleCloseEditAssignmentModal();
             fetchAssignments(pagination.page, filters); // Refresh list

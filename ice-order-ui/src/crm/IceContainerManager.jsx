@@ -1,6 +1,14 @@
 // src/crm/IceContainerManager.jsx 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { apiService } from '../apiService'; 
+import {
+    getIceContainers,
+    getContainerSizes,
+    addIceContainer,
+    updateIceContainer,
+    assignIceContainer,
+    retireIceContainer,
+} from '../api/containers.js';
+import { apiService } from '../apiService';
 import IceContainerList from './IceContainerList'; 
 import IceContainerForm from './IceContainerForm'; 
 import AssignContainerForm from './AssignContainerForm'; 
@@ -90,7 +98,7 @@ export default function IceContainerManager() {
                     delete params[key];
                 }
             });
-            const response = await apiService.getIceContainers(params); 
+            const response = await getIceContainers(params);
             setContainers(Array.isArray(response.data) ? response.data : []);
             // Preserve existing limit if not in response pagination
             setPagination(prevPagination => ({
@@ -120,7 +128,7 @@ export default function IceContainerManager() {
     const fetchContainerSizesForForm = useCallback(async () => { 
         if (containerSizes.length === 0 || isFormModalOpen || isAssignModalOpen) { // Fetch if needed for any modal
             try {
-                const sizesData = await apiService.getContainerSizes(); 
+                const sizesData = await getContainerSizes();
                 setContainerSizes(Array.isArray(sizesData) ? sizesData.filter(s => s.is_active !== false) : []);
             } catch (err) {
                 console.error("Failed to fetch container sizes for form:", err);
@@ -191,10 +199,10 @@ export default function IceContainerManager() {
         try {
             const payload = { ...formDataFromForm }; 
             if (editingContainer && editingContainer.container_id) {
-                await apiService.updateIceContainer(editingContainer.container_id, payload);
+                await updateIceContainer(editingContainer.container_id, payload);
                 setSuccessMessage(`อัปเดตถังน้ำแข็ง "${payload.serial_number}" สำเร็จ.`);
             } else {
-                await apiService.addIceContainer(payload);
+                await addIceContainer(payload);
                 setSuccessMessage(`เพิ่มถังน้ำแข็ง "${payload.serial_number}" สำเร็จ.`);
             }
             handleCloseFormModal();
@@ -223,7 +231,7 @@ export default function IceContainerManager() {
     const handleConfirmAssignment = useCallback(async (containerId, assignmentData) => {
         let opError = null;
         try {
-            await apiService.assignIceContainer(containerId, assignmentData);
+            await assignIceContainer(containerId, assignmentData);
             setSuccessMessage(`มอบหมายถังน้ำแข็งสำเร็จ.`);
             handleCloseAssignModal();
             await fetchIceContainers(pagination.page, filters); // Refresh the list to show updated status
@@ -244,7 +252,7 @@ export default function IceContainerManager() {
         if (confirmRetire) {
             setIsLoading(true); setError(null); setSuccessMessage('');
             try {
-                await apiService.retireIceContainer(containerId);
+                await retireIceContainer(containerId);
                 setSuccessMessage(`ปลดระวางถังน้ำแข็ง "${containerToRetire.serial_number}" สำเร็จ.`);
                 await fetchIceContainers(pagination.page, filters);
             } catch (err) {

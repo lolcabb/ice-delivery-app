@@ -1,7 +1,7 @@
 // src/crm/CreateAssignmentModal.jsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '../Modal';
-import { apiService } from '../apiService';
+import { getCustomers } from '../api/customers.js';
 import { getCurrentLocalDateISO } from '../utils/dateUtils';
 
 // Define static parts of the initial state outside the component
@@ -85,7 +85,7 @@ const CreateAssignmentModal = ({
             if (newSearchText.length > 1) {
                 customerSearchTimeoutRef.current = setTimeout(async () => {
                     try {
-                        const results = await apiService.getCustomers({ search: newSearchText, limit: 7, is_active: 'true' });
+                        const results = await getCustomers({ search: newSearchText, limit: 7, is_active: 'true' });
                         setSuggestedCustomers(results.data || []);
                     } catch (searchError) {
                         console.error("Failed to search customers:", searchError);
