@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { query, getClient } = require('../db/postgres'); // Ensure getClient is exported for transactions
 const { authMiddleware, requireRole } = require('../middleware/auth');
+const errorHandler = require('../middleware/errorHandler');
 
 const { Storage } = require('@google-cloud/storage');
 const sharp = require('sharp');
@@ -21,12 +22,6 @@ const upload = multer({
 const gcs = new Storage();
 const bucket = gcs.bucket(GCS_BUCKET_NAME);
 
-// --- Helper function for error handling ---
-const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
-    console.error(message, error);
-    const errorMessage = process.env.NODE_ENV === 'production' ? message : `${message}: ${error.message || error}`;
-    res.status(statusCode).json({ error: errorMessage });
-};
 
 // Helper function for uploading expense receipts to GCS
 const uploadExpenseReceiptToGCS = (file) => {
@@ -122,7 +117,7 @@ async function updatePettyCashTotalForDate(logDate, dbQueryFn) {
 }
 
 // GET /api/expenses/dashboard/enhanced-summary
-router.get('/dashboard/enhanced-summary', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/dashboard/enhanced-summary', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     try {
         const { todayYYYYMMDD, firstDayCurrentMonth, firstDayLastMonth, lastDayLastMonth, firstDayCurrentYear } = getThailandDateStrings();
 
@@ -347,13 +342,13 @@ router.get('/dashboard/enhanced-summary', authMiddleware, requireRole(['admin', 
         });
 
     } catch (err) {
-        handleError(res, err, "Failed to retrieve enhanced dashboard summary");
+        next(err);
     }
 });
 
 // --- Dashboard Endpoints (with corrected date logic using getThailandDateStrings) ---
 // GET /api/expenses/dashboard/summary-cards
-router.get('/dashboard/summary-cards', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/dashboard/summary-cards', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     try {
         const { todayYYYYMMDD, firstDayCurrentMonth, firstDayLastMonth, lastDayLastMonth } = getThailandDateStrings();
 
@@ -384,12 +379,12 @@ router.get('/dashboard/summary-cards', authMiddleware, requireRole(['admin', 'ac
             recentPettyCashClosing: recentPettyCashResult.rows.length > 0 ? parseFloat(recentPettyCashResult.rows[0].closing_balance) : 0
         });
     } catch (err) {
-        handleError(res, err, "Failed to retrieve dashboard summary cards data");
+        next(err);
     }
 });
 
 // GET /api/expenses/dashboard/expenses-by-category
-router.get('/dashboard/expenses-by-category', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/dashboard/expenses-by-category', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const period = req.query.period || 'current_month';
     let startDate;
     let endDate; 
@@ -425,12 +420,12 @@ router.get('/dashboard/expenses-by-category', authMiddleware, requireRole(['admi
         const result = await query(queryText, queryParams);
         res.json(result.rows.map(row => ({...row, total_amount: parseFloat(row.total_amount)})));
     } catch (err) {
-        handleError(res, err, `Failed to retrieve expenses by category for ${period}`);
+        next(err);
     }
 });
 
 // GET /api/expenses/dashboard/monthly-trend
-router.get('/dashboard/monthly-trend', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/dashboard/monthly-trend', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const monthsCount = parseInt(req.query.months) || 6;
     try {
         const nowInThailand = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
@@ -452,14 +447,14 @@ router.get('/dashboard/monthly-trend', authMiddleware, requireRole(['admin', 'ac
             total_expenses: parseFloat(row.total_expenses)
         })));
     } catch (err) {
-        handleError(res, err, "Failed to retrieve monthly expense trend");
+        next(err);
     }
 });
 
 
 // --- Existing Endpoints to be kept ---
 // GET /api/expenses/dashboard/recent-expenses (keep as is)
-router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 5;
     try {
         const result = await query(
@@ -479,12 +474,12 @@ router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', '
         );
         res.json(result.rows.map(row => ({ ...row, amount: parseFloat(row.amount)})));
     } catch (err) {
-        handleError(res, err, "Failed to retrieve recent expenses");
+        next(err);
     }
 });
 
 // GET /api/expenses/reports/detailed (keep as is)
-router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const { startDate, endDate, category_id, payment_method, is_petty_cash_expense, user_id } = req.query;
     let sqlQuery = `
         SELECT 
@@ -518,17 +513,17 @@ router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountan
                 filtersApplied: req.query 
             }
         });
-    } catch (err) { handleError(res, err, "Failed to generate detailed expense report"); }
+    } catch (err) { next(err); }
 });
 
 // Expense Categories Endpoints (keep as is)
-router.get('/expense-categories', authMiddleware, async (req, res) => {
+router.get('/expense-categories', authMiddleware, async (req, res, next) => {
     try {
         const result = await query('SELECT * FROM expense_categories WHERE is_active = TRUE ORDER BY category_name ASC');
         res.json(result.rows);
-    } catch (err) { handleError(res, err, "Failed to retrieve expense categories"); }
+    } catch (err) { next(err); }
 });
-router.post('/expense-categories', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.post('/expense-categories', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const { category_name, description } = req.body;
     const created_by_user_id = req.user.id;
     if (!category_name) return res.status(400).json({ error: 'Category name is required' });
@@ -536,11 +531,11 @@ router.post('/expense-categories', authMiddleware, requireRole(['admin', 'accoun
         const result = await query('INSERT INTO expense_categories (category_name, description, created_by_user_id) VALUES ($1, $2, $3) RETURNING *', [category_name, description, created_by_user_id]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return handleError(res, err, "Expense category name already exists", 409);
-        handleError(res, err, "Failed to create expense category");
+        if (err.code === '23505') return next(err);
+        next(err);
     }
 });
-router.put('/expense-categories/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.put('/expense-categories/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const categoryId = parseInt(req.params.id);
     const { category_name, description, is_active } = req.body;
     if (isNaN(categoryId)) return res.status(400).json({ error: 'Invalid category ID' });
@@ -550,24 +545,24 @@ router.put('/expense-categories/:id', authMiddleware, requireRole(['admin', 'acc
         if (result.rows.length === 0) return res.status(404).json({ error: 'Expense category not found' });
         res.json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return handleError(res, err, "Expense category name already exists", 409);
-        handleError(res, err, "Failed to update expense category");
+        if (err.code === '23505') return next(err);
+        next(err);
     }
 });
-router.delete('/expense-categories/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.delete('/expense-categories/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const categoryId = parseInt(req.params.id);
     if (isNaN(categoryId)) return res.status(400).json({ error: 'Invalid category ID' });
     try {
         const result = await query('UPDATE expense_categories SET is_active = FALSE, updated_at = NOW() WHERE category_id = $1 RETURNING *', [categoryId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Expense category not found' });
         res.json({ message: 'Expense category deactivated successfully', category: result.rows[0] });
-    } catch (err) { handleError(res, err, "Failed to deactivate expense category"); }
+    } catch (err) { next(err); }
 });
 
 
 // --- Petty Cash Log Endpoints ---
 // GET /api/expenses/petty-cash (keep existing, pagination already present)
-router.get('/petty-cash', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/petty-cash', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const { startDate, endDate, page = 1, limit = 15 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let mainQuery = 'SELECT pcl.*, u.username as user_managed_by FROM petty_cash_log pcl LEFT JOIN users u ON pcl.user_id = u.id';
@@ -584,11 +579,11 @@ router.get('/petty-cash', authMiddleware, requireRole(['admin', 'accountant', 'm
         const totalItems = parseInt(countResult.rows[0].count);
         const totalPages = Math.ceil(totalItems / parseInt(limit));
         res.json({ data: result.rows, pagination: { page: parseInt(page), limit: parseInt(limit), totalItems, totalPages } });
-    } catch (err) { handleError(res, err, "Failed to retrieve petty cash logs"); }
+    } catch (err) { next(err); }
 });
 
 // POST /api/expenses/petty-cash (Modified to use helper for initial total calculation)
-router.post('/petty-cash', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.post('/petty-cash', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const { log_date, opening_balance, cash_received_description, cash_received_amount, notes } = req.body;
     const user_id = req.user.id;
     if (!log_date || opening_balance === undefined) return res.status(400).json({ error: 'Log date and opening balance are required' });
@@ -610,27 +605,27 @@ router.post('/petty-cash', authMiddleware, requireRole(['admin', 'accountant']),
         res.status(201).json(result.rows[0]);
     } catch (err) {
         await client.query('ROLLBACK');
-        if (err.code === '23505') return handleError(res, err, "Petty cash log for this date already exists", 409);
-        handleError(res, err, "Failed to create petty cash log entry");
+        if (err.code === '23505') return next(err);
+        next(err);
     } finally {
         client.release();
     }
 });
 
 // GET /api/expenses/petty-cash/:log_date (keep as is)
-router.get('/petty-cash/:log_date', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/petty-cash/:log_date', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const { log_date } = req.params;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(log_date)) return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     try {
         const result = await query('SELECT pcl.*, u.username as user_managed_by FROM petty_cash_log pcl LEFT JOIN users u ON pcl.user_id = u.id WHERE pcl.log_date = $1', [log_date]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Petty cash log for this date not found' });
         res.json(result.rows[0]);
-    } catch (err) { handleError(res, err, "Failed to retrieve petty cash log"); }
+    } catch (err) { next(err); }
 });
 
 
 // PUT /api/expenses/petty-cash/:log_date (Modified to always recalculate total)
-router.put('/petty-cash/:log_date', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.put('/petty-cash/:log_date', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const { log_date: original_log_date } = req.params;
 
     // **MODIFICATION**: Destructure the potentially new date and opening_balance from the body
@@ -708,15 +703,15 @@ router.put('/petty-cash/:log_date', authMiddleware, requireRole(['admin', 'accou
 
     } catch (err) {
         await client.query('ROLLBACK');
-        if (err.code === '23505') return handleError(res, err, "The new date you selected already has a petty cash log.", 409);
-        handleError(res, err, "Failed to update petty cash log");
+        if (err.code === '23505') return next(err);
+        next(err);
     } finally {
         client.release();
     }
 });
 
 // POST /api/expenses/petty-cash/:log_date/reconcile (Modified to use helper)
-router.post('/petty-cash/:log_date/reconcile', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.post('/petty-cash/:log_date/reconcile', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const { log_date } = req.params;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(log_date)) return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     
@@ -736,7 +731,7 @@ router.post('/petty-cash/:log_date/reconcile', authMiddleware, requireRole(['adm
         res.json({ message: 'Petty cash log reconciled successfully', log: updatedLog.rows[0] });
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to reconcile petty cash log");
+        next(err);
     } finally {
         client.release();
     }
@@ -744,7 +739,7 @@ router.post('/petty-cash/:log_date/reconcile', authMiddleware, requireRole(['adm
 
 // --- Expenses Endpoints (Modified for Petty Cash Reconciliation) ---
 // POST /api/expenses
-router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res) => {
+router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res, next) => {
     const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
     const pettyCash = String(is_petty_cash_expense).toLowerCase() === 'true';
     const user_id_who_recorded = req.user.id;
@@ -787,25 +782,25 @@ router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager'])
         res.status(201).json(newExpense);
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to create expense");
+        next(err);
     } finally {
         client.release();
     }
 });
 
 // GET /api/expenses/:id
-router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const expenseId = parseInt(req.params.id);
     if (isNaN(expenseId)) return res.status(400).json({ error: 'Invalid expense ID' });
     try {
         const result = await query(`SELECT e.*, ec.category_name FROM expenses e JOIN expense_categories ec ON e.category_id = ec.category_id WHERE e.expense_id = $1`, [expenseId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Expense not found' });
         res.json(result.rows[0]);
-    } catch (err) { handleError(res, err, "Failed to retrieve expense"); }
+    } catch (err) { next(err); }
 });
 
 // PUT /api/expenses/:id
-router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res) => {
+router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res, next) => {
     const expenseId = parseInt(req.params.id);
     const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
     const pettyCash = String(is_petty_cash_expense).toLowerCase() === 'true';
@@ -869,14 +864,14 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
         res.json(updatedExpense);
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to update expense");
+        next(err);
     } finally {
         client.release();
     }
 });
 
 // DELETE /api/expenses/:id
-router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const expenseId = parseInt(req.params.id);
     if (isNaN(expenseId)) return res.status(400).json({ error: 'Invalid expense ID' });
 
@@ -899,14 +894,14 @@ router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), asyn
         res.json({ message: 'Expense deleted successfully', expense: result.rows[0] });
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to delete expense");
+        next(err);
     } finally {
         client.release();
     }
 });
 
 // GET /api/expenses (List expenses - keep as is)
-router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const { startDate, endDate, category_id, user_id, payment_method, is_petty_cash_expense, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let sqlQuery = `SELECT e.*, ec.category_name FROM expenses e JOIN expense_categories ec ON e.category_id = ec.category_id`;
@@ -934,8 +929,10 @@ router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']),
             data: result.rows,
             pagination: { page: parseInt(page), limit: parseInt(limit), totalItems, totalPages }
         });
-    } catch (err) { handleError(res, err, "Failed to retrieve expenses"); }
+    } catch (err) { next(err); }
 });
+
+router.use(errorHandler);
 
 module.exports = router;
 module.exports.uploadExpenseReceiptToGCS = uploadExpenseReceiptToGCS;

@@ -2,6 +2,7 @@ const express = require('express');
 //const bodyParser = require('body-parser');
 const path = require('path');
 const cors = require('cors');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 app.use(cors({
@@ -65,6 +66,9 @@ app.get('/test-headers', (req, res) => {
   console.log("HEADERS TEST:", result);
   res.json(result);
 });
+
+// Global error handler
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on ${PORT}`);
