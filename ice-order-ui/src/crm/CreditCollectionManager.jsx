@@ -1,6 +1,16 @@
 // ice-delivery-app/ice-order-ui/src/crm/CreditCollectionManager.jsx
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { apiService } from '../apiService';
+import {
+    getCustomers,
+    getDeliveryRoutes,
+} from '../api/customers.js';
+import {
+    getCustomerCreditSales,
+    getCustomerCreditPayments,
+    addCustomerCreditPayment,
+    updateCreditPayment,
+    voidCreditPayment,
+} from '../api/credits.js';
 import CreditList from './CreditList'; 
 import PaymentForm from './PaymentForm'; 
 import PastPaymentsList from './PastPaymentsList';
@@ -29,7 +39,7 @@ const CustomerSearch = ({ onCustomerSelect, routes }) => {
         debounceTimeoutRef.current = setTimeout(async () => {
             try {
                 const filters = { search: searchText, route_id: selectedRoute, is_active: true, limit: 15 };
-                const response = await apiService.getCustomers(filters);
+                const response = await getCustomers(filters);
                 setSuggestions(response.data || []);
             } catch (error) {
                 console.error("Failed to fetch customer suggestions:", error);
@@ -111,7 +121,7 @@ export default function CreditCollectionManager() {
     useEffect(() => {
         const fetchPrereqs = async () => {
             try {
-                const { data: routesData } = await apiService.getDeliveryRoutes();
+                const { data: routesData } = await getDeliveryRoutes();
                 setRoutes(routesData || []);
             } catch (err) {
                 setError("Could not load initial routes data.");
@@ -128,8 +138,8 @@ export default function CreditCollectionManager() {
         setError(null);
         try {
             const [sales, payments] = await Promise.all([
-                apiService.getCustomerCreditSales(selectedCustomer.customer_id),
-                apiService.getCustomerCreditPayments(selectedCustomer.customer_id)
+                getCustomerCreditSales(selectedCustomer.customer_id),
+                getCustomerCreditPayments(selectedCustomer.customer_id)
             ]);
             setOutstandingSales(sales || []);
             setPastPayments(payments || []);
@@ -172,7 +182,7 @@ export default function CreditCollectionManager() {
         }
 
         try {
-            await apiService.addCustomerCreditPayment(selectedCustomer.customer_id, formData);
+            await addCustomerCreditPayment(selectedCustomer.customer_id, formData);
             setSuccessMessage('Payment successfully recorded!');
             // Refresh data for the current customer
             fetchDataForSelectedCustomer(); // <-- FIX #1: Call the new fetch function
@@ -197,7 +207,7 @@ export default function CreditCollectionManager() {
     const handleUpdatePayment = async (paymentId, paymentData) => {
         // This function will be passed to EditPaymentForm
         try {
-            await apiService.updateCreditPayment(paymentId, paymentData);
+            await updateCreditPayment(paymentId, paymentData);
             setSuccessMessage("Payment details updated successfully!");
             // Refresh data for the current customer
             fetchDataForSelectedCustomer(); // <-- FIX #1: Call the new fetch function 
@@ -215,7 +225,7 @@ export default function CreditCollectionManager() {
         setSuccessMessage('');
 
         try {
-            await apiService.voidCreditPayment(paymentId, reason);
+            await voidCreditPayment(paymentId, reason);
             setSuccessMessage("Payment successfully voided. Outstanding sales have been updated.");
              // Refresh data for the current customer
             fetchDataForSelectedCustomer(); // <-- FIX #1: Call the new fetch function;

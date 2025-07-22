@@ -1,6 +1,13 @@
 // src/crm/CustomerManager.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { apiService } from '../apiService'; 
+import {
+    getCustomers,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+    getDeliveryRoutes,
+} from '../api/customers.js';
+import { apiService } from '../apiService';
 import CustomerList from './CustomerList'; 
 import CustomerForm from './CustomerForm'; 
 
@@ -91,7 +98,7 @@ export default function CustomerManager() {
                     delete params[key];
                 }
             });
-            const response = await apiService.getCustomers(params);
+            const response = await getCustomers(params);
             setCustomers(Array.isArray(response.data) ? response.data : []);
             setPagination(prevPagination => ({
                 ...prevPagination,
@@ -109,7 +116,7 @@ export default function CustomerManager() {
     const fetchDeliveryRoutesForForm = useCallback(async () => {
         if (deliveryRoutes.length === 0 || isFormModalOpen) {
             try {
-                const { data } = await apiService.getDeliveryRoutes();
+                const { data } = await getDeliveryRoutes();
                 setDeliveryRoutes(Array.isArray(data) ? data.filter(r => r.is_active !== false) : []);
             } catch (err) {
                 console.error("Failed to fetch delivery routes for form:", err);
@@ -190,10 +197,10 @@ export default function CustomerManager() {
         // Form handles its own loading state
         try {   
             if (editingCustomer && editingCustomer.customer_id) {
-                await apiService.updateCustomer(editingCustomer.customer_id, formDataFromForm);
+                await updateCustomer(editingCustomer.customer_id, formDataFromForm);
                 setSuccessMessage(`อัปเดตลูกค้า "${formDataFromForm.customer_name}" สำเร็จ`);
             } else {
-                await apiService.addCustomer(formDataFromForm);
+                await addCustomer(formDataFromForm);
                 setSuccessMessage(`เพิ่มลูกค้า "${formDataFromForm.customer_name}" สำเร็จ`);
             }
             handleCloseFormModal();
@@ -220,11 +227,11 @@ export default function CustomerManager() {
             setIsLoading(true); setError(null); setSuccessMessage('');
             try {
                 if (customerToToggle.is_active) {
-                    await apiService.deleteCustomer(customerId); 
+                    await deleteCustomer(customerId);
                 } else {
                     // Ensure all necessary fields are passed for reactivation if API expects them
                     //const { customer_id, create_at,update_at, route_name, ...payload } = customerToToggle;
-                    await apiService.updateCustomer(customerId, { ...customerToToggle, is_active: true });
+                    await updateCustomer(customerId, { ...customerToToggle, is_active: true });
                 }
                 setSuccessMessage(`ลูกค้า "${customerToToggle.customer_name}" ${actionText} เรียบร้อยแล้ว`);
                 await fetchCustomers(pagination.page, filters);

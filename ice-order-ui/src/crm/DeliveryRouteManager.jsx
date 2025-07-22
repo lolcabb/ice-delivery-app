@@ -1,6 +1,7 @@
 // ice-delivery-app/ice-order-ui/src/crm/DeliveryRouteManager.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiService } from '../apiService';
+import { getDeliveryRoutes } from '../api/customers.js';
+import { request } from '../api/base.js';
 import DeliveryRouteList from './DeliveryRouteList';
 import DeliveryRouteForm from './DeliveryRouteForm';
 
@@ -24,7 +25,7 @@ export default function DeliveryRouteManager() {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await apiService.getDeliveryRoutes();
+            const data = await getDeliveryRoutes();
             setRoutes(Array.isArray(data) ? data : []);
         } catch (err) {
             setError(err.data?.error || err.message || 'Could not load delivery routes.');
@@ -55,11 +56,11 @@ export default function DeliveryRouteManager() {
         try {
             if (editingRoute && editingRoute.route_id) {
                 // This is an update
-                await apiService.put(`/customers/delivery-routes/${editingRoute.route_id}`, routeData);
+                await request(`/customers/delivery-routes/${editingRoute.route_id}`, 'PUT', routeData);
                 setSuccessMessage(`Route "${routeData.route_name}" was updated successfully.`);
             } else {
                 // This is a new route
-                await apiService.post('/customers/delivery-routes', routeData);
+                await request('/customers/delivery-routes', 'POST', routeData);
                 setSuccessMessage(`Route "${routeData.route_name}" was created successfully.`);
             }
             handleCloseModal();
@@ -81,7 +82,7 @@ export default function DeliveryRouteManager() {
         const payload = { ...route, is_active: !route.is_active };
 
         try {
-            await apiService.put(`/customers/delivery-routes/${route.route_id}`, payload);
+            await request(`/customers/delivery-routes/${route.route_id}`, 'PUT', payload);
             setSuccessMessage(`Route "${route.route_name}" has been ${actionText}d.`);
             fetchRoutes();
             setTimeout(() => setSuccessMessage(''), 4000);
