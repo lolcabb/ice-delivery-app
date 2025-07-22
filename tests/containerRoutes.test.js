@@ -51,4 +51,18 @@ describe('container routes', () => {
     expect(res.statusCode).toBe(403);
     expect(containerController.createContainerSize).not.toHaveBeenCalled();
   });
+
+  test('POST /api/containers/items/1/assign validates body', async () => {
+    const res = await request(app).post('/api/containers/items/1/assign');
+    expect(res.statusCode).toBe(400);
+    expect(containerController.assignContainer).not.toHaveBeenCalled();
+  });
+
+  test('POST /api/containers/items/1/assign with data calls controller', async () => {
+    const res = await request(app)
+      .post('/api/containers/items/1/assign')
+      .send({ customerId: 5 });
+    expect(res.statusCode).toBe(200);
+    expect(containerController.assignContainer).toHaveBeenCalled();
+  });
 });
