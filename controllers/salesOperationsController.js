@@ -2,14 +2,6 @@
 const { query, getClient, pool } = require("../db/postgres");
 const { v4: uuidv4, validate: uuidValidate } = require('uuid'); 
 
-// --- Helper function for error handling ---
-const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
-    console.error(message, error);
-    const errorMessage = process.env.NODE_ENV === 'production' && statusCode === 500
-        ? "An unexpected error occurred on the server."
-        : `${message}: ${error.message || error}`;
-    res.status(statusCode).json({ error: errorMessage });
-};
 
 // Helper for uuid validation (example, if not using a library that provides it)
 // This is a simple regex, for robust validation use a library or PostgreSQL's own type checking
@@ -65,7 +57,7 @@ const updateDriverDailySummaryTotals = async (client, driverDailySummaryId) => {
 
 // GET /api/sales-ops/routes/:routeId/customers
 // This now correctly joins and orders by the route_sequence
-exports.getRouteCustomers = async (req, res) => { // FIXED: Using authMiddleware
+exports.getRouteCustomers = async (req, res, next) => { // FIXED: Using authMiddleware
     const { routeId } = req.params;
     try {
         const query = `
@@ -90,7 +82,7 @@ exports.getRouteCustomers = async (req, res) => { // FIXED: Using authMiddleware
 
 // POST /api/sales-ops/routes/:routeId/customers
 // Adds a single customer to a route, placing them at the end of the sequence.
-exports.addRouteCustomer = async (req, res) => { // FIXED: Using authMiddleware
+exports.addRouteCustomer = async (req, res, next) => { // FIXED: Using authMiddleware
     const { routeId } = req.params;
     const { customer_id } = req.body;
 
@@ -139,7 +131,7 @@ exports.addRouteCustomer = async (req, res) => { // FIXED: Using authMiddleware
 
 // DELETE /api/sales-ops/routes/:routeId/customers/:customerId
 // Deactivates a customer from a route instead of hard deleting
-exports.removeRouteCustomer = async (req, res) => { // FIXED: Using authMiddleware
+exports.removeRouteCustomer = async (req, res, next) => { // FIXED: Using authMiddleware
     const { routeId, customerId } = req.params;
     try {
         const result = await pool.query(
@@ -160,7 +152,7 @@ exports.removeRouteCustomer = async (req, res) => { // FIXED: Using authMiddlewa
 
 // PUT /api/sales-ops/routes/:routeId/customer-order
 // This now correctly performs a bulk update of the sequence.
-exports.updateRouteCustomerOrder = async (req, res) => { // FIXED: Using authMiddleware
+exports.updateRouteCustomerOrder = async (req, res, next) => { // FIXED: Using authMiddleware
     const { routeId } = req.params;
     const { customer_ids } = req.body;
 
@@ -196,7 +188,7 @@ exports.updateRouteCustomerOrder = async (req, res) => { // FIXED: Using authMid
 };
 
 // GET customer prices for sales entry
-exports.getCustomerPrices = async (req, res) => {
+exports.getCustomerPrices = async (req, res, next) => {
     const customer_id = parseInt(req.params.customer_id);
     
     if (isNaN(customer_id)) {
@@ -213,12 +205,12 @@ exports.getCustomerPrices = async (req, res) => {
         });
 
     } catch (err) {
-        handleError(res, err, 'Failed to fetch customer prices');
+        next(err);
     }
 };
 
 // PUT update customer price
-exports.updateCustomerPrice = async (req, res) => {
+exports.updateCustomerPrice = async (req, res, next) => {
     const customer_id = parseInt(req.params.customer_id);
     const product_id = parseInt(req.params.product_id);
     const { unit_price, reason } = req.body;
@@ -237,12 +229,12 @@ exports.updateCustomerPrice = async (req, res) => {
         res.json(result.rows[0]);
 
     } catch (err) {
-        handleError(res, err, 'Failed to update customer price');
+        next(err);
     }
 };
 
 // Enhanced batch sales save with pricing
-exports.batchSalesEntry = async (req, res) => {
+exports.batchSalesEntry = async (req, res, next) => {
     const { driver_daily_summary_id, sales_data } = req.body;
     const area_manager_id = req.user.id;
 
@@ -428,14 +420,14 @@ exports.batchSalesEntry = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(`[SalesOps API] Transaction ROLLBACK for batch sales save. Error: ${err.message}`);
-        handleError(res, err, 'Failed to save batch sales');
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // GET sales for editing
-exports.getDriverSalesForEdit = async (req, res) => {
+exports.getDriverSalesForEdit = async (req, res, next) => {
     const summary_id = parseInt(req.params.summary_id);
 
     if (isNaN(summary_id)) {
@@ -483,12 +475,12 @@ exports.getDriverSalesForEdit = async (req, res) => {
         });
 
     } catch (err) {
-        handleError(res, err, 'Failed to fetch sales for editing');
+        next(err);
     }
 };
 
 // PUT update individual sale (for corrections)
-exports.updateDriverSaleSimple = async (req, res) => {
+exports.updateDriverSaleSimple = async (req, res, next) => {
     const sale_id = parseInt(req.params.sale_id);
     const { payment_type, notes, items } = req.body;
     const user_id = req.user.id;
@@ -587,14 +579,14 @@ exports.updateDriverSaleSimple = async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, 'Failed to update sale');
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // DELETE sale (soft delete with reason)
-exports.deleteDriverSaleSimple = async (req, res) => {
+exports.deleteDriverSaleSimple = async (req, res, next) => {
     const sale_id = parseInt(req.params.sale_id);
     const { reason } = req.body;
     const user_id = req.user.id;
@@ -655,14 +647,14 @@ exports.deleteDriverSaleSimple = async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, 'Failed to delete sale');
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // POST /api/sales-ops/batch-returns - New transactional endpoint
-exports.batchReturns = async (req, res) => {
+exports.batchReturns = async (req, res, next) => {
     const { driver_id, return_date, product_items, packaging_items, driver_daily_summary_id } = req.body;
     const area_manager_id = req.user.id;
 
@@ -719,14 +711,14 @@ exports.batchReturns = async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to save batch returns");
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // GET /api/sales-ops/reconciliation-summary?driver_id=X&date=YYYY-MM-DD
-exports.getReconciliationSummary = async (req, res) => {
+exports.getReconciliationSummary = async (req, res, next) => {
     const { driver_id, date } = req.query;
 
     if (!driver_id || !date) {
@@ -802,22 +794,22 @@ exports.getReconciliationSummary = async (req, res) => {
         });
 
     } catch (err) {
-        handleError(res, err, "Failed to generate reconciliation summary");
+        next(err);
     }
 };
 
 // === PRODUCTS ===
-exports.getProducts = async (req, res) => {
+exports.getProducts = async (req, res, next) => {
     try {
         const result = await query('SELECT product_id, product_name, default_unit_price, unit_of_measure FROM products WHERE is_active = TRUE ORDER BY product_id ASC');
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve sales products");
+        next(err);
     }
 };
 
 // === LOADING LOGS ===
-exports.createLoadingLogs = async (req, res) => {
+exports.createLoadingLogs = async (req, res, next) => {
     const { driver_id, route_id, load_type = 'initial', load_timestamp, notes, items } = req.body;
     const area_manager_id = req.user.id;
 
@@ -928,16 +920,16 @@ exports.createLoadingLogs = async (req, res) => {
         await client.query('ROLLBACK');
         console.error(`[SalesOps API] Transaction ROLLBACK for batch loading log. Error: ${err.message}`);
         if (err.code === '23503') { 
-            return handleError(res, err, 'Invalid reference ID provided (Driver, Product, or Route).', 400);
+            return next(err);
         }
-        handleError(res, err, "Failed to create loading log entries");
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // GET /api/sales-ops/loading-logs?driver_id=X&date=YYYY-MM-DD (Corrected Joins)
-exports.getLoadingLogs = async (req, res) => {
+exports.getLoadingLogs = async (req, res, next) => {
     const { driver_id, date, driver_name } = req.query;
     const requesting_user_id = req.user.id;
 
@@ -1000,12 +992,12 @@ exports.getLoadingLogs = async (req, res) => {
         }));
         res.json(logsWithFullName); 
     } catch (err) {
-        handleError(res, err, "Failed to retrieve loading logs");
+        next(err);
     }
 };
 
 // === PUT /api/sales-ops/loading-logs/batch/:batchUUID - Edit an entire loading log batch ===
-exports.updateLoadingLogBatch = async (req, res) => {
+exports.updateLoadingLogBatch = async (req, res, next) => {
     const { batchUUID } = req.params;
     const { driver_id, route_id, load_type, load_timestamp, notes, items } = req.body;
     const area_manager_id = req.user.id;
@@ -1206,7 +1198,7 @@ exports.updateLoadingLogBatch = async (req, res) => {
             });
         }
         
-        handleError(res, err, "Failed to update loading log batch");
+        next(err);
     } finally {
         client.release();
     }
@@ -1214,7 +1206,7 @@ exports.updateLoadingLogBatch = async (req, res) => {
 
 // === DRIVER DAILY SUMMARIES ===
 // POST /api/sales-ops/driver-daily-summaries
-exports.createDriverDailySummary = async (req, res) => {
+exports.createDriverDailySummary = async (req, res, next) => {
     const { driver_id, route_id, sale_date } = req.body;
     const area_manager_id = req.user.id;
 
@@ -1257,23 +1249,23 @@ exports.createDriverDailySummary = async (req, res) => {
         res.status(201).json(newSummary);
     } catch (err) {
         if (err.code === '23505' && err.constraint === 'driver_daily_summaries_driver_id_sale_date_key') {
-            return handleError(res, err, 'A daily summary already exists for this driver on this date.', 409);
+            return next(err);
         }
         if (err.code === '23503') { 
              if (err.constraint && err.constraint.includes('driver_id')) {
-                return handleError(res, err, 'Invalid Driver ID provided.', 400);
+                return next(err);
             }
             if (err.constraint && err.constraint.includes('route_id')) {
-                return handleError(res, err, 'Invalid Route ID provided.', 400);
+                return next(err);
             }
         }
-        handleError(res, err, "Failed to create driver daily summary");
+        next(err);
     }
 };
 
 // GET /api/sales-ops/driver-daily-summaries?driver_id=X&sale_date=YYYY-MM-DD
 // GET /api/sales-ops/driver-daily-summaries?sale_date=YYYY-MM-DD&reconciliation_status=Pending
-exports.getDriverDailySummaries = async (req, res) => {
+exports.getDriverDailySummaries = async (req, res, next) => {
     const { driver_id, sale_date, reconciliation_status, summary_id } = req.query;
     const requesting_user_id = req.user.id;
 
@@ -1335,12 +1327,12 @@ exports.getDriverDailySummaries = async (req, res) => {
         }
         res.json(summariesWithFullName);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve driver daily summaries");
+        next(err);
     }
 };
 
 // PUT /api/sales-ops/driver-daily-summaries/:summaryId - Update a summary
-exports.updateDriverDailySummary = async (req, res) => {
+exports.updateDriverDailySummary = async (req, res, next) => {
     const summaryId = parseInt(req.params.summaryId);
     const { route_id } = req.body;
     const last_updated_by_user_id = req.user.id;
@@ -1385,12 +1377,12 @@ exports.updateDriverDailySummary = async (req, res) => {
         res.json(finalResult.rows[0]);
 
     } catch (err) {
-        handleError(res, err, "Failed to update driver daily summary");
+        next(err);
     }
 };
 
 // PUT /api/sales-ops/driver-daily-summaries/:summaryId/reconcile
-exports.reconcileDriverDailySummary = async (req, res) => {
+exports.reconcileDriverDailySummary = async (req, res, next) => {
     const summaryId = parseInt(req.params.summaryId);
     const { total_cash_collected_from_driver, reconciliation_status, reconciliation_notes } = req.body;
     const area_manager_id = req.user.id;
@@ -1419,7 +1411,7 @@ exports.reconcileDriverDailySummary = async (req, res) => {
         const updatedSummaryAfterTotals = await updateDriverDailySummaryTotals(client, summaryId);
         if (!updatedSummaryAfterTotals) {
             await client.query('ROLLBACK');
-            return handleError(res, new Error("Failed to recalculate summary totals before reconciliation."), "Reconciliation error");
+            return next(new Error("Failed to recalculate summary totals before reconciliation."));
         }
 
         const finalUpdateSql = `
@@ -1447,7 +1439,7 @@ exports.reconcileDriverDailySummary = async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to reconcile driver daily summary");
+        next(err);
     } finally {
         client.release();
     }
@@ -1455,7 +1447,7 @@ exports.reconcileDriverDailySummary = async (req, res) => {
 
 // === DRIVER SALES & SALE ITEMS ===
 // POST /api/sales-ops/driver-sales
-exports.createDriverSale = async (req, res) => {
+exports.createDriverSale = async (req, res, next) => {
     const {
         driver_daily_summary_id,
         customer_id,
@@ -1563,23 +1555,23 @@ exports.createDriverSale = async (req, res) => {
         await client.query('ROLLBACK');
         if (err.code === '23503') { 
              if (err.constraint && err.constraint.includes('driver_daily_summary_id')) {
-                return handleError(res, err, 'Invalid Driver Daily Summary ID provided.', 400);
+                return next(err);
             }
             if (err.constraint && err.constraint.includes('customer_id')) {
-                return handleError(res, err, 'Invalid Customer ID provided.', 400);
+                return next(err);
             }
              if (err.constraint && err.constraint.includes('product_id')) {
-                return handleError(res, err, 'Invalid Product ID in sale items.', 400);
+                return next(err);
             }
         }
-        handleError(res, err, "Failed to create driver sale");
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // GET /api/sales-ops/driver-sales?driver_daily_summary_id=X
-exports.getDriverSales = async (req, res) => {
+exports.getDriverSales = async (req, res, next) => {
     const { driver_daily_summary_id } = req.query;
     const requesting_user_id = req.user.id;
 
@@ -1624,12 +1616,12 @@ exports.getDriverSales = async (req, res) => {
         }
         res.json(sales);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve driver sales");
+        next(err);
     }
 };
 
 // PUT /api/sales-ops/driver-sales/:saleId
-exports.updateDriverSale = async (req, res) => {
+exports.updateDriverSale = async (req, res, next) => {
     const saleId = parseInt(req.params.saleId);
     const {
         customer_id,
@@ -1749,14 +1741,14 @@ exports.updateDriverSale = async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to update driver sale");
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // DELETE /api/sales-ops/driver-sales/:saleId
-exports.deleteDriverSale = async (req, res) => {
+exports.deleteDriverSale = async (req, res, next) => {
     const saleId = parseInt(req.params.saleId);
     const area_manager_logged_by_id = req.user.id; 
 
@@ -1797,23 +1789,23 @@ exports.deleteDriverSale = async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to delete driver sale");
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // === PRODUCT RETURNS ===
-exports.getLossReasons = async (req, res) => {
+exports.getLossReasons = async (req, res, next) => {
     try {
         const result = await query('SELECT loss_reason_id, reason_description FROM loss_reasons WHERE is_active = TRUE ORDER BY loss_reason_id');
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve loss reasons");
+        next(err);
     }
 };
 
-exports.createProductReturns = async (req, res) => {
+exports.createProductReturns = async (req, res, next) => {
     const { driver_id, return_date, items, driver_daily_summary_id } = req.body;
     const area_manager_id = req.user.id; 
 
@@ -1878,16 +1870,16 @@ exports.createProductReturns = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         if (err.code === '23503') {
-            return handleError(res, err, 'Invalid Driver ID or Product ID provided.', 400);
+            return next(err);
         }
-        handleError(res, err, "Failed to log product returns");
+        next(err);
     } finally {
         client.release();
     }
 };
 
 // GET /api/sales-ops/product-returns?driver_id=X&date=YYYY-MM-DD
-exports.getProductReturns = async (req, res) => {
+exports.getProductReturns = async (req, res, next) => {
     const { driver_id, date, product_id } = req.query; 
     const requesting_user_id = req.user.id;
 
@@ -1941,22 +1933,22 @@ exports.getProductReturns = async (req, res) => {
         }));
         res.json(logsWithFullName);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve product returns");
+        next(err);
     }
 };
 
 // === PACKAGING LOGS & TYPES ===
-exports.getPackagingTypes = async (req, res) => {
+exports.getPackagingTypes = async (req, res, next) => {
     console.log(`[SalesOps API] GET /packaging-types - User: ${req.user.id}`);
     try {
         const result = await query('SELECT packaging_type_id, type_name, description FROM packaging_types WHERE is_active = TRUE ORDER BY type_name ASC');
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve packaging types");
+        next(err);
     }
 };
 
-exports.createPackagingLog = async (req, res) => {
+exports.createPackagingLog = async (req, res, next) => {
     const {
         driver_id,
         driver_daily_summary_id, 
@@ -2015,14 +2007,14 @@ exports.createPackagingLog = async (req, res) => {
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.code === '23503') { 
-            if (err.constraint && err.constraint.includes('packaging_type_id')) return handleError(res, err, 'Invalid Packaging Type ID.', 400);
-            return handleError(res, err, 'Invalid reference ID provided (Driver or Summary).', 400);
+            if (err.constraint && err.constraint.includes('packaging_type_id')) return next(err);
+            return next(err);
         }
-        handleError(res, err, "Failed to log packaging data");
+        next(err);
     }
 };
 
-exports.getPackagingLogs = async (req, res) => {
+exports.getPackagingLogs = async (req, res, next) => {
     const { driver_id, date, packaging_type_id } = req.query;
     const requesting_user_id = req.user.id;
 
@@ -2073,9 +2065,8 @@ exports.getPackagingLogs = async (req, res) => {
         }));
         res.json(logsWithFullName);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve packaging logs");
+        next(err);
     }
 };
 
-module.exports.handleError = handleError;
 module.exports.updateDriverDailySummaryTotals = updateDriverDailySummaryTotals;

@@ -1,22 +1,14 @@
 // ice-delivery-app/routes/drivers.js
 const express = require('express');
 const router = express.Router();
-const { query, getClient } = require('../db/postgres'); 
+const { query, getClient } = require('../db/postgres');
 const { authMiddleware, requireRole } = require('../middleware/auth');
-
-// --- Helper function for error handling ---
-const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
-    console.error(message, error);
-    const errorMessage = process.env.NODE_ENV === 'production' && statusCode === 500
-        ? "An unexpected error occurred on the server."
-        : `${message}: ${error.message || error}`;
-    res.status(statusCode).json({ error: errorMessage });
-};
+const errorHandler = require('../middleware/errorHandler');
 
 // === DRIVER MANAGEMENT ENDPOINTS ===
 
 // POST /api/drivers - Create a new driver
-router.post('/', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+router.post('/', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res, next) => {
     // Expect 'name' instead of 'first_name', 'last_name' will be nullified
     const { name, phone_number, license_plate, notes, is_active = true } = req.body;
     const created_by_user_id = req.user.id;
@@ -51,12 +43,12 @@ router.post('/', authMiddleware, requireRole(['admin', 'manager', 'staff']), asy
             name: driver.first_name // Add a 'name' field to the response for clarity
         });
     } catch (err) {
-        handleError(res, err, "Failed to create driver");
+        next(err);
     }
 });
 
 // GET /api/drivers - Fetch a list of drivers
-router.get('/', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+router.get('/', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res, next) => {
     const { is_active, search } = req.query;
     const requesting_user_id = req.user.id;
 
@@ -99,12 +91,12 @@ router.get('/', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accou
         }));
         res.json(driversWithFullName);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve drivers");
+        next(err);
     }
 });
 
 // GET /api/drivers/:driverId - Fetch a single driver by ID
-router.get('/:driverId', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res) => {
+router.get('/:driverId', authMiddleware, requireRole(['admin', 'manager', 'staff', 'accountant']), async (req, res, next) => {
     const driverId = parseInt(req.params.driverId);
     const requesting_user_id = req.user.id;
 
@@ -134,12 +126,12 @@ router.get('/:driverId', authMiddleware, requireRole(['admin', 'manager', 'staff
             name: driver.first_name // Add 'name' for consistency
         });
     } catch (err) {
-        handleError(res, err, "Failed to retrieve driver");
+        next(err);
     }
 });
 
 // PUT /api/drivers/:driverId - Update an existing driver
-router.put('/:driverId', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res) => {
+router.put('/:driverId', authMiddleware, requireRole(['admin', 'manager', 'staff']), async (req, res, next) => {
     const driverId = parseInt(req.params.driverId);
     // Expect 'name' instead of 'first_name'
     const { name, phone_number, license_plate, notes, is_active } = req.body;
@@ -195,12 +187,12 @@ router.put('/:driverId', authMiddleware, requireRole(['admin', 'manager', 'staff
             name: driver.first_name // Add 'name' for consistency
         });
     } catch (err) {
-        handleError(res, err, "Failed to update driver");
+        next(err);
     }
 });
 
 // DELETE /api/drivers/:driverId - Soft delete a driver
-router.delete('/:driverId', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => {
+router.delete('/:driverId', authMiddleware, requireRole(['admin', 'manager']), async (req, res, next) => {
     const driverId = parseInt(req.params.driverId);
     const last_updated_by_user_id = req.user.id;
 
@@ -229,9 +221,10 @@ router.delete('/:driverId', authMiddleware, requireRole(['admin', 'manager']), a
             driver: { ...driver, name: driver.first_name }
         });
     } catch (err) {
-        handleError(res, err, "Failed to deactivate driver");
+        next(err);
     }
 });
 
+router.use(errorHandler);
 
 module.exports = router;

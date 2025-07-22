@@ -1,25 +1,20 @@
 // ice-delivery-app/routes/containerRoutes.js
 const express = require('express');
 const router = express.Router();
-const { query, getClient } = require('../db/postgres'); 
-const { authMiddleware, requireRole } = require('../middleware/auth'); 
+const { query, getClient } = require('../db/postgres');
+const { authMiddleware, requireRole } = require('../middleware/auth');
+const errorHandler = require('../middleware/errorHandler');
 
-// --- Helper function for error handling ---
-const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
-    console.error(message, error);
-    const errorMessage = process.env.NODE_ENV === 'production' ? message : `${message}: ${error.message || error}`;
-    res.status(statusCode).json({ error: errorMessage });
-};
 
 // === ICE CONTAINER SIZES ===
 // Base path: /api/containers/sizes
-router.get('/sizes', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.get('/sizes', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     try {
         const result = await query('SELECT * FROM ice_container_sizes WHERE is_active = TRUE ORDER BY capacity_liters ASC');
         res.json(result.rows);
-    } catch (err) { handleError(res, err, "Failed to retrieve ice container sizes"); }
+    } catch (err) { next(err); }
 });
-router.post('/sizes', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.post('/sizes', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const { size_code, description, capacity_liters } = req.body;
     if (!size_code || capacity_liters === undefined) return res.status(400).json({ error: 'Size code and capacity (liters) are required.' });
     if (isNaN(parseInt(capacity_liters)) || parseInt(capacity_liters) <= 0) return res.status(400).json({ error: 'Capacity must be a positive number.' });
@@ -27,11 +22,11 @@ router.post('/sizes', authMiddleware, requireRole(['admin', 'accountant', 'manag
         const result = await query('INSERT INTO ice_container_sizes (size_code, description, capacity_liters) VALUES ($1, $2, $3) RETURNING *', [size_code, description, parseInt(capacity_liters)]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return handleError(res, err, `Container size code '${size_code}' already exists.`, 409);
-        handleError(res, err, "Failed to create ice container size");
+        if (err.code === '23505') return next(err);
+        next(err);
     }
 });
-router.put('/sizes/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.put('/sizes/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const sizeId = parseInt(req.params.id);
     const { size_code, description, capacity_liters, is_active } = req.body;
     if (isNaN(sizeId)) return res.status(400).json({ error: 'Invalid size ID.' });
@@ -42,11 +37,11 @@ router.put('/sizes/:id', authMiddleware, requireRole(['admin', 'accountant', 'ma
         if (result.rows.length === 0) return res.status(404).json({ error: 'Ice container size not found.' });
         res.json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return handleError(res, err, `Container size code '${size_code}' already exists.`, 409);
-        handleError(res, err, "Failed to update ice container size");
+        if (err.code === '23505') return next(err);
+        next(err);
     }
 });
-router.delete('/sizes/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => { 
+router.delete('/sizes/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => { 
     const sizeId = parseInt(req.params.id);
     if (isNaN(sizeId)) return res.status(400).json({ error: 'Invalid size ID.' });
     try {
@@ -55,29 +50,29 @@ router.delete('/sizes/:id', authMiddleware, requireRole(['admin', 'accountant', 
         const result = await query('UPDATE ice_container_sizes SET is_active = FALSE, updated_at = NOW() WHERE size_id = $1 RETURNING *', [sizeId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Ice container size not found.' });
         res.json({ message: 'Ice container size deactivated successfully.', size: result.rows[0] });
-    } catch (err) { handleError(res, err, "Failed to deactivate ice container size"); }
+    } catch (err) { next(err); }
 });
 
 // === RETURN REASONS ===
 // Base path: /api/containers/return-reasons
-router.get('/return-reasons', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => { 
+router.get('/return-reasons', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => { 
     try {
         const result = await query('SELECT * FROM return_reasons WHERE is_active = TRUE ORDER BY reason_description ASC');
         res.json(result.rows);
-    } catch (err) { handleError(res, err, "Failed to retrieve return reasons"); }
+    } catch (err) { next(err); }
 });
-router.post('/return-reasons', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.post('/return-reasons', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const { reason_description } = req.body;
     if (!reason_description) return res.status(400).json({ error: 'Reason description is required.' });
     try {
         const result = await query('INSERT INTO return_reasons (reason_description) VALUES ($1) RETURNING *', [reason_description]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return handleError(res, err, `Return reason '${reason_description}' already exists.`, 409);
-        handleError(res, err, "Failed to create return reason");
+        if (err.code === '23505') return next(err);
+        next(err);
     }
 });
-router.put('/return-reasons/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.put('/return-reasons/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const reasonId = parseInt(req.params.id);
     const { reason_description, is_active } = req.body;
     if (isNaN(reasonId)) return res.status(400).json({ error: 'Invalid reason ID.' });
@@ -87,11 +82,11 @@ router.put('/return-reasons/:id', authMiddleware, requireRole(['admin', 'account
         if (result.rows.length === 0) return res.status(404).json({ error: 'Return reason not found.' });
         res.json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return handleError(res, err, `Return reason '${reason_description}' already exists.`, 409);
-        handleError(res, err, "Failed to update return reason");
+        if (err.code === '23505') return next(err);
+        next(err);
     }
 });
-router.delete('/return-reasons/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.delete('/return-reasons/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const reasonId = parseInt(req.params.id);
     if (isNaN(reasonId)) return res.status(400).json({ error: 'Invalid reason ID.' });
     try {
@@ -100,7 +95,7 @@ router.delete('/return-reasons/:id', authMiddleware, requireRole(['admin', 'acco
         const result = await query('UPDATE return_reasons SET is_active = FALSE, updated_at = NOW() WHERE return_reason_id = $1 RETURNING *', [reasonId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Return reason not found.' });
         res.json({ message: 'Return reason deactivated successfully.', reason: result.rows[0] });
-    } catch (err) { handleError(res, err, "Failed to deactivate return reason"); }
+    } catch (err) { next(err); }
 });
 
 
@@ -108,7 +103,7 @@ router.delete('/return-reasons/:id', authMiddleware, requireRole(['admin', 'acco
 // Base path: /api/containers/items
 
 // POST a new ice container
-router.post('/items', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => { 
+router.post('/items', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => { 
     const { 
         serial_number, size_id, container_type, 
         status = 'In Stock', purchase_date, notes 
@@ -128,17 +123,17 @@ router.post('/items', authMiddleware, requireRole(['admin', 'accountant', 'staff
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505' && err.constraint === 'ice_containers_serial_number_key') {
-            return handleError(res, err, `Serial number '${serial_number}' already exists.`, 409);
+            return next(err);
         }
         if (err.code === '23503') { // Foreign key violation (e.g. for size_id)
-            return handleError(res, err, 'Invalid size_id provided.', 400);
+            return next(err);
         }
-        handleError(res, err, "Failed to create ice container");
+        next(err);
     }
 });
 
 // GET all ice containers (with filtering and pagination)
-router.get('/items', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.get('/items', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const { page = 1, limit = 20, serial_number, size_id, container_type, status, customer_id } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
@@ -201,12 +196,12 @@ router.get('/items', authMiddleware, requireRole(['admin', 'accountant', 'staff'
             }
         });
     } catch (err) {
-        handleError(res, err, "Failed to retrieve ice containers");
+        next(err);
     }
 });
 
 // GET a single ice container by ID
-router.get('/items/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => { 
+router.get('/items/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => { 
     const containerId = parseInt(req.params.id);
     if (isNaN(containerId)) return res.status(400).json({ error: 'Invalid container ID.' });
     try {
@@ -224,12 +219,12 @@ router.get('/items/:id', authMiddleware, requireRole(['admin', 'accountant', 'st
         if (result.rows.length === 0) return res.status(404).json({ error: 'Ice container not found.' });
         res.json(result.rows[0]);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve ice container");
+        next(err);
     }
 });
 
 // PUT (update) an existing ice container
-router.put('/items/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.put('/items/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const containerId = parseInt(req.params.id);
     const { 
         serial_number, size_id, container_type, 
@@ -266,17 +261,17 @@ router.put('/items/:id', authMiddleware, requireRole(['admin', 'accountant', 'st
         res.json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505' && err.constraint === 'ice_containers_serial_number_key') {
-            return handleError(res, err, `Serial number '${serial_number}' already exists for another container.`, 409);
+            return next(err);
         }
         if (err.code === '23503') { 
-            return handleError(res, err, 'Invalid size_id, current_customer_id, or current_assignment_id provided.', 400);
+            return next(err);
         }
-        handleError(res, err, "Failed to update ice container");
+        next(err);
     }
 });
 
 // DELETE (soft delete by setting status to 'Retired') an ice container
-router.delete('/items/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => { 
+router.delete('/items/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => { 
     const containerId = parseInt(req.params.id);
     const user_id_last_updated_by = req.user.id;
     if (isNaN(containerId)) return res.status(400).json({ error: 'Invalid container ID.' });
@@ -295,13 +290,13 @@ router.delete('/items/:id', authMiddleware, requireRole(['admin', 'accountant'])
         const result = await query( `UPDATE ice_containers SET status = 'Retired', user_id_last_updated_by = $1, updated_at = NOW(), current_customer_id = NULL, current_assignment_id = NULL WHERE container_id = $2 RETURNING *`, [user_id_last_updated_by, containerId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Ice container not found during update to retired.' });
         res.json({ message: 'Ice container retired successfully.', container: result.rows[0] });
-    } catch (err) { handleError(res, err, "Failed to retire ice container"); }
+    } catch (err) { next(err); }
 });
 
 
 // === ICE CONTAINER ASSIGNMENTS ===
 // POST: Assign a container to a customer
-router.post('/items/:containerId/assign', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.post('/items/:containerId/assign', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const containerId = parseInt(req.params.containerId);
     const { customer_id, assigned_date, notes, expected_return_date } = req.body; // Expecting customer_id now
     const user_id = req.user.id;
@@ -351,15 +346,15 @@ router.post('/items/:containerId/assign', authMiddleware, requireRole(['admin', 
         await client.query('ROLLBACK'); 
         if (err.code === '23503') { // Foreign key violation
             if (err.constraint === 'ice_container_assignments_customer_id_fkey') {
-                 return handleError(res, err, 'Invalid customer_id provided for assignment.', 400);
+                 return next(err);
             }
         }
-        handleError(res, err, "Failed to assign container");
+        next(err);
     } finally { client.release(); }
 });
 
 // PUT: Update specific details of an existing assignment
-router.put('/assignments/:assignmentId', authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), async (req, res) => {
+router.put('/assignments/:assignmentId', authMiddleware, requireRole(['admin', 'manager', 'accountant', 'staff']), async (req, res, next) => {
     const assignmentId = parseInt(req.params.assignmentId, 10);
     // These are the fields we'll allow editing for an assignment via this route
     const { assigned_date, notes, expected_return_date } = req.body;
@@ -474,14 +469,14 @@ router.put('/assignments/:assignmentId', authMiddleware, requireRole(['admin', '
 
     } catch (err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to update assignment details");
+        next(err);
     } finally {
         client.release();
     }
 });
 
 // PUT: Mark a container as returned (updates an assignment)
-router.put('/assignments/:assignmentId/return', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.put('/assignments/:assignmentId/return', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const assignmentId = parseInt(req.params.assignmentId);
     const { returned_date, return_reason_id, custom_return_reason, notes: return_notes, new_container_status = 'In Stock' } = req.body;
     const user_id = req.user.id;
@@ -514,13 +509,13 @@ router.put('/assignments/:assignmentId/return', authMiddleware, requireRole(['ad
         res.json(updatedAssignmentResult.rows[0]);
     } catch (err) {
         await client.query('ROLLBACK');
-        if (err.code === '23503' && err.constraint === 'ice_container_assignments_return_reason_id_fkey') return handleError(res, err, "Invalid return_reason_id provided.", 400);
-        handleError(res, err, "Failed to process container return");
+        if (err.code === '23503' && err.constraint === 'ice_container_assignments_return_reason_id_fkey') return next(err);
+        next(err);
     } finally { client.release(); }
 });
 
 // GET assignment history for a specific container
-router.get('/items/:containerId/assignments', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => {
+router.get('/items/:containerId/assignments', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => {
     const containerId = parseInt(req.params.containerId);
     const { page = 1, limit = 10 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -539,11 +534,11 @@ router.get('/items/:containerId/assignments', authMiddleware, requireRole(['admi
         const totalItems = parseInt(countResult.rows[0].count);
         const totalPages = Math.ceil(totalItems / parseInt(limit));
         res.json({ data: result.rows, pagination: { page: parseInt(page), limit: parseInt(limit), totalItems, totalPages } });
-    } catch (err) { handleError(res, err, "Failed to retrieve container assignment history"); }
+    } catch (err) { next(err); }
 });
 
 // GET all assignments (with filters and pagination)
-router.get('/assignments', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/assignments', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const { page = 1, limit = 20, customer_id, customer_name_search, container_id, serial_number, assigned_date_start, assigned_date_end, returned_status, expected_return_date_start, expected_return_date_end } = req.query; // Added customer_id and customer_name_search
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let mainQuery = `SELECT a.*, ic.serial_number, ic.container_type, sz.size_code as container_size_code, cust.customer_name, rr.reason_description as return_reason_text, u.username as processed_by_username FROM ice_container_assignments a JOIN ice_containers ic ON a.container_id = ic.container_id JOIN ice_container_sizes sz ON ic.size_id = sz.size_id JOIN customers cust ON a.customer_id = cust.customer_id LEFT JOIN return_reasons rr ON a.return_reason_id = rr.return_reason_id LEFT JOIN users u ON a.user_id = u.id`;
@@ -584,7 +579,9 @@ router.get('/assignments', authMiddleware, requireRole(['admin', 'accountant', '
         const totalItems = parseInt(countResult.rows[0].count);
         const totalPages = Math.ceil(totalItems / parseInt(limit));
         res.json({ data: result.rows, pagination: { page: parseInt(page), limit: parseInt(limit), totalItems, totalPages } });
-    } catch (err) { handleError(res, err, "Failed to retrieve assignments"); }
+    } catch (err) { next(err); }
 });
+
+router.use(errorHandler);
 
 module.exports = router;

@@ -1,8 +1,9 @@
 // ice-delivery-app/routes/customers.js
 const express = require('express');
 const router = express.Router();
-const { query, getClient } = require('../db/postgres'); 
+const { query, getClient } = require('../db/postgres');
 const { authMiddleware, requireRole } = require('../middleware/auth');
+const errorHandler = require('../middleware/errorHandler');
 const { GCS_BUCKET_NAME } = require('../config/index.js');
 
 const { Storage } = require('@google-cloud/storage');
@@ -21,12 +22,6 @@ const upload = multer({
 const gcs = new Storage();
 const bucket = gcs.bucket(GCS_BUCKET_NAME);
 
-// --- Helper function for error handling ---
-const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
-    console.error(message, error);
-    const errorMessage = process.env.NODE_ENV === 'production' ? message : `${message}: ${error.message || error}`;
-    res.status(statusCode).json({ error: errorMessage });
-};
 
 // --- Helper function for upload and optimization ---
 const uploadToGCS = (file) => {
@@ -66,7 +61,7 @@ const uploadToGCS = (file) => {
 };
 
 // GET customer search (for adding to routes)
-router.get('/customers/search', authMiddleware, async (req, res) => {
+router.get('/customers/search', authMiddleware, async (req, res, next) => {
     const { search, exclude_route_id, limit = 20 } = req.query;
 
     if (!search || search.length < 2) {
@@ -117,12 +112,12 @@ router.get('/customers/search', authMiddleware, async (req, res) => {
         res.json(result.rows);
 
     } catch (err) {
-        handleError(res, err, 'Failed to search customers');
+        next(err);
     }
 });
 
 // GET route analytics (optional - for future dashboard)
-router.get('/routes/:route_id/analytics', authMiddleware, async (req, res) => {
+router.get('/routes/:route_id/analytics', authMiddleware, async (req, res, next) => {
     const route_id = parseInt(req.params.route_id);
 
     if (isNaN(route_id)) {
@@ -154,7 +149,7 @@ router.get('/routes/:route_id/analytics', authMiddleware, async (req, res) => {
         });
 
     } catch (err) {
-        handleError(res, err, 'Failed to fetch route analytics');
+        next(err);
     }
 });
 
@@ -162,17 +157,17 @@ router.get('/routes/:route_id/analytics', authMiddleware, async (req, res) => {
 // Moved this section before GET /:id for customers to avoid route conflict
 
 // GET all active delivery routes
-router.get('/delivery-routes', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/delivery-routes', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     try {
         const result = await query('SELECT * FROM delivery_routes WHERE is_active = TRUE ORDER BY route_name ASC');
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve delivery routes");
+        next(err);
     }
 });
 
 // POST a new delivery route
-router.post('/delivery-routes', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.post('/delivery-routes', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const { route_name, route_description } = req.body;
     if (!route_name) {
         return res.status(400).json({ error: 'Route name is required.' });
@@ -185,14 +180,14 @@ router.post('/delivery-routes', authMiddleware, requireRole(['admin', 'accountan
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505') { // unique_violation
-            return handleError(res, err, `Delivery route name '${route_name}' already exists.`, 409);
+            return next(err);
         }
-        handleError(res, err, "Failed to create delivery route");
+        next(err);
     }
 });
 
 // PUT (update) an existing delivery route
-router.put('/delivery-routes/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res) => {
+router.put('/delivery-routes/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const routeId = parseInt(req.params.id);
     const { route_name, route_description, is_active } = req.body;
 
@@ -210,14 +205,14 @@ router.put('/delivery-routes/:id', authMiddleware, requireRole(['admin', 'accoun
         res.json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505') { // unique_violation
-            return handleError(res, err, `Delivery route name '${route_name}' already exists.`, 409);
+            return next(err);
         }
-        handleError(res, err, "Failed to update delivery route");
+        next(err);
     }
 });
 
 // DELETE (soft delete) a delivery route
-router.delete('/delivery-routes/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.delete('/delivery-routes/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const routeId = parseInt(req.params.id);
     if (isNaN(routeId)) return res.status(400).json({ error: 'Invalid route ID.' });
 
@@ -232,12 +227,12 @@ router.delete('/delivery-routes/:id', authMiddleware, requireRole(['admin', 'acc
         }
         res.json({ message: 'Delivery route deactivated successfully.', route: result.rows[0] });
     } catch (err) {
-        handleError(res, err, "Failed to deactivate delivery route");
+        next(err);
     }
 });
 
 //credit-sales
-router.get('/:customerId/credit-sales', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/:customerId/credit-sales', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const customerId = parseInt(req.params.customerId);
     if (isNaN(customerId)) return res.status(400).json({ error: 'Invalid Customer ID.' });
 
@@ -253,7 +248,7 @@ router.get('/:customerId/credit-sales', authMiddleware, requireRole(['admin', 'a
         const result = await query(sql, [customerId]);
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve outstanding credit sales for customer.");
+        next(err);
     }
 });
 
@@ -264,7 +259,7 @@ router.post(
     authMiddleware, 
     requireRole(['admin', 'accountant', 'manager', 'staff']), 
     upload.single('payment_slip_image'), 
-    async (req, res) => {
+    async (req, res, next) => {
         const customerId = parseInt(req.params.customerId);
         const { payment_date, amount_paid, payment_method, notes, cleared_sale_ids } = req.body;
         const created_by_user_id = req.user.id;
@@ -315,7 +310,7 @@ router.post(
             res.status(201).json({ message: 'Payment created successfully', payment_id: newPaymentId });
         } catch(err) {
             await client.query('ROLLBACK');
-            handleError(res, err, "Failed to create credit payment.");
+            next(err);
         } finally {
             client.release();
         }
@@ -323,7 +318,7 @@ router.post(
 );
 
 //credit-sales
-router.get('/:customerId/credit-payments', authMiddleware, requireRole(['admin', 'accountant', 'manager',  'staff']), async (req, res) => {
+router.get('/:customerId/credit-payments', authMiddleware, requireRole(['admin', 'accountant', 'manager',  'staff']), async (req, res, next) => {
     const customerId = parseInt(req.params.customerId);
     const { startDate, endDate } = req.query;
 
@@ -352,12 +347,12 @@ router.get('/:customerId/credit-payments', authMiddleware, requireRole(['admin',
         const result = await query(sql, values);
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve payment history.");
+        next(err);
     }
 });
 
 // --- ADD THIS NEW ENDPOINT FOR VOIDING A PAYMENT ---
-router.post('/credit-payments/:paymentId/void', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => {
+router.post('/credit-payments/:paymentId/void', authMiddleware, requireRole(['admin', 'manager']), async (req, res, next) => {
     const paymentId = parseInt(req.params.paymentId);
     const { void_reason } = req.body; // Optional reason for voiding
     const user_id = req.user.id;
@@ -403,14 +398,14 @@ router.post('/credit-payments/:paymentId/void', authMiddleware, requireRole(['ad
 
     } catch(err) {
         await client.query('ROLLBACK');
-        handleError(res, err, "Failed to void payment.");
+        next(err);
     } finally {
         client.release();
     }
 });
 
 // --- ADD THIS NEW ENDPOINT FOR EDITING A PAYMENT ---
-router.put('/credit-payments/:paymentId', authMiddleware, requireRole(['admin', 'manager']), async (req, res) => {
+router.put('/credit-payments/:paymentId', authMiddleware, requireRole(['admin', 'manager']), async (req, res, next) => {
     const paymentId = parseInt(req.params.paymentId);
     // We only allow editing of non-critical data to preserve the audit trail
     const { payment_date, payment_method, notes } = req.body;
@@ -430,13 +425,13 @@ router.put('/credit-payments/:paymentId', authMiddleware, requireRole(['admin', 
         }
         res.json(result.rows[0]);
     } catch(err) {
-        handleError(res, err, "Failed to update payment details.");
+        next(err);
     }
 });
 
 // === CUSTOMER ENDPOINTS ===
 // POST: Create a new customer
-router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const { 
         customer_name, phone, address, contact_person, 
         customer_type, route_id, notes, is_active = true 
@@ -461,14 +456,14 @@ router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager', 
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.code === '23503' && err.constraint === 'customers_route_id_fkey') { 
-            return handleError(res, err, 'Invalid route_id provided.', 400);
+            return next(err);
         }
-        handleError(res, err, "Failed to create customer");
+        next(err);
     }
 });
 
 // GET: List all customers (with filtering and pagination)
-router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const { 
         page = 1, limit = 20, search, route_id, customer_type, is_active 
     } = req.query;
@@ -531,13 +526,13 @@ router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager', '
             }
         });
     } catch (err) {
-        handleError(res, err, "Failed to retrieve customers");
+        next(err);
     }
 });
 
 // GET: Get a single customer by ID
 // This MUST be defined AFTER specific string routes like '/delivery-routes'
-router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const customerId = parseInt(req.params.id);
     if (isNaN(customerId)) return res.status(400).json({ error: 'Invalid customer ID.' });
 
@@ -554,12 +549,12 @@ router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
         }
         res.json(result.rows[0]);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve customer");
+        next(err);
     }
 });
 
 // PUT: Update an existing customer
-router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const customerId = parseInt(req.params.id);
     const { 
         customer_name, phone, address, contact_person, 
@@ -590,14 +585,14 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
         res.json(result.rows[0]);
     } catch (err) {
         if (err.code === '23503' && err.constraint === 'customers_route_id_fkey') { 
-            return handleError(res, err, 'Invalid route_id provided.', 400);
+            return next(err);
         }
-        handleError(res, err, "Failed to update customer");
+        next(err);
     }
 });
 
 // DELETE: Soft delete a customer (set is_active = false)
-router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const customerId = parseInt(req.params.id);
     const user_id_last_updated_by = req.user.id;
 
@@ -615,8 +610,10 @@ router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), asyn
         }
         res.json({ message: 'Customer deactivated successfully.', customer: result.rows[0] });
     } catch (err) {
-        handleError(res, err, "Failed to deactivate customer");
+        next(err);
     }
 });
+
+router.use(errorHandler);
 
 module.exports = router;

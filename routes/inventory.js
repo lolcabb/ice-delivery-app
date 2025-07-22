@@ -1,19 +1,14 @@
 // ice-delivery-app/routes/inventory.js
 const express = require('express');
 const router = express.Router();
-const { query, getClient } = require('../db/postgres'); 
-const { authMiddleware, requireRole } = require('../middleware/auth'); 
+const { query, getClient } = require('../db/postgres');
+const { authMiddleware, requireRole } = require('../middleware/auth');
+const errorHandler = require('../middleware/errorHandler');
 
-// --- Helper function for error handling ---
-const handleError = (res, error, message = "An error occurred", statusCode = 500) => {
-    console.error(message, error);
-    const errorMessage = process.env.NODE_ENV === 'production' ? message : `${message}: ${error.message || error}`;
-    res.status(statusCode).json({ error: errorMessage });
-};
 
 // === INVENTORY DASHBOARD (CONSUMABLES) ===
 // GET /api/inventory/dashboard/consumables/summary
-router.get('/dashboard/consumables/summary', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/dashboard/consumables/summary', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     try {
         const lowStockResult = await query(
             "SELECT COUNT(*) as count FROM inventory_consumables WHERE current_stock_level <= reorder_point AND reorder_point IS NOT NULL"
@@ -38,12 +33,12 @@ router.get('/dashboard/consumables/summary', authMiddleware, requireRole(['admin
             mostActiveConsumable: mostActiveResult.rows[0] || { consumable_name: 'N/A', movement_count: 0 }
         });
     } catch (err) {
-        handleError(res, err, "Failed to retrieve consumables dashboard summary");
+        next(err);
     }
 });
 
 // GET /api/inventory/dashboard/consumables/recent-movements
-router.get('/dashboard/consumables/recent-movements', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/dashboard/consumables/recent-movements', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 5;
     try {
         const result = await query(
@@ -66,12 +61,12 @@ router.get('/dashboard/consumables/recent-movements', authMiddleware, requireRol
         );
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve recent consumable movements");
+        next(err);
     }
 });
 
 // GET /api/inventory/dashboard/consumables/item-type-movement-trend
-router.get('/dashboard/consumables/item-type-movement-trend', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/dashboard/consumables/item-type-movement-trend', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     const { item_type_id, period = 'last_7_days' } = req.query;
     
     if (!item_type_id) {
@@ -127,12 +122,12 @@ router.get('/dashboard/consumables/item-type-movement-trend', authMiddleware, re
             total_out: parseFloat(row.total_out)
         })));
     } catch (err) {
-        handleError(res, err, "Failed to retrieve item type movement trend");
+        next(err);
     }
 });
 
 // GET /api/inventory/dashboard/consumables/inventory-value
-router.get('/dashboard/consumables/inventory-value', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/dashboard/consumables/inventory-value', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     try {
         // Get basic inventory stats (simplified)
         const valueResult = await query(`
@@ -177,12 +172,12 @@ router.get('/dashboard/consumables/inventory-value', authMiddleware, requireRole
             }
         });
     } catch (err) {
-        handleError(res, err, "Failed to retrieve inventory value summary");
+        next(err);
     }
 });
 
 // GET /api/inventory/dashboard/consumables/usage-patterns
-router.get('/dashboard/consumables/usage-patterns', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res) => {
+router.get('/dashboard/consumables/usage-patterns', authMiddleware, requireRole(['admin', 'accountant', 'manager', 'staff']), async (req, res, next) => {
     try {
         // Get items with highest usage in last 30 days (simplified)
         const highUsageResult = await query(`
@@ -243,22 +238,22 @@ router.get('/dashboard/consumables/usage-patterns', authMiddleware, requireRole(
             }))
         });
     } catch (err) {
-        handleError(res, err, "Failed to retrieve usage patterns");
+        next(err);
     }
 });
 
 // === INVENTORY ITEM TYPES ===
 // (For categorizing consumables like "Packaging", "Cleaning Supplies", etc.)
-router.get('/item-types', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => { // Staff/Manager might need to view types
+router.get('/item-types', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => { // Staff/Manager might need to view types
     try {
         const result = await query('SELECT * FROM inventory_item_types ORDER BY type_name ASC');
         res.json(result.rows);
     } catch (err) {
-        handleError(res, err, "Failed to retrieve inventory item types");
+        next(err);
     }
 });
 
-router.post('/item-types', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.post('/item-types', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const { type_name, description } = req.body;
     if (!type_name) {
         return res.status(400).json({ error: 'Type name is required' });
@@ -271,13 +266,13 @@ router.post('/item-types', authMiddleware, requireRole(['admin', 'accountant']),
         res.status(201).json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505') { 
-            return handleError(res, err, `Inventory item type name '${type_name}' already exists.`, 409);
+            return next(err);
         }
-        handleError(res, err, "Failed to create inventory item type");
+        next(err);
     }
 });
 
-router.put('/item-types/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => {
+router.put('/item-types/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => {
     const typeId = parseInt(req.params.id);
     const { type_name, description } = req.body;
     if (isNaN(typeId)) return res.status(400).json({ error: 'Invalid item type ID' });
@@ -293,13 +288,13 @@ router.put('/item-types/:id', authMiddleware, requireRole(['admin', 'accountant'
         res.json(result.rows[0]);
     } catch (err) {
         if (err.code === '23505') { 
-            return handleError(res, err, `Inventory item type name '${type_name}' already exists.`, 409);
+            return next(err);
         }
-        handleError(res, err, "Failed to update inventory item type");
+        next(err);
     }
 });
 
-router.delete('/item-types/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => { // Allow accountant to delete if unused
+router.delete('/item-types/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => { // Allow accountant to delete if unused
     const typeId = parseInt(req.params.id);
     if (isNaN(typeId)) return res.status(400).json({ error: 'Invalid item type ID' });
     try {
@@ -315,15 +310,15 @@ router.delete('/item-types/:id', authMiddleware, requireRole(['admin', 'accounta
         res.json({ message: 'Inventory item type deleted successfully', itemType: result.rows[0] });
     } catch (err) {
         if (err.code === '23503') { 
-             return handleError(res, err, 'Cannot delete item type. It is currently in use.', 400);
+             return next(err);
         }
-        handleError(res, err, "Failed to delete inventory item type");
+        next(err);
     }
 });
 
 
 // === INVENTORY CONSUMABLES (e.g., Packaging) ===
-router.get('/consumables', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => { 
+router.get('/consumables', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => { 
     const { page = 1, limit = 20, item_type_id, search } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let mainQuery = `SELECT ic.*, it.type_name FROM inventory_consumables ic JOIN inventory_item_types it ON ic.item_type_id = it.item_type_id`;
@@ -344,20 +339,20 @@ router.get('/consumables', authMiddleware, requireRole(['admin', 'accountant', '
         const totalItems = parseInt(countResult.rows[0].count);
         const totalPages = Math.ceil(totalItems / parseInt(limit));
         res.json({ data: result.rows, pagination: { page: parseInt(page), limit: parseInt(limit), totalItems, totalPages } });
-    } catch (err) { handleError(res, err, "Failed to retrieve inventory consumables"); }
+    } catch (err) { next(err); }
 });
 
-router.get('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => { 
+router.get('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => { 
     const consumableId = parseInt(req.params.id);
     if (isNaN(consumableId)) return res.status(400).json({ error: 'Invalid consumable ID' });
     try {
         const result = await query(`SELECT ic.*, it.type_name FROM inventory_consumables ic JOIN inventory_item_types it ON ic.item_type_id = it.item_type_id WHERE ic.consumable_id = $1`, [consumableId]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Inventory consumable not found' });
         res.json(result.rows[0]);
-    } catch (err) { handleError(res, err, "Failed to retrieve inventory consumable"); }
+    } catch (err) { next(err); }
 });
 
-router.post('/consumables', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res) => {
+router.post('/consumables', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res, next) => {
     const { item_type_id, consumable_name, unit_of_measure, current_stock_level = 0, reorder_point, notes } = req.body;
     const user_id_created_by = req.user.id;
     if (!item_type_id || !consumable_name || !unit_of_measure) return res.status(400).json({ error: 'Item type, consumable name, and unit of measure are required' });
@@ -369,13 +364,13 @@ router.post('/consumables', authMiddleware, requireRole(['admin', 'accountant', 
         const result = await query(`INSERT INTO inventory_consumables (item_type_id, consumable_name, unit_of_measure, current_stock_level, reorder_point, notes, user_id_created_by, user_id_last_updated_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING *`, [parsedTypeId, consumable_name, unit_of_measure, parseInt(current_stock_level) || 0, reorder_point ? parseInt(reorder_point) : null, notes, user_id_created_by]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
-        if (err.code === '23505') return handleError(res, err, `Consumable name '${consumable_name}' already exists.`, 409);
-        if (err.code === '23503') return handleError(res, err, `Invalid item_type_id.`, 400);
-        handleError(res, err, "Failed to create inventory consumable");
+        if (err.code === '23505') return next(err);
+        if (err.code === '23503') return next(err);
+        next(err);
     }
 });
 
-router.put('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res) => {
+router.put('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res, next) => {
     const consumableId = parseInt(req.params.id);
     const { item_type_id, consumable_name, unit_of_measure, reorder_point, notes } = req.body;
     const user_id_last_updated_by = req.user.id;
@@ -389,13 +384,13 @@ router.put('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant
         if (result.rows.length === 0) return res.status(404).json({ error: 'Inventory consumable not found' });
         res.json(result.rows[0]);
     } catch (err) {
-         if (err.code === '23505') return handleError(res, err, `Consumable name '${consumable_name}' already exists.`, 409);
-        if (err.code === '23503') return handleError(res, err, `Invalid item_type_id.`, 400);
-        handleError(res, err, "Failed to update inventory consumable");
+         if (err.code === '23505') return next(err);
+        if (err.code === '23503') return next(err);
+        next(err);
     }
 });
 
-router.delete('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res) => { 
+router.delete('/consumables/:id', authMiddleware, requireRole(['admin', 'accountant']), async (req, res, next) => { 
     const consumableId = parseInt(req.params.id);
     if (isNaN(consumableId)) return res.status(400).json({ error: 'Invalid consumable ID' });
     try {
@@ -405,13 +400,13 @@ router.delete('/consumables/:id', authMiddleware, requireRole(['admin', 'account
         if (result.rows.length === 0) return res.status(404).json({ error: 'Inventory consumable not found' });
         res.json({ message: 'Inventory consumable deleted successfully', consumable: result.rows[0] });
     } catch (err) {
-        if (err.code === '23503') return handleError(res, err, 'Cannot delete consumable. It is referenced elsewhere (e.g., movements).', 400);
-        handleError(res, err, "Failed to delete inventory consumable");
+        if (err.code === '23503') return next(err);
+        next(err);
     }
 });
 
 // === INVENTORY CONSUMABLE MOVEMENTS ===
-router.post('/consumables/:consumableId/movements', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res) => {
+router.post('/consumables/:consumableId/movements', authMiddleware, requireRole(['admin', 'accountant', 'staff']), async (req, res, next) => {
     const consumableId = parseInt(req.params.consumableId);
     const { movement_type, quantity_changed, notes, movement_date } = req.body;
     const user_id = req.user.id;
@@ -454,11 +449,11 @@ router.post('/consumables/:consumableId/movements', authMiddleware, requireRole(
         
         await client.query('COMMIT');
         res.status(201).json(movementResult.rows[0]);
-    } catch (err) { await client.query('ROLLBACK'); handleError(res, err, "Failed to record stock movement");
+    } catch (err) { await client.query('ROLLBACK'); next(err);
     } finally { client.release(); }
 });
 
-router.get('/consumables/:consumableId/movements', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res) => { 
+router.get('/consumables/:consumableId/movements', authMiddleware, requireRole(['admin', 'accountant', 'staff', 'manager']), async (req, res, next) => { 
     const consumableId = parseInt(req.params.consumableId);
     const { page = 1, limit = 20, startDate, endDate, movement_type } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -479,8 +474,10 @@ router.get('/consumables/:consumableId/movements', authMiddleware, requireRole([
         const totalItems = parseInt(countResult.rows[0].count);
         const totalPages = Math.ceil(totalItems / parseInt(limit));
         res.json({ data: result.rows, pagination: { page: parseInt(page), limit: parseInt(limit), totalItems, totalPages } });
-    } catch (err) { handleError(res, err, "Failed to retrieve consumable movement history"); }
+    } catch (err) { next(err); }
 });
+
+router.use(errorHandler);
 
 // Removed sections for:
 // === ICE CONTAINER SIZES ===
