@@ -6,7 +6,7 @@ const db = require('../db/postgres');
 const router = express.Router();
 
 // Import JWT_SECRET from config
-const { JWT_SECRET } = require('../config');
+const { JWT_SECRET } = require('../config/index.js');
 
 /**
  * @route   POST /api/auth/login
