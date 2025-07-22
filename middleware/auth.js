@@ -1,7 +1,7 @@
 // Unified authentication middleware
 const jwt = require('jsonwebtoken');
 const db = require('../db/postgres');
-const { JWT_SECRET } = require('../config');
+const { JWT_SECRET } = require('../config/index.js');
 
 /**
  * Authentication middleware to verify the JWT token
