@@ -163,6 +163,46 @@ export default function WaterTestLogManager() {
         fetchLogs(selectedDate);
     }, [selectedDate, fetchLogs]);
 
+    const resetForm = useCallback(() => {
+        const reset = {};
+        stages.forEach(stage => {
+            reset[stage.stage_id] = {
+                morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' },
+                afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' }
+            };
+        });
+        setFormData(reset);
+    }, [stages]);
+
+    useEffect(() => {
+        if (showLogForm) {
+            if (logs.length > 0) {
+                const existingData = {};
+                stages.forEach(s => {
+                    existingData[s.stage_id] = { morning: {}, afternoon: {} };
+                });
+                logs.forEach(log => {
+                    const sessionKey = log.test_session.toLowerCase();
+                    if (!existingData[log.stage_id]) {
+                        existingData[log.stage_id] = { morning: {}, afternoon: {} };
+                    }
+                    existingData[log.stage_id][sessionKey] = {
+                        ph_value: log.ph_value || '',
+                        tds_ppm_value: log.tds_ppm_value || '',
+                        ec_us_cm_value: log.ec_us_cm_value || ''
+                    };
+                });
+                setFormData(existingData);
+            }
+        } else {
+            resetForm();
+        }
+    }, [showLogForm, logs, stages, resetForm]);
+
+    useEffect(() => {
+        resetForm();
+    }, [selectedDate, resetForm]);
+
     const handleSubmitLogs = async () => {
         setLoading(true);
         try {
