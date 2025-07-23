@@ -2,19 +2,26 @@
 // PostgreSQL connection module using pg Pool
 
 const { Pool } = require('pg');
+const {
+  DB_USER,
+  DB_PASSWORD,
+  DB_NAME,
+  INSTANCE_CONNECTION_NAME,
+  DB_SOCKET_PATH
+} = require('../config');
 
-// Connection pool configuration - reads from environment variables
+// Connection pool configuration - reads from config values
 // These variables should be set in your Cloud Run service configuration
 const config = {
-  user: process.env.DB_USER, // e.g., 'postgres'
-  password: process.env.DB_PASSWORD, // The password for your Cloud SQL user
-  database: process.env.DB_NAME, // The database name you created in Cloud SQL
+  user: DB_USER, // e.g., 'postgres'
+  password: DB_PASSWORD, // The password for your Cloud SQL user
+  database: DB_NAME, // The database name you created in Cloud SQL
   // host: Specifies the connection path.
   // For Cloud Run connecting via Cloud SQL Auth Proxy (recommended):
   // Use the Unix socket path provided by the proxy.
   // Format: /cloudsql/INSTANCE_CONNECTION_NAME
   // INSTANCE_CONNECTION_NAME is like 'your-project-id:your-region:your-instance-id'
-  host: process.env.DB_SOCKET_PATH || `/cloudsql/${process.env.INSTANCE_CONNECTION_NAME}`,
+  host: DB_SOCKET_PATH || `/cloudsql/${INSTANCE_CONNECTION_NAME}`,
 
   // Optional settings for the connection pool
   max: 10, // Max number of clients in the pool
@@ -24,7 +31,7 @@ const config = {
 
 // Basic validation to ensure essential environment variables are set
 // Helps catch configuration errors early during container startup
-if (!config.user || !config.password || !config.database || !config.host || !config.host.includes(process.env.INSTANCE_CONNECTION_NAME)) {
+if (!DB_USER || !DB_PASSWORD || !DB_NAME || !INSTANCE_CONNECTION_NAME || !config.host) {
   console.error('FATAL ERROR: Database configuration environment variables missing or incomplete.');
   console.error('Required: DB_USER, DB_PASSWORD, DB_NAME, INSTANCE_CONNECTION_NAME (used to build DB_SOCKET_PATH)');
   // Optional: Exit if configuration is critically missing, preventing the app from starting incorrectly
