@@ -8,7 +8,7 @@ import {
     assignIceContainer,
     retireIceContainer,
 } from '../api/containers.js';
-import { apiService } from '../apiService';
+import { handleComponentAuthError } from '../api/helpers.js';
 import IceContainerList from './IceContainerList'; 
 import IceContainerForm from './IceContainerForm'; 
 import AssignContainerForm from './AssignContainerForm'; 
@@ -108,14 +108,13 @@ export default function IceContainerManager() {
         } catch (err) {
             console.error("Failed to fetch ice containers:", err);
             setError(err.data?.error || err.message || 'ไม่สามรถโหลดถังน้ำแข็งได้.');
-            if (err.status === 401) apiService.handleComponentAuthError(err, () => window.location.replace('/login'));
+            if (err.status === 401) handleComponentAuthError(err, () => window.location.replace('/login'));
         } finally {
             setIsLoading(false);
         }
     // Add all reactive values from the component scope that are used inside the callback
     // State setters (setIsLoading, setError, etc.) are stable and usually don't need to be listed,
     // but including them satisfies the strictest interpretation of exhaustive-deps.
-    // apiService is an import, so it's stable.
     }, [
         pagination.page, // Used as fallback for pageArg
         pagination.limit, // Used directly for params.limit
@@ -136,7 +135,6 @@ export default function IceContainerManager() {
             }
         }
     // Dependencies are values from scope used inside.
-    // apiService is stable. setContainerSizes and setError are stable state setters.
     }, [containerSizes.length, isFormModalOpen, isAssignModalOpen, setContainerSizes, setError]);
 
     // --- Step 3: Add debouncing useEffect ---
@@ -258,7 +256,7 @@ export default function IceContainerManager() {
             } catch (err) {
                 console.error("Failed to retire container:", err);
                 setError(err.data?.error || err.message || "ไม่สามารถปลดระวางถังน้ำแข็งได้.");
-                if (err.status === 401) apiService.handleComponentAuthError(err, () => window.location.replace('/login'));
+                if (err.status === 401) handleComponentAuthError(err, () => window.location.replace('/login'));
             } finally {
                 setIsLoading(false);
                 setTimeout(() => setSuccessMessage(''), 4000);

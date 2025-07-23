@@ -1,6 +1,7 @@
 // Suggested path: src/inventory/ItemTypesManager.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiService } from '../apiService'; // Adjust path as needed
+import { request } from '../api/base.js';
+import { handleComponentAuthError } from '../api/helpers.js';
 import ItemTypeList from './ItemTypeList'; // Import actual component
 import ItemTypeForm from './ItemTypeForm'; // Import actual component
 // Modal is used by ItemTypeForm, so no direct import needed here.
@@ -23,12 +24,12 @@ export default function ItemTypesManager() {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await apiService.getInventoryItemTypes();
+            const { data } = await request('/inventory/item-types');
             setItemTypes(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error("Failed to fetch item types:", err);
             setError(err.data?.error || err.message || 'ไม่สามารถโหลดประเภทวัสดุได้.');
-            if (err.status === 401) apiService.handleComponentAuthError(err, () => window.location.replace('/login'));
+            if (err.status === 401) handleComponentAuthError(err, () => window.location.replace('/login'));
         } finally {
             setIsLoading(false);
         }
@@ -61,10 +62,10 @@ export default function ItemTypesManager() {
             };
 
             if (editingItemType && editingItemType.item_type_id) {
-                await apiService.updateInventoryItemType(editingItemType.item_type_id, payload);
+                await request(`/inventory/item-types/${editingItemType.item_type_id}`, 'PUT', payload);
                 setSuccessMessage(`ประเภทวัสดุ "${payload.type_name}" อัปเดตสำเร็จแล้ว.`);
             } else {
-                await apiService.addInventoryItemType(payload);
+                await request('/inventory/item-types', 'POST', payload);
                 setSuccessMessage(`ประเภทวัสดุ "${payload.type_name}" เพิ่มเรียบร้อยแล้ว.`);
             }
             handleCloseModal(); // Close modal on successful save
@@ -92,13 +93,13 @@ export default function ItemTypesManager() {
         if (confirmDelete) {
             setIsLoading(true); setError(null); setSuccessMessage('');
             try {
-                await apiService.deleteInventoryItemType(itemTypeId);
+                await request(`/inventory/item-types/${itemTypeId}`, 'DELETE');
                 setSuccessMessage(`ประเภทวัสดุ "${typeToDelete.type_name}" ลบเรียบร้อยแล้ว.`);
                 await fetchItemTypes();
             } catch (err) {
                 console.error("Failed to delete item type:", err);
                 setError(err.data?.error || err.message || "ไม่สามารถลบประเภทวัสดุได้ อาจมีการใช้งานอยู่.");
-                if (err.status === 401) apiService.handleComponentAuthError(err, () => window.location.replace('/login'));
+                if (err.status === 401) handleComponentAuthError(err, () => window.location.replace('/login'));
             } finally {
                 setIsLoading(false);
                 setTimeout(() => setSuccessMessage(''), 4000);
