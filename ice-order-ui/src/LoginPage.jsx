@@ -1,7 +1,7 @@
 // 📁 src/LoginPage.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiService } from './apiService';
+import { auth } from './api/index.js';
 
 function LoginPage({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
@@ -17,9 +17,9 @@ function LoginPage({ onLoginSuccess }) {
     
     try {
       console.log('Attempting login...');
-      const response = await apiService.post('/auth/login', { 
-        username, 
-        password 
+      const { data: response } = await auth.login({
+        username,
+        password
       });
       
       console.log('Login successful, response:', 

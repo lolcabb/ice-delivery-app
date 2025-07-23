@@ -2,7 +2,8 @@
 // Refactored for Tailwind v4 principles, clarity, and UI improvements
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { apiService } from './apiService';
+import { request } from './api/base.js';
+import { handleComponentAuthError } from './api/helpers.js';
 
 import { getCurrentLocalDateISO, getCurrentLocalMonthISO } from './utils/dateUtils'; // Adjust path
 
@@ -575,7 +576,7 @@ export default function AdminPanel() {
         setError('');
         try {
             console.log(`Workspaceing orders for date: ${selectedDate}`);
-            const data = await apiService.get(`/orders?date=${selectedDate}`);
+            const { data } = await request(`/orders?date=${selectedDate}`);
             const processedOrders = (Array.isArray(data) ? data : []).map(o => ({
                 ...o,
                 items: Array.isArray(o.items) ? o.items : [],
@@ -602,7 +603,7 @@ export default function AdminPanel() {
         setError('');
         setSuccessMessage('');
         try {
-            await apiService.delete(`/orders/${id}`);
+            await request(`/orders/${id}`, 'DELETE');
             setSuccessMessage(`Order #${id} deleted successfully.`);
             setExpandedOrderId(null);
             fetchOrders(false); // Refetch
@@ -618,7 +619,7 @@ export default function AdminPanel() {
         setError('');
         setSuccessMessage('');
         try {
-            const result = await apiService.put(`/orders/${orderId}`, updatedData);
+            const { data: result } = await request(`/orders/${orderId}`, 'PUT', updatedData);
             setSuccessMessage(result?.message || `Order #${orderId} updated successfully.`);
             fetchOrders(false); // Refetch
             // No need to return Promise.resolve(), modal can close based on no error
@@ -638,7 +639,7 @@ export default function AdminPanel() {
         setError('');
         setSuccessMessage('');
         try {
-            const data = await apiService.get(`/reports/daily?date=${dailyDate}`);
+            const { data } = await request(`/reports/daily?date=${dailyDate}`);
             setDailyReport(data);
         } catch (err) {
             console.error("Daily report fetch error in AdminPanel:", err);
@@ -657,7 +658,7 @@ export default function AdminPanel() {
         setError('');
         setSuccessMessage('');
         try {
-            const data = await apiService.get(`/reports/monthly?month=${monthlyMonth}`);
+            const { data } = await request(`/reports/monthly?month=${monthlyMonth}`);
             setMonthlyReport(data);
         } catch (err) {
             console.error("Monthly report fetch error in AdminPanel:", err);

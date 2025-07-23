@@ -1,6 +1,6 @@
 // 📁 File: BillsList.js (Optimized - Uses billsData Prop, Payment Deselect)
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { apiService } from './apiService'; // Import the apiService
+import { request } from './api/base.js';
 
 // Constants
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'; // Use env var
@@ -60,7 +60,7 @@ export default function BillsList({ billsData = [] }) { // Default to empty arra
             console.log(`Fetching details for bill #${bill.id}`);
             try {
                 // These direct fetch calls don't include Authorization headers
-                const fullOrder = await apiService.get(`/orders/${bill.id}`);
+                const { data: fullOrder } = await request(`/orders/${bill.id}`);
                 setSelectedOrder(fullOrder); // Update selectedOrder with full details
             } catch (err) {
                 console.error('Failed to load full order details:', err);
@@ -81,13 +81,13 @@ export default function BillsList({ billsData = [] }) { // Default to empty arra
     const updateOrderField = useCallback(async (orderId, fieldUpdate) => {
         setError(''); // Clear previous errors
         try {
-            // Assuming apiService.put returns the updated order or a success indicator
-            await apiService.put(`/orders/${orderId}`, fieldUpdate);
+            // Send update and rely on request helper
+            await request(`/orders/${orderId}`, 'PUT', fieldUpdate);
             console.log(`Successfully updated field for order ${orderId} via BillsList:`, fieldUpdate);
             // Re-fetch selected order details after successful update to show changes
             if (selectedOrder && selectedOrder.id === orderId) {
                  try {
-                    const freshData = await apiService.get(`/orders/${orderId}`);
+                    const { data: freshData } = await request(`/orders/${orderId}`);
                     setSelectedOrder(freshData); // Update the expanded view
                  } catch (fetchErr) { console.error("Failed to refetch order after update success:", fetchErr); }
             }
@@ -99,13 +99,13 @@ export default function BillsList({ billsData = [] }) { // Default to empty arra
             // Attempt to revert optimistic update by re-fetching details on error
             if (selectedOrder && selectedOrder.id === orderId) {
                  try {
-                    const oldData = await apiService.get(`/orders/${orderId}`);
+                    const { data: oldData } = await request(`/orders/${orderId}`);
                     setSelectedOrder(oldData);
                  } catch (fetchErr) { console.error("Failed to refetch order after update error:", fetchErr); }
             }
             return false;
         }
-    }, [selectedOrder]); // setError, setSelectedOrder are stable, apiService is a stable import
+    }, [selectedOrder]); // setError, setSelectedOrder are stable
 
     const handleBillDriverChange = useCallback((orderId, newDriverName) => {
         if (!selectedOrder || selectedOrder.id !== orderId) return;

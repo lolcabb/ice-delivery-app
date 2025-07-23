@@ -1,6 +1,7 @@
 // Suggested path: src/inventory/ConsumablesManager.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { apiService } from '../apiService'; // Adjust path as needed
+import { request } from '../api/base.js';
+import { handleComponentAuthError } from '../api/helpers.js';
 
 // Import the actual components
 import ConsumablesList from './ConsumablesList';
@@ -86,7 +87,7 @@ export default function ConsumablesManager() {
                     delete params[key];
                 }
             });
-            const response = await apiService.getInventoryConsumables(params);
+            const response = await request(`/inventory/consumables?${new URLSearchParams(params).toString()}`);
             setConsumables(Array.isArray(response.data) ? response.data : []);
             setPagination(prevPagination => ({
                 ...prevPagination,
@@ -95,7 +96,7 @@ export default function ConsumablesManager() {
         } catch (err) {
             console.error("Failed to fetch consumables:", err);
             setError(err.data?.error || err.message || 'Could not load consumable items.');
-            if (err.status === 401) apiService.handleComponentAuthError(err, () => window.location.replace('/login'));
+            if (err.status === 401) handleComponentAuthError(err, () => window.location.replace('/login'));
         } finally {
             setIsLoading(false);
         }
@@ -105,7 +106,7 @@ export default function ConsumablesManager() {
     const fetchItemTypesForConsumables = useCallback(async () => {
         if (itemTypes.length === 0 || isConsumableFormOpen) {
             try {
-                const data = await apiService.getInventoryItemTypes();
+                const { data } = await request('/inventory/item-types');
                 setItemTypes(Array.isArray(data) ? data.filter(type => type.is_active !== false) : []);
             } catch (err) {
                 console.error("Failed to fetch item types for consumables forms:", err);
@@ -176,10 +177,10 @@ export default function ConsumablesManager() {
         let opError = null;
         try {
             if (editingConsumable && editingConsumable.consumable_id) {
-                await apiService.updateInventoryConsumable(editingConsumable.consumable_id, formData);
+                await request(`/inventory/consumables/${editingConsumable.consumable_id}`, 'PUT', formData);
                 setSuccessMessage(`วัสดุสิ้นเปลือง "${formData.consumable_name}" อัปเดตสำเร็จแล้ว.`);
             } else {
-                await apiService.addInventoryConsumable(formData);
+                await request('/inventory/consumables', 'POST', formData);
                 setSuccessMessage(`วัสดุสิ้นเปลือง "${formData.consumable_name}" ถูกเพิ่มเรียบร้อยแล้ว.`);
             }
             handleCloseConsumableForm();
@@ -208,7 +209,7 @@ export default function ConsumablesManager() {
         if (!movementTargetConsumable) return;
         let opError = null;
         try {
-            await apiService.addConsumableMovement(movementTargetConsumable.consumable_id, movementData);
+            await request(`/inventory/consumables/${movementTargetConsumable.consumable_id}/movements`, 'POST', movementData);
             setSuccessMessage(`บันทึกการเคลื่อนไหวสต็อกสำหรับ "${movementTargetConsumable.consumable_name}" แล้ว.`);
             handleCloseMovementForm();
             await fetchConsumables(pagination.page, filters); 
