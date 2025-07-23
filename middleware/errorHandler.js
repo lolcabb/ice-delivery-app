@@ -14,7 +14,7 @@ const logger = createLogger({
  * Express error-handling middleware for consistent API responses.
  * Logs errors using winston and sends a JSON response.
  */
-module.exports = (err, req, res, next) => {
+const errorHandler = (err, req, res, next) => {
   logger.error({
     message: err.message,
     stack: err.stack,
@@ -32,3 +32,7 @@ module.exports = (err, req, res, next) => {
 
   res.status(status).json({ error: message });
 };
+
+module.exports = errorHandler;
+module.exports.logger = logger;
+
