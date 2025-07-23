@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
-jest.mock('../apiService.jsx', () => ({ apiService: { post: jest.fn() } }));
+jest.mock('../api/base.js', () => ({ request: jest.fn() }));
 
 import NewOrder from '../NewOrder.jsx';
 
@@ -28,12 +28,12 @@ test('shows validation error when price entered without quantity', async () => {
 
 test('submits order and calls callback', async () => {
   const data = { id: 1, status: 'Created' };
-  const { apiService } = require('../apiService.jsx');
-  apiService.post.mockResolvedValueOnce(data);
+  const { request } = require('../api/base.js');
+  request.mockResolvedValueOnce({ data });
   const onCreated = jest.fn();
   render(<NewOrder onOrderCreated={onCreated} />);
   fillRequiredFields();
   fireEvent.click(screen.getByRole('button', { name: /ออกบิล/i }));
-  await waitFor(() => expect(apiService.post).toHaveBeenCalled());
+  await waitFor(() => expect(request).toHaveBeenCalled());
   expect(onCreated).toHaveBeenCalledWith(data);
 });

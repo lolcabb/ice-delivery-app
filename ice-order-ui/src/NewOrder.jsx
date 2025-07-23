@@ -1,6 +1,6 @@
 // 📁 File: NewOrder.js (Corrected CSS Grid for Product Alignment)
 import React, { useState, useRef, useEffect } from 'react';
-import { apiService } from './apiService'; // Adjust the import based on your project structure
+import { request } from './api/base.js';
 
 // Define the product names mapping
 const productNames = {
@@ -152,7 +152,7 @@ export default function NewOrder({ onOrderCreated }) {
 
     // --- API Call & Post-Submit Actions ---
     try {
-       const createdOrderData = await apiService.post('/orders', payload);
+       const { data: createdOrderData } = await request('/orders', 'POST', payload);
 
        if (!createdOrderData || !createdOrderData.id || !createdOrderData.status) {
            throw new Error('สร้างคำสั่งซื้อแล้ว แต่ข้อมูลที่ได้รับกลับมาจากเซิร์ฟเวอร์ไม่สมบูรณ์หรือไม่ถูกต้อง');

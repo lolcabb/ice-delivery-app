@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "JWT_SECRET=test-secret GCS_BUCKET_NAME=test-bucket jest"
+    "test": "JWT_SECRET=test-secret GCS_BUCKET_NAME=test-bucket DB_USER=test DB_PASSWORD=test DB_NAME=testdb INSTANCE_CONNECTION_NAME=test-instance jest"
   },
   "keywords": [],
   "author": "",

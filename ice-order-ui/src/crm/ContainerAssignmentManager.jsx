@@ -8,7 +8,7 @@ import {
     assignIceContainer,
     updateAssignmentDetails,
 } from '../api/containers.js';
-import { apiService } from '../apiService';
+import { handleComponentAuthError } from '../api/helpers.js';
 import ContainerAssignmentList from './ContainerAssignmentList';
 import ReturnContainerForm from './ReturnContainerForm';
 import CreateAssignmentModal from './CreateAssignmentModal';
@@ -138,7 +138,7 @@ export default function ContainerAssignmentManager() {
         } catch (err) {
             console.error("Failed to fetch assignments:", err);
             setError(err.data?.error || err.message || 'ไม่สามารถโหลดการมอบหมายได้');
-            if (err.status === 401) apiService.handleComponentAuthError(err, () => window.location.replace('/login'));
+            if (err.status === 401) handleComponentAuthError(err, () => window.location.replace('/login'));
         } finally {
             setIsLoading(false);
         }

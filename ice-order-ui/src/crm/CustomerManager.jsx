@@ -1,6 +1,5 @@
 // src/crm/CustomerManager.jsx
 import React, { useState, useCallback } from 'react';
-import { apiService } from '../apiService';
 import CustomerList from './CustomerList';
 import CustomerForm from './CustomerForm';
 import useCustomerFilters from './hooks/useCustomerFilters';

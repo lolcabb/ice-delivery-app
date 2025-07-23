@@ -1,4 +1,4 @@
-// 📁 File: MainLayout.jsx (Refactored to use apiService and corrected dependencies)
+// 📁 File: MainLayout.jsx (using modular API and corrected dependencies)
 import React, { useState, useEffect, useCallback, memo, useRef, useMemo, use } from 'react';
 import NewOrder from './NewOrder';
 import BillsList from './BillsList';
@@ -10,10 +10,10 @@ import {
     SortableContext, verticalListSortingStrategy, useSortable, arrayMove
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { apiService } from './apiService'; // Import apiService
+import { request } from './api/base.js';
 
 // --- Constants ---
-// API_BASE_URL is now primarily managed by apiService.jsx, but can be kept for reference or direct link construction if needed.
+// API_BASE_URL is primarily managed by the API helpers, but kept for reference.
 // const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 const VALID_TARGET_COLUMNS = ['created', 'delivering', 'completed'];
 const STATUS_MAP = { created: 'Created', delivering: 'Out for Delivery', completed: 'Completed' };
@@ -160,7 +160,7 @@ export default function MainLayout() {
         setIsFetching(true);
 
         try {
-            const response = await apiService.getWithMetadata('/orders/today', { etag: lastEtag });
+            const response = await request('/orders/today', 'GET', null, lastEtag ? { headers: { 'If-None-Match': lastEtag } } : {});
             console.log('[fetchOrderMonitor] API response received:', JSON.stringify(response, null, 2));
 
             if (response.notModified) {
@@ -241,7 +241,7 @@ export default function MainLayout() {
         const { id, status } = updateToSync;
         const timer = setTimeout(async () => {
             try {
-                await apiService.put(`/orders/${id}`, { status });
+                await request(`/orders/${id}`, 'PUT', { status });
                 console.log(`Synced status successfully: Order ${id} -> ${status}`);
             } catch (err) {
                 console.error(`Failed to sync order ${id} to ${status}. Status: ${err.status}, Message: ${err.message || err}`);
@@ -257,14 +257,14 @@ export default function MainLayout() {
     // --- DND Sensors ---
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: DRAG_ACTIVATION_DISTANCE } }));
 
-    // --- Callback Handlers (Refactored to use apiService) ---
+    // --- Callback Handlers ---
     const handleDriverChange = useCallback(async (orderId, driverName) => {
         console.log(`Attempting to update driver for order ${orderId} to "${driverName}"`);
         const updateFunc = (o) => String(o.id) === String(orderId) ? { ...o, driverName } : o;
         setOrdersByStatus(prev => ({ created: (prev.created || []).map(updateFunc), delivering: (prev.delivering || []).map(updateFunc), completed: (prev.completed || []).map(updateFunc) }));
         setRawBills(prev => prev.map(updateFunc));
         try {
-            await apiService.put(`/orders/${orderId}`, { driverName });
+            await request(`/orders/${orderId}`, 'PUT', { driverName });
             console.log(`Successfully updated driver for order ${orderId}`);
             setLastEtag(null); // Invalidate ETag
         } catch (e) {
@@ -305,7 +305,7 @@ export default function MainLayout() {
         setOrdersByStatus(prev => ({ created: (prev.created || []).map(updateFunc), delivering: (prev.delivering || []).map(updateFunc), completed: (prev.completed || []).map(updateFunc) }));
         setRawBills(prev => prev.map(updateFunc));
         try {
-            await apiService.put(`/orders/${orderId}`, { paymentType: newPaymentType });
+            await request(`/orders/${orderId}`, 'PUT', { paymentType: newPaymentType });
             console.log(`Successfully updated payment type for order ${orderId}`);
             setLastEtag(null); // Invalidate ETag
         } catch (e) {
