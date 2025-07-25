@@ -60,9 +60,9 @@ const authMiddleware = async (req, res, next) => {
     logger.info(`Querying database for user ID: ${userId}`);
     const result = await db.query('SELECT id, username, role FROM users WHERE id = $1', [userId]);
     const user = result.rows[0];
-    
+
     if (!user) {
-      logger.warn('User not found in database');
+      logger.warn(`User ID ${userId} from token not found in database`);
       return res.status(401).json({ message: 'Authentication failed: User not found' });
     }
     
@@ -78,11 +78,20 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ message: 'Token expired. Please log in again.' });
     }
     if (err.name === 'JsonWebTokenError') {
-      logger.warn(`JWT error: ${err.message}`);
+      switch (err.message) {
+        case 'invalid signature':
+          logger.warn('JWT verification failed: invalid signature');
+          break;
+        case 'jwt malformed':
+          logger.warn('JWT verification failed: malformed token');
+          break;
+        default:
+          logger.warn(`JWT error: ${err.message}`);
+      }
       return res.status(401).json({ message: 'Invalid token. Please log in again.' });
     }
-    
-    logger.error('Auth middleware error', { error: err });
+
+    logger.error('Auth middleware error during verification', { error: err });
     return res.status(401).json({ message: 'Authentication failed: ' + err.message });
   }
 };

@@ -13,6 +13,10 @@ export const debugToken = () => {
 export const handleGlobalAuthError = (status, endpoint) => {
     if (status === 401) {
         console.warn(`Unauthorized (401) response from ${endpoint}. Token may be invalid or expired. Redirecting to login.`);
+        localStorage.setItem(
+            'authErrorMessage',
+            'Could not verify your login token. Please log in again and check server logs or configuration if this continues.'
+        );
         const lastAuthErrorTime = parseInt(sessionStorage.getItem('lastAuthErrorTime') || '0');
         const now = Date.now();
         if (now - lastAuthErrorTime > 2000) {
