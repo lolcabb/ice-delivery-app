@@ -2,13 +2,14 @@
 // PostgreSQL connection module using pg Pool
 
 const { Pool } = require('pg');
+const { getConfig } = require('../config');
 const {
   DB_USER,
   DB_PASSWORD,
   DB_NAME,
   INSTANCE_CONNECTION_NAME,
   DB_SOCKET_PATH
-} = require('../config');
+} = getConfig();
 
 // Connection pool configuration - reads from config values
 // These variables should be set in your Cloud Run service configuration

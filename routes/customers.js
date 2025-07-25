@@ -4,7 +4,8 @@ const { authMiddleware, requireRole } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { body } = require('express-validator');
 const customerController = require('../controllers/customerController');
-const { GCS_BUCKET_NAME } = require('../config/index.js');
+const { getConfig } = require('../config/index.js');
+const { GCS_BUCKET_NAME } = getConfig();
 
 router.get('/customers/search', authMiddleware, customerController.searchCustomers);
 router.get('/routes/:route_id/analytics', authMiddleware, customerController.getRouteAnalytics);

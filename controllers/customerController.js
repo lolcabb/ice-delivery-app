@@ -2,7 +2,8 @@ const { query, getClient } = require('../db/postgres');
 const { Storage } = require('@google-cloud/storage');
 const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
-const { GCS_BUCKET_NAME } = require('../config/index.js');
+const { getConfig } = require('../config/index.js');
+const { GCS_BUCKET_NAME } = getConfig();
 
 const gcs = new Storage();
 const bucket = gcs.bucket(GCS_BUCKET_NAME);
