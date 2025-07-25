@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "JWT_SECRET=test-secret GCS_BUCKET_NAME=test-bucket DB_USER=test DB_PASSWORD=test DB_NAME=testdb INSTANCE_CONNECTION_NAME=test-instance jest"
+    "test": "cross-env JWT_SECRET=test-secret GCS_BUCKET_NAME=test-bucket DB_USER=test DB_PASSWORD=test DB_NAME=testdb INSTANCE_CONNECTION_NAME=test-instance jest"
   },
   "keywords": [],
   "author": "",
@@ -19,15 +19,16 @@
     "ejs": "^3.1.10",
     "exceljs": "^4.4.0",
     "express": "^5.1.0",
+    "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "pg": "^8.14.1",
     "sharp": "^0.34.2",
     "uuid": "^11.1.0",
-    "winston": "^3.17.0",
-    "express-validator": "^7.0.1"
+    "winston": "^3.17.0"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "jest": "^29.7.0",
     "supertest": "^6.3.3"
   }
