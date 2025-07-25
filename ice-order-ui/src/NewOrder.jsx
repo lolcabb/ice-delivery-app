@@ -12,7 +12,7 @@ const productNames = {
 };
 const productKeys = Object.keys(productNames); // ['A', 'B', 'C', 'D', 'E']
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'; //var env
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 // Default initial state for the form
 const initialFormState = {

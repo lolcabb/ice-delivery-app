@@ -13,8 +13,6 @@ import { CSS } from '@dnd-kit/utilities';
 import { request } from './api/base.js';
 
 // --- Constants ---
-// API_BASE_URL is primarily managed by the API helpers, but kept for reference.
-// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 const VALID_TARGET_COLUMNS = ['created', 'delivering', 'completed'];
 const STATUS_MAP = { created: 'Created', delivering: 'Out for Delivery', completed: 'Completed' };
 const POLLING_INTERVALS = { monitor: 60000 };
