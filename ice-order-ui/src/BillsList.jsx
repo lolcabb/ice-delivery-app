@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { request } from './api/base.js';
 
 // Constants
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'; // Use env var
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 const PAYMENT_TYPES = ['Cash', 'Debit', 'Credit'];
 
 // Mapping for display names
