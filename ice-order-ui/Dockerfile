@@ -8,7 +8,7 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN echo "Build-time Check API URL: $VITE_API_URL"
+RUN echo "Build-time Check API URL: $VITE_API_BASE_URL"
 RUN npm run build
 
 # Serve with nginx
