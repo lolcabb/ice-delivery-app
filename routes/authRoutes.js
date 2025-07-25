@@ -5,8 +5,9 @@ const jwt = require('jsonwebtoken');
 const db = require('../db/postgres');
 const router = express.Router();
 
-// Import JWT_SECRET from config
-const { JWT_SECRET } = require('../config/index.js');
+// Import getConfig to access JWT_SECRET
+const { getConfig } = require('../config/index.js');
+const { JWT_SECRET } = getConfig();
 
 /**
  * @route   POST /api/auth/login

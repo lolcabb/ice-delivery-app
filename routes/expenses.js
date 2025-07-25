@@ -10,7 +10,8 @@ const sharp = require('sharp');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 
-const { GCS_BUCKET_NAME } = require('../config/index.js');
+const { getConfig } = require('../config/index.js');
+const { GCS_BUCKET_NAME } = getConfig();
 
 const storage = multer.memoryStorage();
 const upload = multer({ 
