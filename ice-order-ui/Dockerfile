@@ -4,6 +4,10 @@ WORKDIR /app
 
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+RUN if [ -z "$VITE_API_BASE_URL" ]; then \
+      echo "Error: VITE_API_BASE_URL build arg not set" >&2; \
+      exit 1; \
+    fi
 
 COPY package*.json ./
 RUN npm ci
