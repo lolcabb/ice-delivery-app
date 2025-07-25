@@ -1,5 +1,5 @@
 // 📁 src/LoginPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from './api/index.js';
 
@@ -9,6 +9,14 @@ function LoginPage({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const msg = localStorage.getItem('authErrorMessage');
+    if (msg) {
+      setError(msg);
+      localStorage.removeItem('authErrorMessage');
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,17 +39,22 @@ function LoginPage({ onLoginSuccess }) {
       
       // Make sure we got a proper response with token
       if (!response || !response.token) {
-        throw new Error('Invalid response from server: missing token');
+        throw new Error(
+          'Invalid response from server: missing token. Check server logs or configuration.'
+        );
       }
       
       // Store token and call success handler
       localStorage.setItem('authToken', response.token);
       localStorage.setItem('authUser', JSON.stringify(response.user));
+      localStorage.removeItem('authErrorMessage');
       
       // Verify token was stored
       const storedToken = localStorage.getItem('authToken');
       if (!storedToken) {
-          throw new Error('Failed to store authentication token');
+          throw new Error(
+            'Failed to store authentication token. Check browser settings or server configuration.'
+          );
       }
       
       // Pass both user and token to the success handler
