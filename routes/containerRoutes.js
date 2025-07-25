@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware, requireRole } = require('../middleware/auth');
 const containerController = require('../controllers/containerController');
-const { SOME_CONFIG } = require('../config/index.js');
 const validate = require('../middleware/validate');
 const { body, param } = require('express-validator');
 
