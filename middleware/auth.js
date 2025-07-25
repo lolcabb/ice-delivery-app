@@ -2,8 +2,11 @@
 const jwt = require('jsonwebtoken');
 const db = require('../db/postgres');
 const { getConfig } = require('../config/index.js');
-const { JWT_SECRET } = getConfig();
 const { logger } = require('./errorHandler');
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+console.log('Auth middleware JWT_SECRET:', JWT_SECRET ? 'SET' : 'UNDEFINED');
 
 /**
  * Authentication middleware to verify the JWT token

@@ -7,7 +7,10 @@ const router = express.Router();
 
 // Import getConfig to access JWT_SECRET
 const { getConfig } = require('../config/index.js');
-const { JWT_SECRET } = getConfig();
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+console.log('Auth route JWT_SECRET:', JWT_SECRET ? 'SET' : 'UNDEFINED');
 
 /**
  * @route   POST /api/auth/login
@@ -56,6 +59,16 @@ router.post('/login', async (req, res) => {
       JWT_SECRET, 
       { expiresIn: '24h' }
     );
+
+    console.log('Token created with JWT_SECRET:', JWT_SECRET ? 'PRESENT' : 'MISSING');
+    console.log('Token length:', token ? token.length : 'NO TOKEN');
+
+    try {
+    const testDecode = jwt.verify(token, JWT_SECRET);
+    console.log('Immediate token verification successful:', testDecode);
+    } catch (testErr) {
+    console.error('Immediate token verification failed:', testErr.message);
+    }
     
     console.log('Login successful for user:', username);
     
