@@ -4,3 +4,4 @@ ice-order-ui/node_modules/
 ice-order-ui/build/
 .env
 gcloud-credentials.json
+.env.yaml
