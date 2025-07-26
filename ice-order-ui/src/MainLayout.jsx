@@ -139,30 +139,38 @@ function MonitorColumn({ title, orders = [], columnId, searchTerm, onSearchChang
 export default function MainLayout() {
     const [ordersByStatus, setOrdersByStatus] = useState({ created: [], delivering: [], completed: [] });
     const [rawBills, setRawBills] = useState([]);
-    const [lastEtag, setLastEtag] = useState(null);
+    // Store the last seen ETag in a ref so updates don't retrigger effects
+    const lastEtagRef = useRef(null);
     const [pendingUpdates, setPendingUpdates] = useState([]);
+    const pendingUpdatesRef = useRef(pendingUpdates);
     const [searchTerms, setSearchTerms] = useState({ created: '', delivering: '', completed: '' });
     const [activeId, setActiveId] = useState(null);
+    const activeIdRef = useRef(activeId);
     const [activeOrderData, setActiveOrderData] = useState(null);
     const [isNewOrderVisible, setIsNewOrderVisible] = useState(true);
     const [isFetching, setIsFetching] = useState(false);
     // const fetchTimerRef = useRef(null); // From original user upload, seems unused, can be removed if so.
 
+    // Keep refs in sync with state so stable callbacks can access latest values
+    useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+    useEffect(() => { pendingUpdatesRef.current = pendingUpdates; }, [pendingUpdates]);
+
+    // Stable polling function accessing state via refs to avoid effect re-runs
     const fetchOrderMonitor = useCallback(async () => {
-        console.log(`[fetchOrderMonitor] Check conditions: activeId=${activeId}, pendingUpdates.length=${pendingUpdates.length}`);
-        if (activeId || pendingUpdates.length > 0) {
+        console.log(`[fetchOrderMonitor] Check conditions: activeId=${activeIdRef.current}, pendingUpdates.length=${pendingUpdatesRef.current.length}`);
+        if (activeIdRef.current || pendingUpdatesRef.current.length > 0) {
             console.log("[fetchOrderMonitor] Skipping fetch: Active drag or pending updates.");
             return;
         }
-        console.log("[fetchOrderMonitor] Fetching data. Current ETag:", lastEtag);
+        console.log("[fetchOrderMonitor] Fetching data. Current ETag:", lastEtagRef.current);
         setIsFetching(true);
 
         try {
-            const response = await request('/orders/today', 'GET', null, lastEtag ? { headers: { 'If-None-Match': lastEtag } } : {});
+            const response = await request('/orders/today', 'GET', null, lastEtagRef.current ? { headers: { 'If-None-Match': lastEtagRef.current } } : {});
             console.log('[fetchOrderMonitor] API response received:', JSON.stringify(response, null, 2));
 
             if (response.notModified) {
-                console.log("[fetchOrderMonitor] Data not modified (304). ETag:", lastEtag);
+                console.log("[fetchOrderMonitor] Data not modified (304). ETag:", lastEtagRef.current);
             } else if (response.data && Array.isArray(response.data)) {
                 console.log(`[fetchOrderMonitor] Data received (${response.data.length} items). New ETag from metadata:`, response.metadata?.headers?.etag);
                 const allOrders = response.data;
@@ -179,7 +187,7 @@ export default function MainLayout() {
                 });
                 console.log('[fetchOrderMonitor] Categorized orders:', JSON.stringify(newOrdersByStatus, null, 2));
 
-                if (!activeId && pendingUpdates.length === 0) { // Re-check condition before setting state
+                if (!activeIdRef.current && pendingUpdatesRef.current.length === 0) { // Re-check condition before setting state
                     setOrdersByStatus(newOrdersByStatus);
                     setRawBills(allOrders);
                     console.log('[fetchOrderMonitor] State for ordersByStatus and rawBills updated.');
@@ -187,7 +195,7 @@ export default function MainLayout() {
                     const newEtag = response.metadata?.headers?.etag;
                     if (newEtag) {
                         console.log('[fetchOrderMonitor] Updating ETag to:', newEtag);
-                        setLastEtag(newEtag);
+                        lastEtagRef.current = newEtag;
                     }
                 } else {
                      console.log('[fetchOrderMonitor] State update skipped due to activeId or pendingUpdates after data fetch.');
@@ -197,30 +205,21 @@ export default function MainLayout() {
                 setRawBills([]);
                 setOrdersByStatus({ created: [], delivering: [], completed: [] });
                 const newEtag = response.metadata?.headers?.etag;
-                if (newEtag) setLastEtag(newEtag);
-                else if (lastEtag !== null) setLastEtag(null); // Clear etag if server stops sending one for empty
+                if (newEtag) lastEtagRef.current = newEtag;
+                else if (lastEtagRef.current !== null) lastEtagRef.current = null; // Clear etag if server stops sending one for empty
             }
         } catch (err) {
             console.error('[fetchOrderMonitor] Failed to fetch or process orders:', err);
             if (err.status === 401 || err.status === 403) {
-                setLastEtag(null); // Clear ETag on auth errors to force full fetch next time.
+                lastEtagRef.current = null; // Clear ETag on auth errors to force full fetch next time.
             }
             // Optionally, set an error state to display to the user
             // setErrorState(err.message || 'Failed to load orders');
         } finally {
             setIsFetching(false);
         }
-    }, [
-        activeId,
-        pendingUpdates.length, // Note: .length makes it a primitive, if pendingUpdates itself is needed, use that.
-        lastEtag,
-        // React guarantees state setters are stable, including them is for ESLint/explicitness
-        setOrdersByStatus,
-        setRawBills,
-        setLastEtag,
-        setIsFetching
-        // STATUS_MAP is a module constant, not needed in deps.
-    ]);
+    // Empty dependency array because we rely on refs for mutable values
+    }, []);
 
     useEffect(() => {
         console.log('[MainLayout] Component mounted/fetchOrderMonitor changed. Initial fetch and setting up interval.');
@@ -230,7 +229,7 @@ export default function MainLayout() {
             console.log('[MainLayout] Component unmounting. Clearing interval.');
             clearInterval(interval);
         };
-    }, [fetchOrderMonitor]);
+    }, []);
 
     // --- Pending Updates Sync Effect ---
     useEffect(() => {
@@ -264,12 +263,12 @@ export default function MainLayout() {
         try {
             await request(`/orders/${orderId}`, 'PUT', { driverName });
             console.log(`Successfully updated driver for order ${orderId}`);
-            setLastEtag(null); // Invalidate ETag
+            lastEtagRef.current = null; // Invalidate ETag
         } catch (e) {
             console.error(`Failed to update driver for order ${orderId}:`, e.message || e);
             // Consider reverting optimistic update or showing an error message
         }
-    }, [/* setOrdersByStatus, setRawBills, setLastEtag are stable */]);
+    }, [/* setOrdersByStatus and setRawBills are stable */]);
 
     const handleMonitorSearchChange = useCallback((columnId, value) => {
         setSearchTerms(prev => ({ ...prev, [columnId]: value }));
@@ -294,8 +293,8 @@ export default function MainLayout() {
             return [newlyCreatedOrder, ...prev];
         });
         console.log(`Optimistically updated monitor/bills for order ${newlyCreatedOrder.id}.`);
-        setLastEtag(null); // Invalidate ETag
-    }, [/* setOrdersByStatus, setRawBills, setLastEtag, STATUS_MAP is stable */]);
+        lastEtagRef.current = null; // Invalidate ETag
+    }, [/* setOrdersByStatus, setRawBills and STATUS_MAP are stable */]);
 
     const handlePaymentTypeChange = useCallback(async (orderId, newPaymentType) => {
         console.log(`Attempting to update payment type for order ${orderId} to "${newPaymentType}"`);
@@ -305,11 +304,11 @@ export default function MainLayout() {
         try {
             await request(`/orders/${orderId}`, 'PUT', { paymentType: newPaymentType });
             console.log(`Successfully updated payment type for order ${orderId}`);
-            setLastEtag(null); // Invalidate ETag
+            lastEtagRef.current = null; // Invalidate ETag
         } catch (e) {
             console.error(`Failed to update payment type for order ${orderId}:`, e.message || e);
         }
-    }, [/* setOrdersByStatus, setRawBills, setLastEtag are stable */]);
+    }, [/* setOrdersByStatus and setRawBills are stable */]);
 
     // --- Drag and Drop Handlers ---
     const handleDragStart = useCallback((event) => {
@@ -447,9 +446,9 @@ export default function MainLayout() {
             }
             return [...queue, { id: orderId, status: finalStatus }];
         });
-        setLastEtag(null); // Invalidate ETag
+        lastEtagRef.current = null; // Invalidate ETag
 
-    }, [/* Dependencies: setOrdersByStatus, setRawBills, setPendingUpdates, setLastEtag, STATUS_MAP, VALID_TARGET_COLUMNS. Many are stable. */]);
+    }, [/* Dependencies: setOrdersByStatus, setRawBills, setPendingUpdates, STATUS_MAP, VALID_TARGET_COLUMNS. */]);
 
 
     const handleDragCancel = useCallback(() => {

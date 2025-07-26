@@ -59,7 +59,7 @@ export default function BillsList({ billsData = [] }) { // Default to empty arra
         } else {
             console.log(`Fetching details for bill #${bill.id}`);
             try {
-                // These direct fetch calls don't include Authorization headers
+                // Request automatically includes Authorization header
                 const { data: fullOrder } = await request(`/orders/${bill.id}`);
                 setSelectedOrder(fullOrder); // Update selectedOrder with full details
             } catch (err) {
