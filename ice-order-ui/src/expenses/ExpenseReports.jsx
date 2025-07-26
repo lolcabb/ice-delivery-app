@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiService } from '../apiService';
 import { DownloadIcon } from '../components/Icons';
+import { getISODate } from '../utils/dateUtils';
 
 // Helper functions
 const formatDate = (dateString) => {
@@ -166,7 +167,7 @@ const ReportSummarySection = ({ summary, insights }) => {
 // Quick Filter Badges
 const QuickFilterBadges = ({ onApplyQuickFilter, currentFilters }) => {
     const today = new Date();
-    const formatDateForFilter = (date) => date.toISOString().split('T')[0];
+    const formatDateForFilter = (date) => getISODate(date);
 
     const quickFilters = [
         {
@@ -306,7 +307,7 @@ const enhancedExportToCSV = (reportData, summary, insights) => {
     if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `expense_report_enhanced_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `expense_report_enhanced_${getISODate(new Date())}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
