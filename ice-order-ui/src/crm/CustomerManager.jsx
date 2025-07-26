@@ -74,11 +74,11 @@ export default function CustomerManager() {
     } = useCustomerFilters();
 
     const { data, isLoading, error, refetch } = useCustomers({ page: pagination.page, limit: pagination.limit, filters });
-    const customers = data?.data || [];
+    const customers = Array.isArray(data?.data?.data) ? data.data.data : [];
 
     React.useEffect(() => {
-        if (data?.pagination) {
-            setPagination(prev => ({ ...prev, ...data.pagination }));
+        if (data?.data?.pagination) {
+            setPagination(prev => ({ ...prev, ...data.data.pagination }));
         }
     }, [data, setPagination]);
 
