@@ -212,8 +212,14 @@ export default function DailyOperationsManager() {
                 const loadAgg = loadAggregates.get(driverId);
                 try {
                     const [reconciliationData, productReturns] = await Promise.all([
-                        apiService.getReconciliationSummary(driverId, selectedDate).catch(() => null),
-                        apiService.getProductReturns({ driver_id: driverId, date: selectedDate }).catch(() => [])
+                        apiService.getReconciliationSummary(driverId, selectedDate).catch(err => {
+                            console.error(`Failed to fetch reconciliation for driver ${driverId}:`, err);
+                            return null;
+                        }),
+                        apiService.getProductReturns({ driver_id: driverId, date: selectedDate }).catch(err => {
+                            console.error(`Failed to fetch returns for driver ${driverId}:`, err);
+                            return [];
+                        })
                     ]);
 
                     driverLog.summary = reconciliationData?.summary || null;
