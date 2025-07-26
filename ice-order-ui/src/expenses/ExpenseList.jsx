@@ -181,7 +181,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
 
                     {/* Image Content */}
                     <div className="px-4 pb-4 sm:px-6 sm:pb-6">
-                        <div className="bg-gray-50 rounded-lg p-4 min-h-[200px] flex items-center justify-center zoom-container">
+                        <div className="relative bg-gray-50 rounded-lg p-4 min-h-[200px] flex items-center justify-center zoom-container">
                             {imageLoading && !imageError && (
                                 <div className="text-gray-500">กำลังโหลดรูปภาพ...</div>
                             )}
@@ -209,6 +209,24 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                                     }}
                                 />
                             )}
+
+                            {/* Zoom Controls */}
+                            <div className="absolute top-2 right-2 flex flex-col space-y-1">
+                                <button
+                                    type="button"
+                                    onClick={handleZoomIn}
+                                    className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"
+                                >
+                                    +
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleZoomOut}
+                                    className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"
+                                >
+                                    −
+                                </button>
+                            </div>
                         </div>
                     </div>
 
