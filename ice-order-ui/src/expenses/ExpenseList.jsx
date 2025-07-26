@@ -54,7 +54,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
         // Reset zoom and position when new image loads
         setZoomLevel(1);
         setImagePosition({ x: 0, y: 0 });
-    }, [imageUrl]);
+    }, [imageUrl, isOpen]);
 
     // Keyboard shortcuts and mouse events - MUST be called before any early returns
     useEffect(() => {
