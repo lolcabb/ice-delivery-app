@@ -39,7 +39,7 @@ module.exports = {
         LEFT JOIN ice_container_sizes cs ON c.size_id = cs.size_id
         LEFT JOIN customers cust ON c.current_customer_id = cust.customer_id`;
     let countQuery = `
-        SELECT COUNT(c.*)
+        SELECT COUNT(*)
         FROM ice_containers c
         LEFT JOIN ice_container_sizes cs ON c.size_id = cs.size_id
         LEFT JOIN customers cust ON c.current_customer_id = cust.customer_id`;

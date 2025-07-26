@@ -322,7 +322,7 @@ router.get('/consumables', authMiddleware, requireRole(['admin', 'accountant', '
     const { page = 1, limit = 20, item_type_id, search } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let mainQuery = `SELECT ic.*, it.type_name FROM inventory_consumables ic JOIN inventory_item_types it ON ic.item_type_id = it.item_type_id`;
-    let countQuery = `SELECT COUNT(ic.*) FROM inventory_consumables ic JOIN inventory_item_types it ON ic.item_type_id = it.item_type_id`;
+    let countQuery = `SELECT COUNT(*) FROM inventory_consumables ic JOIN inventory_item_types it ON ic.item_type_id = it.item_type_id`;
     const conditions = []; const values = []; let paramIndex = 1;
     if (item_type_id) {
         const parsedTypeId = parseInt(item_type_id);
