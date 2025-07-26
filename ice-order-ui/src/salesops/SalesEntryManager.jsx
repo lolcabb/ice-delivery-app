@@ -66,8 +66,8 @@ export default function SalesEntryManager() {
         setEditingSale(null); // Reset editing state when loading a new day
 
         try {
-            const fetchedSummaries = await apiService.getDriverDailySummaries({ driver_id: selectedDriverId, sale_date: selectedDate });
-            let summaryToUse = fetchedSummaries[0] || null;
+            const { data: fetchedSummaries } = await apiService.getDriverDailySummaries({ driver_id: selectedDriverId, sale_date: selectedDate });
+            let summaryToUse = Array.isArray(fetchedSummaries) ? fetchedSummaries[0] : null;
 
             if (!summaryToUse) {
                 summaryToUse = await apiService.addDriverDailySummary({ driver_id: selectedDriverId, sale_date: selectedDate, route_id: selectedRouteId || null });
