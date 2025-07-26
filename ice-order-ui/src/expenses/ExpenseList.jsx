@@ -1,5 +1,5 @@
 // Enhanced ExpenseList.jsx - Building on your existing structure
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '../utils/currency';
 import PaymentMethodBadge from '../components/PaymentMethodBadge';
 
@@ -14,19 +14,59 @@ const formatDate = (dateString) => {
 
 // === NEW RECEIPT MODAL COMPONENT ===
 const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
+    // Add error state for image loading - MUST be called before any early returns
+    const [imageError, setImageError] = useState(false);
+    const [imageLoading, setImageLoading] = useState(true);
+    
+    // Reset error state when imageUrl changes - MUST be called before any early returns
+    useEffect(() => {
+        setImageError(false);
+        setImageLoading(true);
+    }, [imageUrl]);
+    
+    // Add error boundary and debugging
+    console.log('ReceiptModal render:', { isOpen, imageUrl, expenseDescription });
+    
+    // Early return AFTER all hooks are called
     if (!isOpen) return null;
 
+    const handleImageLoad = () => {
+        console.log('Image loaded successfully');
+        setImageLoading(false);
+    };
+
+    const handleImageError = (e) => {
+        console.error('Image failed to load:', {
+            src: e.target.src,
+            error: e,
+            naturalWidth: e.target.naturalWidth,
+            naturalHeight: e.target.naturalHeight
+        });
+        setImageError(true);
+        setImageLoading(false);
+    };
+
+    const handleOverlayClick = (e) => {
+        // Only close if clicking the overlay itself, not the modal content
+        if (e.target === e.currentTarget) {
+            onClose();
+        }
+    };
+
     return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div 
+            className="fixed inset-0 z-50 overflow-y-auto"
+            onClick={handleOverlayClick}
+        >
             <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 {/* Backdrop */}
                 <div 
                     className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-                    onClick={onClose}
+                    aria-hidden="true"
                 ></div>
 
                 {/* Modal */}
-                <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
                     {/* Header */}
                     <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div className="flex items-center justify-between">
@@ -36,6 +76,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                             <button
                                 onClick={onClose}
                                 className="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
+                                type="button"
                             >
                                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -47,17 +88,30 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                         )}
                     </div>
 
-                    {/* Image */}
+                    {/* Image Content */}
                     <div className="px-4 pb-4 sm:px-6 sm:pb-6">
-                        <div className="bg-gray-50 rounded-lg p-4">
-                            <img
-                                src={imageUrl}
-                                alt="ใบเสร็จ"
-                                className="w-full h-auto max-h-96 object-contain rounded"
-                                onError={(e) => {
-                                    e.target.src = '/placeholder-receipt.jpg'; // Fallback image
-                                }}
-                            />
+                        <div className="bg-gray-50 rounded-lg p-4 min-h-[200px] flex items-center justify-center">
+                            {imageLoading && !imageError && (
+                                <div className="text-gray-500">กำลังโหลดรูปภาพ...</div>
+                            )}
+                            
+                            {imageError ? (
+                                <div className="text-center text-gray-500">
+                                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <p className="mt-2">ไม่สามารถโหลดรูปภาพได้</p>
+                                    <p className="text-xs text-gray-400 mt-1">URL: {imageUrl}</p>
+                                </div>
+                            ) : (
+                                <img
+                                    src={imageUrl}
+                                    alt="ใบเสร็จ"
+                                    className={`max-w-full h-auto max-h-96 object-contain rounded ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                                    onLoad={handleImageLoad}
+                                    onError={handleImageError}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -70,14 +124,16 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                         >
                             ปิด
                         </button>
-                        <a
-                            href={imageUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                        >
-                            เปิดในแท็บใหม่
-                        </a>
+                        {imageUrl && !imageError && (
+                            <a
+                                href={imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                                เปิดในแท็บใหม่
+                            </a>
+                        )}
                     </div>
                 </div>
             </div>
