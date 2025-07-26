@@ -398,8 +398,8 @@ export default function DailyOperationsManager() {
                 ) : (
                     <div className="space-y-4">
                         {filteredDriverLogs.length > 0 ? filteredDriverLogs.map(log => (
-                            <DriverDayCard 
-                                key={log.driver.driver_id} driverLog={log}
+                            <DriverDayCard
+                                key={log.driver.driver_id} driverLog={log} selectedDate={selectedDate}
                                 onOpenLoadingLog={handleOpenLoadingLogModal} onOpenReturnLog={handleOpenReturnModal}
                                 onNavigateToSales={handleNavigateToSalesEntry} onStartDay={handleStartDay}
                                 isProcessing={isProcessing}
