@@ -10,6 +10,7 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:3000',
     'https://phayayenice.com',
+    'https://storage.googleapis.com',
   ],
   credentials: true,
   allowedHeaders: [
