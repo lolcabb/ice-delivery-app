@@ -137,4 +137,25 @@ describe('sales operations routes', () => {
     expect(res.statusCode).toBe(403);
     expect(salesOpsController.createProductReturns).not.toHaveBeenCalled();
   });
+
+  test('GET /loading-logs with date query hits controller', async () => {
+    __setRole('admin');
+    const date = '2024-01-01';
+
+    const res = await request(app).get(`/api/sales-ops/loading-logs?date=${date}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(salesOpsController.getLoadingLogs).toHaveBeenCalled();
+    const reqPassed = salesOpsController.getLoadingLogs.mock.calls[0][0];
+    expect(reqPassed.query.date).toBe(date);
+  });
+
+  test('GET /loading-logs unauthorized role', async () => {
+    __setRole('guest');
+
+    const res = await request(app).get('/api/sales-ops/loading-logs?date=2024-01-01');
+
+    expect(res.statusCode).toBe(403);
+    expect(salesOpsController.getLoadingLogs).not.toHaveBeenCalled();
+  });
 });

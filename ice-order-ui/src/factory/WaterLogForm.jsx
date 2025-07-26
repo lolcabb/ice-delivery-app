@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Droplets, AlertTriangle, Sun, Moon, Calendar, Save } from 'lucide-react';
+import { getISODate } from '../utils/dateUtils';
 
 const WaterLogForm = ({ 
     isOpen, 
@@ -112,7 +113,7 @@ const WaterLogForm = ({
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
                                 className="px-3 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                max={new Date().toISOString().split('T')[0]}
+                                max={getISODate(new Date())}
                             />
                             <div className="ml-auto text-xs text-blue-700">
                                 <strong>Note:</strong> Empty fields will be skipped during submission

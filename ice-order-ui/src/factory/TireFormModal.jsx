@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Package } from 'lucide-react';
+import { getISODate } from '../utils/dateUtils';
 
 const TireFormModal = ({ 
     isOpen, 
@@ -30,7 +31,7 @@ const TireFormModal = ({
 
     // Helper to get today's date in YYYY-MM-DD format
     const getTodayDate = () => {
-        return new Date().toISOString().split('T')[0];
+        return getISODate(new Date());
     };
 
     // Common tire brands for quick selection

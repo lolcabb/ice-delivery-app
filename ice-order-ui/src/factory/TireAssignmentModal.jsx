@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, MapPin, Truck, Package } from 'lucide-react';
+import { getISODate } from '../utils/dateUtils';
 
 const TireAssignmentModal = ({ 
     isOpen, 
@@ -31,7 +32,7 @@ const TireAssignmentModal = ({
 
     // Helper to get today's date in YYYY-MM-DD format
     const getTodayDate = () => {
-        return new Date().toISOString().split('T')[0];
+        return getISODate(new Date());
     };
 
     // Standard vehicle tire positions
