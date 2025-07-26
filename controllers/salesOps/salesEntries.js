@@ -25,6 +25,14 @@ exports.getRouteCustomers = async (req, res, next) => {
     }
 };
 
+// Add date validation
+const isValidDate = (dateString) => {
+    const regex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!regex.test(dateString)) return false;
+    const date = new Date(dateString);
+    return date instanceof Date && !isNaN(date);
+};
+
 // POST /api/sales-ops/routes/:routeId/customers
 // Adds a single customer to a route, placing them at the end of the sequence.
 exports.addRouteCustomer = async (req, res, next) => {
@@ -560,6 +568,10 @@ exports.getReconciliationSummary = async (req, res, next) => {
         return res.status(400).json({ error: 'Driver ID and Date are required.' });
     }
 
+    if (!isValidDate(date)) {
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+
     try {
         const reconciliationQuery = `
             WITH loaded_quantities AS (
@@ -599,7 +611,7 @@ exports.getReconciliationSummary = async (req, res, next) => {
 
         const summaryQuery = `
             SELECT
-                dds.,
+                dds.*,
                 r.route_name,
                 (SELECT SUM(quantity_loaded)
                  FROM loading_logs ll
@@ -618,7 +630,10 @@ exports.getReconciliationSummary = async (req, res, next) => {
         ]);
 
         if (summaryResult.rows.length === 0) {
-             return res.status(404).json({ error: 'No sales summary found for this driver on this date. Please complete sales or returns entry first.' });
+            return res.json({
+                summary: null,
+                product_reconciliation: []
+    });
         }
 
         res.json({
