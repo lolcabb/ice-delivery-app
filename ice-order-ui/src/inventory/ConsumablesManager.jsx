@@ -1,6 +1,7 @@
 // Suggested path: src/inventory/ConsumablesManager.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { request } from '../api/base.js';
+import { apiService } from '../apiService';
 import { handleComponentAuthError } from '../api/helpers.js';
 
 // Import the actual components
@@ -87,11 +88,16 @@ export default function ConsumablesManager() {
                     delete params[key];
                 }
             });
-            const response = await request(`/inventory/consumables?${new URLSearchParams(params).toString()}`);
-            setConsumables(Array.isArray(response.data) ? response.data : []);
+            const { data, pagination: pag } = await apiService.getInventoryConsumablesWithMetadata(params);
+            if (Array.isArray(data)) {
+                setConsumables(data);
+            } else {
+                console.error('Expected an array of consumables but received:', data);
+                setConsumables([]);
+            }
             setPagination(prevPagination => ({
                 ...prevPagination,
-                ...(response.pagination || { page: 1, totalPages: 1, totalItems: 0 })
+                ...(pag || { page: 1, totalPages: 1, totalItems: 0 })
             }));
         } catch (err) {
             console.error("Failed to fetch consumables:", err);
