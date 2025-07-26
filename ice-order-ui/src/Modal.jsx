@@ -50,7 +50,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
             onMouseUp={handleOverlayMouseUp}   // Use onMouseUp
         >
             <div
-                className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow"
+                className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md sm:max-w-4xl transform transition-all duration-300 ease-in-out scale-95 opacity-0 animate-modalShow"
             >
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-200">
                     <h3 className="text-xl font-semibold text-gray-800">{title}</h3>
