@@ -108,4 +108,23 @@ describe('inventory non-dashboard routes', () => {
       expect(res.statusCode).toBe(400);
     });
   });
+
+  describe('consumables list', () => {
+    test('GET /consumables paginated results', async () => {
+      const rows = [{ consumable_id: 1, consumable_name: 'Box' }];
+      db.query
+        .mockResolvedValueOnce({ rows })
+        .mockResolvedValueOnce({ rows: [{ count: '1' }] });
+
+      const res = await request(app).get(
+        '/api/inventory/consumables?page=1&limit=10'
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({
+        data: rows,
+        pagination: { page: 1, limit: 10, totalItems: 1, totalPages: 1 }
+      });
+    });
+  });
 });

@@ -99,11 +99,12 @@ export default function IceContainerManager() {
                 }
             });
             const response = await getIceContainers(params);
-            setContainers(Array.isArray(response.data) ? response.data : []);
+            const containerData = Array.isArray(response.data?.data) ? response.data.data : [];
+            setContainers(containerData);
             // Preserve existing limit if not in response pagination
             setPagination(prevPagination => ({
                 ...prevPagination,
-                ...(response.pagination || {page: 1, totalPages: 1, totalItems: 0}),
+                ...(response.data?.pagination || {page: 1, totalPages: 1, totalItems: 0}),
             }));
         } catch (err) {
             console.error("Failed to fetch ice containers:", err);

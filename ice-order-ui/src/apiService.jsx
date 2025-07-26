@@ -243,6 +243,12 @@ export const apiService = {
         const queryParams = new URLSearchParams(filters).toString();
         return apiService.get(`/inventory/consumables?${queryParams}`);
     },
+    getInventoryConsumablesWithMetadata: async (filters = {}) => {
+        const queryParams = new URLSearchParams(filters).toString();
+        const response = await apiService.getWithMetadata(`/inventory/consumables?${queryParams}`);
+        const { data, pagination } = response.data || {};
+        return { data, pagination };
+    },
     getInventoryConsumableById: (consumableId) => apiService.get(`/inventory/consumables/${consumableId}`),
     addInventoryConsumable: (consumableData) => apiService.post('/inventory/consumables', consumableData),
     updateInventoryConsumable: (consumableId, consumableData) => apiService.put(`/inventory/consumables/${consumableId}`, consumableData),
