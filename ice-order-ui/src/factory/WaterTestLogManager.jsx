@@ -468,7 +468,7 @@ export default function WaterTestLogManager() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {new Date(log.test_timestamp).toLocaleTimeString()}
+                                                {new Date(log.test_timestamp).toLocaleTimeString('en-US', { timeZone: 'UTC' })}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 {log.recorded_by}
