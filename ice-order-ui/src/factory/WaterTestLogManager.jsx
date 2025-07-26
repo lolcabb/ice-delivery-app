@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Droplets, Plus, Calendar, AlertTriangle, X, BarChart3, Search, Filter } from 'lucide-react';
 import { apiService } from '../apiService';
+import { getISODate } from '../utils/dateUtils';
 
 
 import WaterDashboard from './WaterDashboard';
@@ -9,7 +10,7 @@ import WaterLogForm from './WaterLogForm';
 export default function WaterTestLogManager() {
     const [logs, setLogs] = useState([]);
     const [stages, setStages] = useState([]);
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedDate, setSelectedDate] = useState(getISODate(new Date()));
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [showLogForm, setShowLogForm] = useState(false);
@@ -84,7 +85,7 @@ export default function WaterTestLogManager() {
             const startDate = new Date();
             startDate.setDate(startDate.getDate() - 7);
             
-            const formatDate = (d) => d.toISOString().split('T')[0];
+            const formatDate = (d) => getISODate(d);
 
             const query = new URLSearchParams({
                 start_date: formatDate(startDate),

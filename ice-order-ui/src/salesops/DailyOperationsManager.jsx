@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../apiService';
-import { getCurrentLocalDateISO, formatDisplayDate } from '../utils/dateUtils';
+import { getCurrentLocalDateISO, formatDisplayDate, getISODate } from '../utils/dateUtils';
 import { PlusIcon, EditIcon, CheckCircleIcon, PlayCircleIcon, DocumentTextIcon } from '../components/Icons';
 import LoadingLogForm from './LoadingLogForm';
 import ProductReturnModal from './ProductReturnModal';
@@ -62,7 +62,7 @@ const DriverDayCard = ({ driverLog, selectedDate, onOpenLoadingLog, onOpenReturn
         ? loading_logs
             .filter(log => {
                 // Filter to only include logs from the current selected date
-                const logDate = new Date(log.load_timestamp).toISOString().split('T')[0];
+                const logDate = getISODate(log.load_timestamp);
                 return logDate === selectedDate; // You'll need to pass selectedDate as a prop
             })
             .reduce((acc, log) => acc + log.items.reduce((sum, item) => sum + parseFloat(item.quantity_loaded || 0), 0), 0)

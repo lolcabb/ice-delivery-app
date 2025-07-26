@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Wrench } from 'lucide-react';
+import { getISODate } from '../utils/dateUtils';
 
 const MaintenanceModal = ({ 
     isOpen, 
@@ -30,7 +31,7 @@ const MaintenanceModal = ({
 
     // Helper to get today's date in YYYY-MM-DD format
     const getTodayDate = () => {
-        return new Date().toISOString().split('T')[0];
+        return getISODate(new Date());
     };
 
     return (

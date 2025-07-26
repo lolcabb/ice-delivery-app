@@ -3,8 +3,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiService } from '../apiService'; 
 import { PlusIcon } from '../components/Icons';
 
-import ExpenseList from './ExpenseList'; 
-import ExpenseForm from './ExpenseForm'; 
+import ExpenseList from './ExpenseList';
+import ExpenseForm from './ExpenseForm';
+import { getISODate } from '../utils/dateUtils';
 
 const getDescriptionFromFormData = (formData) => {
     if (formData instanceof FormData) {
@@ -35,7 +36,7 @@ const FilterBadge = ({ label, isActive, onClick, color = 'indigo' }) => {
 // Quick Date Range Selector
 const QuickDateSelector = ({ onSelect, currentFilters }) => {
     const today = new Date();
-    const formatDate = (date) => date.toISOString().split('T')[0];
+    const formatDate = (date) => getISODate(date);
 
     const quickRanges = [
         {
