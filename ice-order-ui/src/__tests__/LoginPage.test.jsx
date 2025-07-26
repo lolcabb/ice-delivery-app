@@ -8,5 +8,5 @@ import LoginPage from '../LoginPage.jsx';
 
 test('renders login header', () => {
   render(<LoginPage onLoginSuccess={jest.fn()} />);
-  expect(screen.getByText(/sign in to your account/i)).toBeInTheDocument();
+  expect(screen.getByText(/ลงชื่อเข้าสู่ระบบ/i)).toBeInTheDocument();
 });
