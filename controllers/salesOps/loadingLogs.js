@@ -125,7 +125,7 @@ exports.createLoadingLogs = async (req, res, next) => {
 };
 
 exports.getLoadingLogs = async (req, res, next) => {
-    const { driver_id, route_id, load_type, batch_uuid } = req.query;
+    const { driver_id, route_id, load_type, batch_uuid, date } = req.query;
     const requesting_user_id = req.user.id;
 
     console.log(`[SalesOps API] GET /loading-logs - User: ${requesting_user_id}, Query: ${JSON.stringify(req.query)}`);
@@ -156,6 +156,10 @@ exports.getLoadingLogs = async (req, res, next) => {
     if (batch_uuid) {
         conditions.push(`ll.load_batch_uuid = $${paramIndex++}`);
         values.push(batch_uuid);
+    }
+    if (date) {
+        conditions.push(`DATE(ll.load_timestamp AT TIME ZONE 'Asia/Bangkok') = $${paramIndex++}`);
+        values.push(date);
     }
 
     if (conditions.length > 0) {

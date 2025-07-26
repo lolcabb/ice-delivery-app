@@ -18,6 +18,7 @@ router.post('/batch-returns', authMiddleware, requireRole(['admin','manager','st
 router.get('/reconciliation-summary', authMiddleware, requireRole(['admin','manager','staff','accountant']), salesOpsController.getReconciliationSummary);
 router.get('/products', authMiddleware, requireRole(['admin','manager','staff','accountant']), salesOpsController.getProducts);
 router.post('/loading-logs', authMiddleware, requireRole(['admin','manager','staff']), salesOpsController.createLoadingLogs);
+// Optional query parameters: driver_id, route_id, load_type, batch_uuid, date (YYYY-MM-DD)
 router.get('/loading-logs', authMiddleware, requireRole(['admin','manager','staff','accountant']), salesOpsController.getLoadingLogs);
 router.put('/loading-logs/batch/:batchUUID', authMiddleware, requireRole(['admin','manager','staff']), salesOpsController.updateLoadingLogBatch);
 router.post('/driver-daily-summaries', authMiddleware, requireRole(['admin','manager','staff']), salesOpsController.createDriverDailySummary);
