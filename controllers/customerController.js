@@ -29,13 +29,90 @@ const uploadToGCS = file => {
 };
 
 module.exports = {
-  searchCustomers: async (req, res, next) => { res.status(200).end(); },
-  getRouteAnalytics: async (req, res, next) => { res.status(200).end(); },
-  getDeliveryRoutes: async (req, res, next) => { res.status(200).end(); },
-  createDeliveryRoute: async (req, res, next) => { res.status(201).end(); },
-  updateDeliveryRoute: async (req, res, next) => { res.status(200).end(); },
-  deleteDeliveryRoute: async (req, res, next) => { res.status(200).end(); },
-  getCreditSales: async (req, res, next) => { res.status(200).end(); },
+  async searchCustomers(req, res, next) {
+    const { search, limit = 10, exclude_route_id } = req.query;
+    if (!search) return res.status(400).json({ error: 'search is required' });
+    try {
+      let sql = `SELECT customer_id, customer_name, phone, address FROM customers
+                 WHERE (LOWER(customer_name) LIKE $1 OR phone ILIKE $1)`;
+      const params = [`%${search.toLowerCase()}%`];
+      if (exclude_route_id) {
+        sql += ` AND customer_id NOT IN (SELECT customer_id FROM customer_route_assignments
+                   WHERE route_id = $2 AND is_active = true)`;
+        params.push(parseInt(exclude_route_id));
+      }
+      sql += ` ORDER BY customer_name ASC LIMIT ${parseInt(limit)}`;
+      const { rows } = await query(sql, params);
+      res.json(rows);
+    } catch (err) { next(err); }
+  },
+
+  async getRouteAnalytics(req, res, next) {
+    const routeId = parseInt(req.params.route_id);
+    if (isNaN(routeId)) return res.status(400).json({ error: 'Invalid route ID.' });
+    try {
+      const { rows } = await query(
+        'SELECT COUNT(*) AS customer_count FROM customers WHERE route_id = $1',
+        [routeId]
+      );
+      res.json({ route_id: routeId, customer_count: parseInt(rows[0].customer_count) });
+    } catch (err) { next(err); }
+  },
+
+  async getDeliveryRoutes(req, res, next) {
+    try {
+      const { rows } = await query('SELECT * FROM delivery_routes ORDER BY route_name');
+      res.json(rows);
+    } catch (err) { next(err); }
+  },
+
+  async createDeliveryRoute(req, res, next) {
+    const { route_name, is_active = true } = req.body;
+    if (!route_name) return res.status(400).json({ error: 'route_name is required' });
+    try {
+      const { rows } = await query(
+        'INSERT INTO delivery_routes (route_name, is_active) VALUES ($1, $2) RETURNING *',
+        [route_name, is_active]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err) { next(err); }
+  },
+
+  async updateDeliveryRoute(req, res, next) {
+    const id = parseInt(req.params.id);
+    const { route_name, is_active } = req.body;
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid route ID.' });
+    try {
+      const { rows } = await query(
+        'UPDATE delivery_routes SET route_name = $1, is_active = $2, updated_at = NOW() WHERE route_id = $3 RETURNING *',
+        [route_name, is_active, id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Route not found.' });
+      res.json(rows[0]);
+    } catch (err) { next(err); }
+  },
+
+  async deleteDeliveryRoute(req, res, next) {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid route ID.' });
+    try {
+      const { rows } = await query('DELETE FROM delivery_routes WHERE route_id = $1 RETURNING route_id', [id]);
+      if (rows.length === 0) return res.status(404).json({ error: 'Route not found.' });
+      res.json({ message: 'Route deleted', route_id: rows[0].route_id });
+    } catch (err) { next(err); }
+  },
+
+  async getCreditSales(req, res, next) {
+    const customerId = parseInt(req.params.customerId);
+    if (isNaN(customerId)) return res.status(400).json({ error: 'Invalid customer ID.' });
+    try {
+      const { rows } = await query(
+        `SELECT * FROM driver_sales WHERE customer_id = $1 AND payment_type = 'Credit' AND cleared_by_payment_id IS NULL`,
+        [customerId]
+      );
+      res.json(rows);
+    } catch (err) { next(err); }
+  },
 
   async createCreditPayment(req, res, next) {
     const customerId = parseInt(req.params.customerId);
@@ -71,9 +148,49 @@ module.exports = {
     } finally { client.release(); }
   },
 
-  getCreditPayments: async (req, res, next) => { res.status(200).end(); },
-  voidCreditPayment: async (req, res, next) => { res.status(200).end(); },
-  editCreditPayment: async (req, res, next) => { res.status(200).end(); },
+  async getCreditPayments(req, res, next) {
+    const customerId = parseInt(req.params.customerId);
+    const { start_date, end_date } = req.query;
+    if (isNaN(customerId)) return res.status(400).json({ error: 'Invalid customer ID.' });
+    try {
+      let sql = 'SELECT * FROM customer_credit_payments WHERE customer_id = $1';
+      const params = [customerId];
+      if (start_date) { params.push(start_date); sql += ` AND payment_date >= $${params.length}`; }
+      if (end_date) { params.push(end_date); sql += ` AND payment_date <= $${params.length}`; }
+      sql += ' ORDER BY payment_date DESC';
+      const { rows } = await query(sql, params);
+      res.json(rows);
+    } catch (err) { next(err); }
+  },
+
+  async voidCreditPayment(req, res, next) {
+    const paymentId = parseInt(req.params.paymentId);
+    const { void_reason } = req.body;
+    const userId = req.user.id;
+    if (isNaN(paymentId) || !void_reason) return res.status(400).json({ error: 'Invalid parameters.' });
+    try {
+      const { rows } = await query(
+        'UPDATE customer_credit_payments SET voided_at = NOW(), void_reason = $1, voided_by_user_id = $2 WHERE payment_id = $3 RETURNING *',
+        [void_reason, userId, paymentId]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Payment not found.' });
+      res.json(rows[0]);
+    } catch (err) { next(err); }
+  },
+
+  async editCreditPayment(req, res, next) {
+    const paymentId = parseInt(req.params.paymentId);
+    const { payment_date, amount_paid, payment_method, notes } = req.body;
+    if (isNaN(paymentId)) return res.status(400).json({ error: 'Invalid payment ID.' });
+    try {
+      const { rows } = await query(
+        `UPDATE customer_credit_payments SET payment_date=$1, amount_paid=$2, payment_method=$3, notes=$4, updated_at = NOW() WHERE payment_id=$5 RETURNING *`,
+        [payment_date, amount_paid ? parseFloat(amount_paid) : null, payment_method, notes, paymentId]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Payment not found.' });
+      res.json(rows[0]);
+    } catch (err) { next(err); }
+  },
 
   async createCustomer(req, res, next) {
     const { customer_name, phone, address, contact_person, customer_type, route_id, notes, is_active = true } = req.body;
@@ -92,7 +209,36 @@ module.exports = {
     }
   },
 
-  listCustomers: async (req, res, next) => { res.status(200).end(); },
+  async listCustomers(req, res, next) {
+    const { page = 1, limit = 20, search, is_active } = req.query;
+    try {
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+      let baseSql = 'FROM customers';
+      const where = [];
+      const params = [];
+      if (search) {
+        params.push(`%${search.toLowerCase()}%`);
+        where.push(`(LOWER(customer_name) LIKE $${params.length} OR phone ILIKE $${params.length})`);
+      }
+      if (is_active !== undefined) {
+        params.push(is_active === 'true');
+        where.push(`is_active = $${params.length}`);
+      }
+      const whereClause = where.length ? ' WHERE ' + where.join(' AND ') : '';
+      const dataSql = `SELECT * ${baseSql}${whereClause} ORDER BY customer_name ASC LIMIT ${parseInt(limit)} OFFSET ${offset}`;
+      const countSql = `SELECT COUNT(*) ${baseSql}${whereClause}`;
+      const dataRes = await query(dataSql, params);
+      const countRes = await query(countSql, params);
+      res.json({
+        data: dataRes.rows,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalItems: parseInt(countRes.rows[0].count)
+        }
+      });
+    } catch (err) { next(err); }
+  },
 
   async getCustomer(req, res, next) {
     const customerId = parseInt(req.params.id);
@@ -123,5 +269,16 @@ module.exports = {
     }
   },
 
-  deleteCustomer: async (req, res, next) => { res.status(200).end(); }
+  async deleteCustomer(req, res, next) {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid customer ID.' });
+    try {
+      const { rows } = await query(
+        'UPDATE customers SET is_active = false, updated_at = NOW() WHERE customer_id = $1 RETURNING customer_id',
+        [id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Customer not found.' });
+      res.json({ message: 'Customer deleted' });
+    } catch (err) { next(err); }
+  }
 };
