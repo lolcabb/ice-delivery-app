@@ -130,10 +130,11 @@ export default function ContainerAssignmentManager() {
                 }
             });
             const response = await getAllAssignments(params);
-            setAssignments(Array.isArray(response.data) ? response.data : []);
+            const assignmentsData = Array.isArray(response.data?.data) ? response.data.data : [];
+            setAssignments(assignmentsData);
             setPagination(prevPagination => ({
                 ...prevPagination,
-                ...(response.pagination || { page: 1, totalPages: 1, totalItems: 0 })
+                ...(response.data?.pagination || { page: 1, totalPages: 1, totalItems: 0 })
             }));
         } catch (err) {
             console.error("Failed to fetch assignments:", err);
@@ -184,7 +185,7 @@ export default function ContainerAssignmentManager() {
         try {
             const containerParams = { status: 'In Stock', limit: 1000 };
             const containerResponse = await getIceContainers(containerParams);
-            const activeContainers = Array.isArray(containerResponse.data) ? containerResponse.data : [];
+            const activeContainers = Array.isArray(containerResponse.data?.data) ? containerResponse.data.data : [];
             setAvailableContainers(activeContainers);
             if (activeContainers.length === 0) {
                 setError("ไม่มีถังน้ำแข็ง 'ในสต็อก' สำหรับการมอบหมายใหม่");
