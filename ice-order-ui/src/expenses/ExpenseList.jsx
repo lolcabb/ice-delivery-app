@@ -17,12 +17,105 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
     // Add error state for image loading - MUST be called before any early returns
     const [imageError, setImageError] = useState(false);
     const [imageLoading, setImageLoading] = useState(true);
+    const [zoomLevel, setZoomLevel] = useState(1);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    
+    // Zoom functions - MUST be defined before early return
+    const handleZoomIn = () => {
+        setZoomLevel(prev => Math.min(prev + 0.25, 3));
+    };
+
+    const handleZoomOut = () => {
+        setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
+    };
+
+    const handleResetZoom = () => {
+        setZoomLevel(1);
+        setImagePosition({ x: 0, y: 0 });
+    };
+
+    // Mouse drag functions for panning when zoomed
+    const handleMouseDown = (e) => {
+        if (zoomLevel > 1) {
+            setIsDragging(true);
+            setDragStart({
+                x: e.clientX - imagePosition.x,
+                y: e.clientY - imagePosition.y
+            });
+        }
+    };
     
     // Reset error state when imageUrl changes - MUST be called before any early returns
     useEffect(() => {
         setImageError(false);
         setImageLoading(true);
+        // Reset zoom and position when new image loads
+        setZoomLevel(1);
+        setImagePosition({ x: 0, y: 0 });
     }, [imageUrl]);
+
+    // Keyboard shortcuts and mouse events - MUST be called before any early returns
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (!isOpen) return;
+            
+            // Only keep Escape key for closing
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        const handleMouseMove = (e) => {
+            if (isDragging && zoomLevel > 1) {
+                setImagePosition({
+                    x: e.clientX - dragStart.x,
+                    y: e.clientY - dragStart.y
+                });
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+        };
+
+        // Handle scroll wheel for zooming
+        const handleWheel = (e) => {
+            if (!isOpen) return;
+            
+            // Check if the wheel event is over the image container
+            const imageContainer = e.target.closest('.zoom-container');
+            if (!imageContainer) return;
+            
+            e.preventDefault();
+            
+            const delta = e.deltaY;
+            const zoomSpeed = 0.1;
+            
+            if (delta < 0) {
+                // Scroll up - zoom in
+                setZoomLevel(prev => Math.min(prev + zoomSpeed, 3));
+            } else {
+                // Scroll down - zoom out
+                setZoomLevel(prev => Math.max(prev - zoomSpeed, 0.5));
+            }
+        };
+
+        if (isOpen) {
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            window.addEventListener('wheel', handleWheel, { passive: false });
+        }
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            window.removeEventListener('wheel', handleWheel);
+        };
+    }, [isOpen, isDragging, dragStart, zoomLevel, onClose]);
     
     // Add error boundary and debugging
     console.log('ReceiptModal render:', { isOpen, imageUrl, expenseDescription });
