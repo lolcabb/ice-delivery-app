@@ -118,13 +118,11 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
     }, [isOpen, isDragging, dragStart, zoomLevel, onClose]);
     
     // Add error boundary and debugging
-    console.log('ReceiptModal render:', { isOpen, imageUrl, expenseDescription });
     
     // Early return AFTER all hooks are called
     if (!isOpen) return null;
 
     const handleImageLoad = () => {
-        console.log('Image loaded successfully');
         setImageLoading(false);
     };
 
@@ -183,7 +181,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
 
                     {/* Image Content */}
                     <div className="px-4 pb-4 sm:px-6 sm:pb-6">
-                        <div className="bg-gray-50 rounded-lg p-4 min-h-[200px] flex items-center justify-center">
+                        <div className="bg-gray-50 rounded-lg p-4 min-h-[200px] flex items-center justify-center zoom-container">
                             {imageLoading && !imageError && (
                                 <div className="text-gray-500">กำลังโหลดรูปภาพ...</div>
                             )}
@@ -203,6 +201,12 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                                     className={`max-w-full h-auto max-h-96 object-contain rounded ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
                                     onLoad={handleImageLoad}
                                     onError={handleImageError}
+                                    onMouseDown={handleMouseDown}
+                                    onDragStart={(e) => e.preventDefault()}
+                                    style={{
+                                        transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${zoomLevel})`,
+                                        cursor: isDragging ? 'grabbing' : zoomLevel > 1 ? 'grab' : 'auto',
+                                    }}
                                 />
                             )}
                         </div>
