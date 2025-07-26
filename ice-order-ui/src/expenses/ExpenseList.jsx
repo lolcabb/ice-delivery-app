@@ -157,7 +157,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                 ></div>
 
                 {/* Modal */}
-                <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
                     {/* Header */}
                     <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div className="flex items-center justify-between">
@@ -198,7 +198,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                                 <img
                                     src={imageUrl}
                                     alt="ใบเสร็จ"
-                                    className={`max-w-full h-auto max-h-96 object-contain rounded ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                                    className={`max-w-full h-auto max-h-[80vh] object-contain rounded ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
                                     onLoad={handleImageLoad}
                                     onError={handleImageError}
                                     onMouseDown={handleMouseDown}
