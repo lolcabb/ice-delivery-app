@@ -35,12 +35,17 @@ export const useZoomPan = (isOpen) => {
         const scaledWidth = imageDimensions.width * zoomLevel;
         const scaledHeight = imageDimensions.height * zoomLevel;
 
-        // Calculate bounds to ensure MIN_VISIBLE_AREA pixels remain visible
-        // This prevents the image from being dragged completely out of view
-        const minX = containerDimensions.width - scaledWidth + MIN_VISIBLE_AREA;
-        const maxX = scaledWidth - containerDimensions.width - MIN_VISIBLE_AREA;
-        const minY = containerDimensions.height - scaledHeight + MIN_VISIBLE_AREA;
-        const maxY = scaledHeight - containerDimensions.height - MIN_VISIBLE_AREA;
+        // Allow dragging even when the image isn't large enough to keep
+        // MIN_VISIBLE_AREA visible on both sides.
+        const excessX = Math.max(0, scaledWidth - containerDimensions.width);
+        const excessY = Math.max(0, scaledHeight - containerDimensions.height);
+        const visibleX = Math.min(MIN_VISIBLE_AREA, excessX / 2);
+        const visibleY = Math.min(MIN_VISIBLE_AREA, excessY / 2);
+
+        const minX = containerDimensions.width - scaledWidth + visibleX;
+        const maxX = scaledWidth - containerDimensions.width - visibleX;
+        const minY = containerDimensions.height - scaledHeight + visibleY;
+        const maxY = scaledHeight - containerDimensions.height - visibleY;
 
         return { minX, maxX, minY, maxY };
     }, [imageDimensions, containerDimensions, zoomLevel]);
@@ -245,12 +250,17 @@ export const useZoomPan = (isOpen) => {
             // Need to manually calculate bounds with new zoom for immediate update
             const scaledWidth = imageDimensions.width * newZoom;
             const scaledHeight = imageDimensions.height * newZoom;
-            
+
+            const excessX = Math.max(0, scaledWidth - containerDimensions.width);
+            const excessY = Math.max(0, scaledHeight - containerDimensions.height);
+            const visibleX = Math.min(MIN_VISIBLE_AREA, excessX / 2);
+            const visibleY = Math.min(MIN_VISIBLE_AREA, excessY / 2);
+
             const bounds = {
-                minX: containerDimensions.width - scaledWidth + MIN_VISIBLE_AREA,
-                maxX: scaledWidth - containerDimensions.width - MIN_VISIBLE_AREA,
-                minY: containerDimensions.height - scaledHeight + MIN_VISIBLE_AREA,
-                maxY: scaledHeight - containerDimensions.height - MIN_VISIBLE_AREA
+                minX: containerDimensions.width - scaledWidth + visibleX,
+                maxX: scaledWidth - containerDimensions.width - visibleX,
+                minY: containerDimensions.height - scaledHeight + visibleY,
+                maxY: scaledHeight - containerDimensions.height - visibleY
             };
             
             let clampedX = newPosX;
