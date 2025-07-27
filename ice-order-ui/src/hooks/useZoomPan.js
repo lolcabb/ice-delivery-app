@@ -11,6 +11,7 @@ export const useZoomPan = (isOpen) => {
     const [zoomLevel, setZoomLevel] = useState(1);
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
+    const isDraggingRef = useRef(false);
     const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
     const [containerDimensions, setContainerDimensions] = useState({ width: 0, height: 0 });
 
@@ -18,6 +19,11 @@ export const useZoomPan = (isOpen) => {
     const imageRef = useRef(null);
     const dragStartRef = useRef({ x: 0, y: 0 });
     const imagePositionRef = useRef({ x: 0, y: 0 });
+
+    const setDragging = useCallback((val) => {
+        isDraggingRef.current = val;
+        setIsDragging(val);
+    }, []);
 
     // Calculate boundaries for panning
     const calculateBounds = useCallback(() => {
@@ -163,7 +169,7 @@ export const useZoomPan = (isOpen) => {
             e.preventDefault();
             e.stopPropagation();
             
-            setIsDragging(true);
+            setDragging(true);
             dragStartRef.current = {
                 x: e.clientX - imagePositionRef.current.x,
                 y: e.clientY - imagePositionRef.current.y
@@ -176,7 +182,7 @@ export const useZoomPan = (isOpen) => {
 
         // Mouse move handler (global)
         const handleMouseMove = (e) => {
-            if (!isDragging) return;
+            if (!isDraggingRef.current) return;
             
             e.preventDefault();
             
@@ -190,9 +196,9 @@ export const useZoomPan = (isOpen) => {
 
         // Mouse up handler (global)
         const handleMouseUp = () => {
-            if (!isDragging) return;
-            
-            setIsDragging(false);
+            if (!isDraggingRef.current) return;
+
+            setDragging(false);
             
             // Reset cursor
             document.body.style.cursor = '';
@@ -224,7 +230,7 @@ export const useZoomPan = (isOpen) => {
         const handleTouchStart = (e) => {
             if (e.touches.length === 1 && zoomLevel > 1) {
                 const touch = e.touches[0];
-                setIsDragging(true);
+                setDragging(true);
                 dragStartRef.current = {
                     x: touch.clientX - imagePositionRef.current.x,
                     y: touch.clientY - imagePositionRef.current.y
@@ -241,7 +247,7 @@ export const useZoomPan = (isOpen) => {
         const handleTouchMove = (e) => {
             e.preventDefault();
             
-            if (e.touches.length === 1 && isDragging) {
+            if (e.touches.length === 1 && isDraggingRef.current) {
                 const touch = e.touches[0];
                 const newX = touch.clientX - dragStartRef.current.x;
                 const newY = touch.clientY - dragStartRef.current.y;
@@ -267,7 +273,7 @@ export const useZoomPan = (isOpen) => {
         };
 
         const handleTouchEnd = () => {
-            setIsDragging(false);
+            setDragging(false);
             lastTouchDistance = 0;
         };
 
@@ -300,7 +306,13 @@ export const useZoomPan = (isOpen) => {
             // Reset cursor
             document.body.style.cursor = '';
         };
-    }, [isOpen, isDragging, zoomLevel, clampPosition, zoomToPoint, handleReset]);
+    }, [isOpen, zoomLevel, clampPosition, zoomToPoint, handleReset]);
+
+    // Update cursor when zoom level changes
+    useEffect(() => {
+        if (!containerRef.current) return;
+        containerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+    }, [zoomLevel]);
 
     // Image load handler
     const handleImageLoad = useCallback(() => {
