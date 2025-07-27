@@ -17,13 +17,16 @@ const formatDate = (dateString) => {
 const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
     const [imageState, setImageState] = useState({ loading: true, error: false });
 
-    // Use the custom hook to manage zoom/pan interactions
+    // Use the improved custom hook to manage zoom/pan interactions
     const { 
         containerRef, 
         imageRef, 
         imageStyle, 
         handleZoomIn, 
-        handleZoomOut 
+        handleZoomOut,
+        handleReset,
+        handleImageLoad: hookImageLoad,
+        zoomLevel
     } = useZoomPan(isOpen);
 
     // Reset image state when the URL or modal visibility changes
@@ -31,8 +34,11 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
         setImageState({ loading: true, error: false });
     }, [imageUrl, isOpen]);
 
-
-    const handleImageLoad = () => setImageState({ loading: false, error: false });
+    const handleImageLoad = (e) => {
+        setImageState({ loading: false, error: false });
+        hookImageLoad(e); // Call the hook's image load handler
+    };
+    
     const handleImageError = () => setImageState({ loading: false, error: true });
 
     const handleOverlayClick = (e) => {
@@ -57,72 +63,126 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
 
     return (
         <div 
-            className="fixed inset-0 z-50 overflow-y-auto"
+            className="fixed inset-0 z-50 overflow-hidden"
             onClick={handleOverlayClick}
             aria-labelledby="modal-title"
             role="dialog"
             aria-modal="true"
         >
-            <div className="flex items-center justify-center min-h-screen p-4 text-center">
+            <div className="flex items-center justify-center min-h-screen p-4">
                 {/* Backdrop */}
-                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
 
                 {/* Modal Content */}
-                <div className="relative inline-block bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all my-8 max-w-4xl w-full">
+                <div className="relative bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
                     {/* Header */}
-                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 flex items-start justify-between">
-                        <div>
-                            <h3 id="modal-title" className="text-lg leading-6 font-medium text-gray-900">ใบเสร็จ/หลักฐาน</h3>
+                    <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                        <div className="flex-1">
+                            <h3 id="modal-title" className="text-lg leading-6 font-medium text-gray-900">
+                                ใบเสร็จ/หลักฐาน
+                            </h3>
                             {expenseDescription && (
-                                <p className="mt-2 text-sm text-gray-600">{expenseDescription}</p>
+                                <p className="mt-1 text-sm text-gray-600">{expenseDescription}</p>
                             )}
                         </div>
-                        <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+                        <button 
+                            onClick={onClose} 
+                            className="text-gray-400 hover:text-gray-500 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-md p-1"
+                        >
                             <span className="sr-only">Close</span>
-                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
 
                     {/* Image Viewer */}
-                    <div className="px-4 pb-4 sm:px-6 sm:pb-6">
+                    <div className="flex-1 relative bg-gray-50 overflow-hidden">
                         <div
                             ref={containerRef}
-                            className="zoom-container relative bg-gray-100 rounded-lg min-h-[50vh] flex items-center justify-center overflow-hidden"
+                            className="zoom-container w-full h-full flex items-center justify-center"
+                            style={{ minHeight: '60vh' }}
                         >
-                            {imageState.loading && <div className="text-gray-500">กำลังโหลดรูปภาพ...</div>}
+                            {imageState.loading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+                                    <div className="text-gray-500">กำลังโหลดรูปภาพ...</div>
+                                </div>
+                            )}
                             
                             {imageState.error ? (
                                 <div className="text-center text-red-500 p-4">
                                     <p>ไม่สามารถโหลดรูปภาพได้</p>
-                                    <p className="text-xs text-gray-400 mt-1 truncate">URL: {imageUrl}</p>
+                                    <p className="text-xs text-gray-400 mt-1 truncate max-w-md mx-auto">URL: {imageUrl}</p>
                                 </div>
                             ) : (
                                 <img
                                     ref={imageRef}
                                     src={imageUrl}
                                     alt="ใบเสร็จ"
-                                    className={`max-w-full h-auto max-h-[70vh] object-contain rounded transition-opacity duration-300 ${imageState.loading ? 'opacity-0' : 'opacity-100'}`}
+                                    //className={`max-w-full h-auto max-h-[70vh] object-contain rounded transition-opacity duration-300 ${imageState.loading ? 'opacity-0' : 'opacity-100'}`}
+                                    className={`max-w-full max-h-full object-contain ${imageState.loading ? 'opacity-0' : 'opacity-100'}`}
                                     onLoad={handleImageLoad}
                                     onError={handleImageError}
                                     style={imageStyle}
-                                    onDragStart={(e) => e.preventDefault()}
+                                    draggable={false}
                                 />
                             )}
 
                             {/* Zoom Controls */}
-                            <div className="absolute top-2 right-2 flex flex-col space-y-1 bg-white/70 rounded-md shadow-lg">
-                                <button onClick={handleZoomIn} className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"> + </button>
-                                <button onClick={handleZoomOut} className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"> - </button>
-                            </div>
+                            {!imageState.error && !imageState.loading && (
+                                <div className="absolute top-4 right-4 flex flex-col space-y-2">
+                                    <div className="bg-white rounded-lg shadow-lg p-1">
+                                        <button 
+                                            onClick={handleZoomIn} 
+                                            className="block w-10 h-10 text-gray-700 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            title="Zoom In"
+                                        >
+                                            <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            onClick={handleZoomOut} 
+                                            className="block w-10 h-10 text-gray-700 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            title="Zoom Out"
+                                        >
+                                            <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                                            </svg>
+                                        </button>
+                                        <button 
+                                            onClick={handleReset} 
+                                            className="block w-10 h-10 text-gray-700 hover:bg-gray-100 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            title="Reset"
+                                        >
+                                            <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div className="bg-white rounded-lg shadow-lg px-3 py-2 text-xs text-gray-600 text-center">
+                                        {Math.round(zoomLevel * 100)}%
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Instructions */}
+                            {!imageState.error && !imageState.loading && (
+                                <div className="absolute bottom-4 left-4 bg-white/90 rounded-lg shadow-lg px-3 py-2 text-xs text-gray-600">
+                                    <div>• ใช้ล้อเมาส์เพื่อซูม</div>
+                                    <div>• ดับเบิลคลิกเพื่อซูมเข้า/ออก</div>
+                                    <div>• ลากเพื่อเลื่อนดูภาพ</div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Footer */}
-                    <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex flex-row-reverse gap-3">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                            className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm transition-colors"
                         >
                             ปิด
                         </button>
@@ -131,7 +191,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                                 href={imageUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                                className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm transition-colors"
                             >
                                 เปิดในแท็บใหม่
                             </a>
