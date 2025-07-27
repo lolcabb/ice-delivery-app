@@ -38,9 +38,9 @@ export const useZoomPan = (isOpen) => {
         // Calculate bounds to ensure MIN_VISIBLE_AREA pixels remain visible
         // This prevents the image from being dragged completely out of view
         const minX = containerDimensions.width - scaledWidth + MIN_VISIBLE_AREA;
-        const maxX = -MIN_VISIBLE_AREA;
+        const maxX = scaledWidth - containerDimensions.width - MIN_VISIBLE_AREA;
         const minY = containerDimensions.height - scaledHeight + MIN_VISIBLE_AREA;
-        const maxY = -MIN_VISIBLE_AREA;
+        const maxY = scaledHeight - containerDimensions.height - MIN_VISIBLE_AREA;
 
         return { minX, maxX, minY, maxY };
     }, [imageDimensions, containerDimensions, zoomLevel]);
@@ -248,9 +248,9 @@ export const useZoomPan = (isOpen) => {
             
             const bounds = {
                 minX: containerDimensions.width - scaledWidth + MIN_VISIBLE_AREA,
-                maxX: -MIN_VISIBLE_AREA,
+                maxX: scaledWidth - containerDimensions.width - MIN_VISIBLE_AREA,
                 minY: containerDimensions.height - scaledHeight + MIN_VISIBLE_AREA,
-                maxY: -MIN_VISIBLE_AREA
+                maxY: scaledHeight - containerDimensions.height - MIN_VISIBLE_AREA
             };
             
             let clampedX = newPosX;
