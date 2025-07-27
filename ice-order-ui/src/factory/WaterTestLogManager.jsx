@@ -444,7 +444,7 @@ export default function WaterTestLogManager() {
                                                         ? 'bg-yellow-100 text-yellow-800' 
                                                         : 'bg-orange-100 text-orange-800'
                                                 }`}>
-                                                    {log.test_session === 'Morning' ? 'เช้า' : 'บ่าย]'}
+                                                    {log.test_session === 'Morning' ? 'เช้า' : 'บ่าย'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">

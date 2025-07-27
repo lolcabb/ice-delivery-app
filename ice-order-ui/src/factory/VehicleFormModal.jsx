@@ -22,7 +22,7 @@ const VehicleFormModal = ({
     const handleSubmit = () => {
         // Basic validation
         if (!vehicleForm.vehicle_name || !vehicleForm.license_plate || !vehicleForm.vehicle_type) {
-            alert('Please fill in all required fields');
+            alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
         onSubmit();
@@ -35,7 +35,7 @@ const VehicleFormModal = ({
                     {/* Header */}
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-semibold text-gray-900">
-                            {isEdit ? 'Edit Vehicle' : 'Add New Vehicle'}
+                            {isEdit ? 'อัปเดตยานพาหนะ' : 'เพิ่มยานพาหนะ'}
                         </h2>
                         <button
                             onClick={onClose}
@@ -50,35 +50,35 @@ const VehicleFormModal = ({
                         {/* Vehicle Name */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Vehicle Name *
+                                ชื่อยานพาหนะ *
                             </label>
                             <input
                                 type="text"
                                 value={vehicleForm.vehicle_name || ''}
                                 onChange={(e) => handleInputChange('vehicle_name', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="e.g., Delivery Truck 01"
+                                placeholder="เช่น รถสแปร์ ML1"
                             />
                         </div>
 
                         {/* License Plate */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                License Plate *
+                                ทะเบียนรถ *
                             </label>
                             <input
                                 type="text"
                                 value={vehicleForm.license_plate || ''}
                                 onChange={(e) => handleInputChange('license_plate', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="e.g., ABC-1234"
+                                placeholder="เช่น กข-1234"
                             />
                         </div>
 
                         {/* Vehicle Type */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Vehicle Type *
+                                ประเภทยานพาหนะ *
                             </label>
                             <select
                                 value={vehicleForm.vehicle_type || ''}
@@ -99,26 +99,26 @@ const VehicleFormModal = ({
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Make
+                                    ยี่ห้อ
                                 </label>
                                 <input
                                     type="text"
                                     value={vehicleForm.make || ''}
                                     onChange={(e) => handleInputChange('make', e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="e.g., Toyota"
+                                    placeholder="เช่น Toyota"
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Model
+                                    รุ่น
                                 </label>
                                 <input
                                     type="text"
                                     value={vehicleForm.model || ''}
                                     onChange={(e) => handleInputChange('model', e.target.value)}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="e.g., Hilux"
+                                    placeholder="เช่น Hilux"
                                 />
                             </div>
                         </div>
@@ -126,7 +126,7 @@ const VehicleFormModal = ({
                         {/* Year */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Year
+                                ปีผลิต
                             </label>
                             <input
                                 type="number"
@@ -135,23 +135,23 @@ const VehicleFormModal = ({
                                 value={vehicleForm.year || ''}
                                 onChange={(e) => handleInputChange('year', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="e.g., 2023"
+                                placeholder="เช่น 2023"
                             />
                         </div>
 
                         {/* Status */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Status
+                                สถานะ
                             </label>
                             <select
                                 value={vehicleForm.status || 'Active'}
                                 onChange={(e) => handleInputChange('status', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
-                                <option value="Active">Active</option>
-                                <option value="In-Shop">In-Shop</option>
-                                <option value="Out of Service">Out of Service</option>
+                                <option value="Active">ใช้งาน</option>
+                                <option value="In-Shop">ซ่อมบำรุง</option>
+                                <option value="Out of Service">ไม่ใช้งาน</option>
                             </select>
                         </div>
                     </div>
@@ -162,14 +162,14 @@ const VehicleFormModal = ({
                             onClick={onClose}
                             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         >
-                            Cancel
+                            ยกเลิก
                         </button>
                         <button
                             onClick={handleSubmit}
                             disabled={loading}
                             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                         >
-                            {loading ? (isEdit ? 'Updating...' : 'Adding...') : (isEdit ? 'Update Vehicle' : 'Add Vehicle')}
+                            {loading ? (isEdit ? 'กำลังอัปเดต...' : 'กำลังเพิ่ม...') : (isEdit ? 'อัปเดตยานพาหนะ' : 'เพิ่มยานพาหนะ')}
                         </button>
                     </div>
                 </div>
