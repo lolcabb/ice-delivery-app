@@ -3,7 +3,6 @@ import { Droplets, Plus, Calendar, AlertTriangle, X, BarChart3, Search, Filter }
 import { apiService } from '../apiService';
 import { getISODate } from '../utils/dateUtils';
 
-
 import WaterDashboard from './WaterDashboard';
 import WaterLogForm from './WaterLogForm';
 
@@ -56,7 +55,7 @@ export default function WaterTestLogManager() {
             setFormData(initialFormData);
         } catch (err) {
             console.error('Error fetching stages:', err);
-            setError('Failed to fetch water test stages.');
+            setError('ไม่สามารถโหลดข้อมูลขั้นตอนการตรวจสอบได้');
         }
     }, []);
 
@@ -71,10 +70,10 @@ export default function WaterTestLogManager() {
             if (err.status === 404) {
                 setLogs([]);
                 if (showWarning) {
-                    setError('No water test log');
+                    setError('ไม่มีบันทึกการตรวจสอบน้ำ');
                 }
             } else {
-                setError('Failed to fetch water logs. Please try again.');
+                setError('ไม่สามารถโหลดบันทึกการตรวจสอบน้ำได้ กรุณาลองใหม่อีกครั้ง');
             }
         } finally {
             setLoading(false);
@@ -256,7 +255,7 @@ export default function WaterTestLogManager() {
             setError(null);
         } catch (err) {
             console.error('Failed to submit water test logs:', err);
-            setError('Failed to submit water test logs. Please try again.');
+            setError('ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -298,8 +297,8 @@ export default function WaterTestLogManager() {
                                 <Droplets className="w-6 h-6 text-blue-600" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900">Water Quality Testing System</h1>
-                                <p className="text-gray-600">Monitor water quality across all treatment stages</p>
+                                <h1 className="text-2xl font-bold text-gray-900">บันทึกการตรวจสอบคุณภาพน้ำ</h1>
+                                <p className="text-gray-600">ติดตามคุณภาพน้ำในทุกขั้นตอนการบำบัด'</p>
                             </div>
                         </div>
                         <div className="flex gap-3">
@@ -312,14 +311,14 @@ export default function WaterTestLogManager() {
                                 }`}
                             >
                                 <BarChart3 className="w-5 h-5" />
-                                Dashboard
+                                แดชบอร์ด
                             </button>
                             <button
                                 onClick={() => setShowLogForm(true)}
                                 className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                             >
                                 <Plus className="w-5 h-5" />
-                                Log Tests
+                                เพิ่มผลการตรวจสอบ
                             </button>
                         </div>
                     </div>
@@ -338,7 +337,7 @@ export default function WaterTestLogManager() {
                     <div className="flex flex-col lg:flex-row gap-4 items-center">
                         <div className="flex items-center gap-3">
                             <Calendar className="w-5 h-5 text-gray-400" />
-                            <label className="text-sm font-medium text-gray-700">Test Date:</label>
+                            <label className="text-sm font-medium text-gray-700">ผลวันที่:</label>
                             <input
                                 type="date"
                                 value={selectedDate}
@@ -352,7 +351,7 @@ export default function WaterTestLogManager() {
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                                 <input
                                     type="text"
-                                    placeholder="Search by stage or recorded by..."
+                                    placeholder="ค้นหาบันทึก..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -366,7 +365,7 @@ export default function WaterTestLogManager() {
                                 onChange={(e) => setStageFilter(e.target.value)}
                                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
-                                <option value="All">All Stages</option>
+                                <option value="All">ขั้นตอนทั้งหมด</option>
                                 {stages.map(stage => (
                                     <option key={stage.stage_id} value={stage.stage_name}>{stage.stage_name}</option>
                                 ))}
@@ -376,9 +375,9 @@ export default function WaterTestLogManager() {
                                 onChange={(e) => setSessionFilter(e.target.value)}
                                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
-                                <option value="All">All Sessions</option>
-                                <option value="Morning">Morning</option>
-                                <option value="Afternoon">Afternoon</option>
+                                <option value="All">ทุกช่วง</option>
+                                <option value="Morning">เช้า</option>
+                                <option value="Afternoon">บ่าย</option>
                             </select>
                         </div>
                     </div>
@@ -404,33 +403,33 @@ export default function WaterTestLogManager() {
                 <div className="bg-white rounded-lg shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <h2 className="text-lg font-semibold text-gray-900">
-                            Water Test Logs for {new Date(selectedDate).toLocaleDateString()}
+                            ผลตรวจสอบน้ำในวันที่ {new Date(selectedDate).toLocaleDateString()}
                         </h2>
                     </div>
 
                     {loading ? (
                         <div className="p-8 text-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                            <p className="mt-2 text-gray-500">Loading test logs...</p>
+                            <p className="mt-2 text-gray-500">กำลังโหลดบันทึกการตรวจสอบ...</p>
                         </div>
                     ) : filteredLogs.length === 0 ? (
                         <div className="p-8 text-center">
                             <Droplets className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-500 text-lg">No test logs found</p>
-                            <p className="text-gray-400">Try selecting a different date or clearing filters</p>
+                            <p className="text-gray-500 text-lg">ไม่พบบันทึกการตรวจสอบ</p>
+                            <p className="text-gray-400">ลองเลือกวันที่อื่นหรือล้างตัวกรอง</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">pH</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ขั้นตอน</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ช่วงเวลา</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ค่า pH</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TDS (ppm)</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EC (µS/cm)</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded By</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เวลา</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">บันทึกโดย</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -445,7 +444,7 @@ export default function WaterTestLogManager() {
                                                         ? 'bg-yellow-100 text-yellow-800' 
                                                         : 'bg-orange-100 text-orange-800'
                                                 }`}>
-                                                    {log.test_session}
+                                                    {log.test_session === 'Morning' ? 'เช้า' : 'บ่าย]'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">

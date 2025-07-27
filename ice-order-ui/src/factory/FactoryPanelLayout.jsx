@@ -2,9 +2,9 @@ import React from 'react';
 import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
 
 const factorySubNavItems = [
-    { name: 'Vehicle Fleet', path: '/factory/vehicles', disabled: false },
-    { name: 'Tire Inventory', path: '/factory/tires', disabled: false },
-    { name: 'Water Testing', path: '/factory/water-test', disabled: false },
+    { name: 'ยานพาหนะ', path: '/factory/vehicles', disabled: false },
+    { name: 'คลังยาง', path: '/factory/tires', disabled: false },
+    { name: 'บันทึกผลตรวจน้ำ', path: '/factory/water-test', disabled: false },
 ];
 
 export default function FactoryPanelLayout() {
