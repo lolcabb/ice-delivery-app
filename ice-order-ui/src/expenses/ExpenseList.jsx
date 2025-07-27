@@ -13,7 +13,7 @@ const formatDate = (dateString) => {
     });
 };
 
-// === NEW RECEIPT MODAL COMPONENT ===
+// Updated ReceiptModal component with fixed container styling
 const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
     const [imageState, setImageState] = useState({ loading: true, error: false });
 
@@ -22,6 +22,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
         containerRef, 
         imageRef, 
         imageStyle, 
+        containerStyle,
         handleZoomIn, 
         handleZoomOut,
         handleReset,
@@ -96,12 +97,15 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                         </button>
                     </div>
 
-                    {/* Image Viewer */}
-                    <div className="flex-1 relative bg-gray-50 overflow-hidden">
+                    {/* Image Viewer - Updated with containerStyle */}
+                    <div className="flex-1 relative bg-gray-50">
                         <div
                             ref={containerRef}
                             className="zoom-container w-full h-full flex items-center justify-center"
-                            style={{ minHeight: '60vh' }}
+                            style={{ 
+                                minHeight: '60vh',
+                                ...containerStyle // Apply the containerStyle from the hook
+                            }}
                         >
                             {imageState.loading && (
                                 <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
@@ -119,7 +123,6 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                                     ref={imageRef}
                                     src={imageUrl}
                                     alt="ใบเสร็จ"
-                                    //className={`max-w-full h-auto max-h-[70vh] object-contain rounded transition-opacity duration-300 ${imageState.loading ? 'opacity-0' : 'opacity-100'}`}
                                     className={`max-w-full max-h-full object-contain ${imageState.loading ? 'opacity-0' : 'opacity-100'}`}
                                     onLoad={handleImageLoad}
                                     onError={handleImageError}
@@ -147,7 +150,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                                             title="Zoom Out"
                                         >
                                             <svg className="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM15 10H9" />
                                             </svg>
                                         </button>
                                         <button 
@@ -160,32 +163,19 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                                             </svg>
                                         </button>
                                     </div>
-                                    <div className="bg-white rounded-lg shadow-lg px-3 py-2 text-xs text-gray-600 text-center">
-                                        {Math.round(zoomLevel * 100)}%
+                                    <div className="bg-white rounded-lg shadow-lg px-3 py-1 text-center">
+                                        <span className="text-xs text-gray-600">{Math.round(zoomLevel * 100)}%</span>
                                     </div>
-                                </div>
-                            )}
-
-                            {/* Instructions */}
-                            {!imageState.error && !imageState.loading && (
-                                <div className="absolute bottom-4 left-4 bg-white/90 rounded-lg shadow-lg px-3 py-2 text-xs text-gray-600">
-                                    <div>• ใช้ล้อเมาส์เพื่อซูม</div>
-                                    <div>• ดับเบิลคลิกเพื่อซูมเข้า/ออก</div>
-                                    <div>• ลากเพื่อเลื่อนดูภาพ</div>
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* Footer */}
-                    <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex flex-row-reverse gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm transition-colors"
-                        >
-                            ปิด
-                        </button>
+                    <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex justify-between items-center">
+                        <div className="text-xs text-gray-500">
+                            ใช้ล้อเมาส์เพื่อซูม, ดับเบิลคลิกเพื่อซูมเข้า/ออก, ลากเพื่อเลื่อนดูภาพ
+                        </div>
                         {!imageState.error && (
                             <a
                                 href={imageUrl}

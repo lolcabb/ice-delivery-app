@@ -6,6 +6,7 @@ const MIN_ZOOM = 0.5;
 const ZOOM_BUTTON_STEP = 0.25;
 const SCROLL_ZOOM_SPEED = 0.002;
 const DOUBLE_CLICK_ZOOM = 2;
+const MIN_VISIBLE_AREA = 50; // Minimum pixels of image that must remain visible for dragging back
 
 export const useZoomPan = (isOpen) => {
     const [zoomLevel, setZoomLevel] = useState(1);
@@ -25,7 +26,7 @@ export const useZoomPan = (isOpen) => {
         setIsDragging(val);
     }, []);
 
-    // Calculate boundaries for panning
+    // Calculate boundaries for panning - ensure minimum visible area remains
     const calculateBounds = useCallback(() => {
         if (!imageDimensions.width || !containerDimensions.width) {
             return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
@@ -34,25 +35,35 @@ export const useZoomPan = (isOpen) => {
         const scaledWidth = imageDimensions.width * zoomLevel;
         const scaledHeight = imageDimensions.height * zoomLevel;
 
-        const fitsWidth = scaledWidth <= containerDimensions.width;
-        const fitsHeight = scaledHeight <= containerDimensions.height;
+        // Calculate bounds to ensure MIN_VISIBLE_AREA pixels remain visible
+        // This prevents the image from being dragged completely out of view
+        const minX = containerDimensions.width - scaledWidth + MIN_VISIBLE_AREA;
+        const maxX = -MIN_VISIBLE_AREA;
+        const minY = containerDimensions.height - scaledHeight + MIN_VISIBLE_AREA;
+        const maxY = -MIN_VISIBLE_AREA;
 
-        if (fitsWidth && fitsHeight) {
-            return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-        }
-
-        const maxX = fitsWidth ? 0 : (scaledWidth - containerDimensions.width) / 2;
-        const maxY = fitsHeight ? 0 : (scaledHeight - containerDimensions.height) / 2;
-
-        return { minX: -maxX, maxX, minY: -maxY, maxY };
+        return { minX, maxX, minY, maxY };
     }, [imageDimensions, containerDimensions, zoomLevel]);
 
     // Clamp position within bounds
     const clampPosition = useCallback((x, y) => {
         const bounds = calculateBounds();
+        
+        // Clamp X - ensure minimum visible area remains
+        let clampedX = x;
+        if (bounds.minX < bounds.maxX) {
+            clampedX = Math.max(bounds.minX, Math.min(bounds.maxX, x));
+        }
+        
+        // Clamp Y - ensure minimum visible area remains
+        let clampedY = y;
+        if (bounds.minY < bounds.maxY) {
+            clampedY = Math.max(bounds.minY, Math.min(bounds.maxY, y));
+        }
+        
         return {
-            x: Math.max(bounds.minX, Math.min(bounds.maxX, x)),
-            y: Math.max(bounds.minY, Math.min(bounds.maxY, y))
+            x: clampedX,
+            y: clampedY
         };
     }, [calculateBounds]);
 
@@ -113,6 +124,8 @@ export const useZoomPan = (isOpen) => {
         const newY = y - (y - imagePosition.y) * zoomRatio;
 
         setZoomLevel(newZoom);
+        
+        // Clamp the new position with the new zoom level
         const clamped = clampPosition(newX, newY);
         setImagePosition(clamped);
         imagePositionRef.current = clamped;
@@ -167,7 +180,7 @@ export const useZoomPan = (isOpen) => {
 
         // Mouse down handler
         const handleMouseDown = (e) => {
-            if (e.button !== 0 || zoomLevel <= 1) return; // Only left click and when zoomed
+            if (e.button !== 0) return; // Only left click
             
             e.preventDefault();
             e.stopPropagation();
@@ -205,7 +218,7 @@ export const useZoomPan = (isOpen) => {
             
             // Reset cursor
             document.body.style.cursor = '';
-            if (container) container.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+            if (container) container.style.cursor = 'grab';
         };
 
         // Mouse wheel zoom
@@ -213,7 +226,46 @@ export const useZoomPan = (isOpen) => {
             e.preventDefault();
             const delta = -e.deltaY * SCROLL_ZOOM_SPEED;
             const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel + delta));
-            zoomToPoint(newZoom, e.clientX, e.clientY);
+            
+            // Update zoom level first to ensure correct bounds calculation
+            const prevZoom = zoomLevel;
+            setZoomLevel(newZoom);
+            
+            // Then calculate the new position
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            
+            const zoomRatio = newZoom / prevZoom;
+            
+            // Adjust position to keep the zoom point stationary
+            const newPosX = x - (x - imagePositionRef.current.x) * zoomRatio;
+            const newPosY = y - (y - imagePositionRef.current.y) * zoomRatio;
+            
+            // Need to manually calculate bounds with new zoom for immediate update
+            const scaledWidth = imageDimensions.width * newZoom;
+            const scaledHeight = imageDimensions.height * newZoom;
+            
+            const bounds = {
+                minX: containerDimensions.width - scaledWidth + MIN_VISIBLE_AREA,
+                maxX: -MIN_VISIBLE_AREA,
+                minY: containerDimensions.height - scaledHeight + MIN_VISIBLE_AREA,
+                maxY: -MIN_VISIBLE_AREA
+            };
+            
+            let clampedX = newPosX;
+            if (bounds.minX < bounds.maxX) {
+                clampedX = Math.max(bounds.minX, Math.min(bounds.maxX, newPosX));
+            }
+            
+            let clampedY = newPosY;
+            if (bounds.minY < bounds.maxY) {
+                clampedY = Math.max(bounds.minY, Math.min(bounds.maxY, newPosY));
+            }
+            
+            const clamped = { x: clampedX, y: clampedY };
+            setImagePosition(clamped);
+            imagePositionRef.current = clamped;
         };
 
         // Double click to zoom
@@ -231,7 +283,7 @@ export const useZoomPan = (isOpen) => {
         let lastTouchDistance = 0;
 
         const handleTouchStart = (e) => {
-            if (e.touches.length === 1 && zoomLevel > 1) {
+            if (e.touches.length === 1) {
                 const touch = e.touches[0];
                 setDragging(true);
                 dragStartRef.current = {
@@ -293,7 +345,7 @@ export const useZoomPan = (isOpen) => {
         document.addEventListener('mouseup', handleMouseUp);
 
         // Set initial cursor
-        container.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
+        container.style.cursor = 'grab';
 
         return () => {
             container.removeEventListener('mousedown', handleMouseDown);
@@ -309,13 +361,13 @@ export const useZoomPan = (isOpen) => {
             // Reset cursor
             document.body.style.cursor = '';
         };
-    }, [isOpen, zoomLevel, clampPosition, zoomToPoint, handleReset]);
+    }, [isOpen, zoomLevel, imageDimensions, containerDimensions, clampPosition, handleReset]);
 
-    // Update cursor when zoom level changes
+    // Update cursor when dragging state changes
     useEffect(() => {
         if (!containerRef.current) return;
-        containerRef.current.style.cursor = zoomLevel > 1 ? 'grab' : 'default';
-    }, [zoomLevel]);
+        containerRef.current.style.cursor = isDragging ? 'grabbing' : 'grab';
+    }, [isDragging]);
 
     // Image load handler
     const handleImageLoad = useCallback(() => {
@@ -331,7 +383,15 @@ export const useZoomPan = (isOpen) => {
         userSelect: 'none',
         touchAction: 'none',
         willChange: isDragging ? 'transform' : 'auto',
-        pointerEvents: 'none' // Important: prevent image from capturing mouse events
+        pointerEvents: 'none', // Important: prevent image from capturing mouse events
+        position: 'relative', // Ensure proper positioning
+        zIndex: 1 // Ensure image is above container background
+    };
+
+    const containerStyle = {
+        overflow: 'visible', // Allow image to render outside container bounds
+        position: 'relative', // Ensure proper positioning context
+        clipPath: 'inset(0)', // Create a clipping context that respects the container bounds
     };
 
     return {
@@ -340,6 +400,7 @@ export const useZoomPan = (isOpen) => {
         zoomLevel,
         isDragging,
         imageStyle,
+        containerStyle,
         handleZoomIn,
         handleZoomOut,
         handleReset,
