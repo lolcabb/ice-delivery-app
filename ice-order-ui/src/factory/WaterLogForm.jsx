@@ -43,7 +43,7 @@ const WaterLogForm = ({
         });
 
         if (!hasData) {
-            alert('Please enter at least one test value before submitting');
+            alert('กรุณากรอกค่าอย่างน้อยหนึ่งค่าก่อนบันทึก');
             return;
         }
 
@@ -91,8 +91,7 @@ const WaterLogForm = ({
                                 <Droplets className="w-6 h-6 text-blue-600" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-semibold text-gray-900">Log Water Quality Tests</h2>
-                                <p className="text-sm text-gray-600">Enter test values for all treatment stages</p>
+                                <h2 className="text-xl font-semibold text-gray-900">แบบฟอร์มตรวจสอบคุณภาพน้ำ</h2>
                             </div>
                         </div>
                         <button
@@ -107,7 +106,7 @@ const WaterLogForm = ({
                     <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center gap-3">
                             <Calendar className="w-5 h-5 text-blue-600" />
-                            <label className="text-sm font-medium text-blue-900">Test Date:</label>
+                            <label className="text-sm font-medium text-blue-900">วันที่ตรวจสอบ:</label>
                             <input
                                 type="date"
                                 value={selectedDate}
@@ -116,7 +115,7 @@ const WaterLogForm = ({
                                 max={getISODate(new Date())}
                             />
                             <div className="ml-auto text-xs text-blue-700">
-                                <strong>Note:</strong> Empty fields will be skipped during submission
+                                <strong>หมายเหตุ:</strong> กรอกค่าที่วัดได้จากการตรวจสอบคุณภาพน้ำในแต่ละขั้นตอน สามารถกรอกเฉพาะช่วงเวลาที่ต้องการได้
                             </div>
                         </div>
                     </div>
@@ -126,19 +125,19 @@ const WaterLogForm = ({
                         <div className="flex items-start gap-3">
                             <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
                             <div>
-                                <h3 className="text-sm font-medium text-yellow-900 mb-2">Safety Guidelines & Thresholds</h3>
+                                <h3 className="text-sm font-medium text-yellow-900 mb-2">ช่วงค่ามาตรฐาน</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-yellow-800">
                                     <div>
                                         <strong>pH Level:</strong> {dangerThresholds?.ph_value?.min} - {dangerThresholds?.ph_value?.max}
-                                        <div className="text-yellow-700">Optimal: 7.0 - 7.5</div>
+                                        <div className="text-yellow-700">ค่าเหมาะสม: 6.5 - 8.5</div>
                                     </div>
                                     <div>
                                         <strong>TDS:</strong> 0 - {dangerThresholds?.tds_ppm_value?.max} ppm
-                                        <div className="text-yellow-700">Target: &lt; 50 ppm (RO output)</div>
+                                        <div className="text-yellow-700">ค่าเหมาะสม: &lt; 50 ppm (หลัง RO)</div>
                                     </div>
                                     <div>
                                         <strong>EC:</strong> 0 - {dangerThresholds?.ec_us_cm_value?.max} µS/cm
-                                        <div className="text-yellow-700">Target: &lt; 100 µS/cm (RO output)</div>
+                                        <div className="text-yellow-700">ค่าเหมาะสม: &lt; 100 µS/cm (หลัง RO)</div>
                                     </div>
                                 </div>
                             </div>
@@ -151,13 +150,13 @@ const WaterLogForm = ({
                             <thead>
                                 <tr className="bg-gray-50">
                                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                                        Treatment Stage
+                                        ขั้นตอนการกรองน้ำ
                                     </th>
                                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                                        Session
+                                        ช่วงทดสอบ
                                     </th>
                                     <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                        pH Level {getParameterThreshold('ph_value')}
+                                        ค่า pH {getParameterThreshold('ph_value')}
                                     </th>
                                     <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
                                         TDS (ppm) {getParameterThreshold('tds_ppm_value')}
@@ -260,20 +259,20 @@ const WaterLogForm = ({
                         <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
                             <div className="flex items-center gap-1">
                                 <div className="w-3 h-3 bg-green-50 border border-green-300 rounded"></div>
-                                <span>Safe values</span>
+                                <span>ช่วงปลอดภัย</span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <div className="w-3 h-3 bg-red-50 border border-red-300 rounded"></div>
                                 <AlertTriangle className="w-3 h-3 text-red-500" />
-                                <span>Dangerous values (outside safe range)</span>
+                                <span>ค่าอันตราย</span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <Sun className="w-3 h-3 text-yellow-600" />
-                                <span>Morning tests</span>
+                                <span>ตรวจน้ำช่วงเช้า</span>
                             </div>
                             <div className="flex items-center gap-1">
                                 <Moon className="w-3 h-3 text-blue-600" />
-                                <span>Afternoon tests</span>
+                                <span>ตรวจน้ำช่วงบ่าย</span>
                             </div>
                         </div>
                     </div>
@@ -285,7 +284,7 @@ const WaterLogForm = ({
                             onClick={onClose}
                             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         >
-                            Cancel
+                            ยกเลิก
                         </button>
                         <button
                             type="button"
@@ -294,7 +293,7 @@ const WaterLogForm = ({
                             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                         >
                             <Save className="w-5 h-5" />
-                            {loading ? 'Submitting...' : 'Submit All Tests'}
+                            {loading ? 'กำลังบันทึก...' : 'บันทึกผลการตรวจสอบทั้งหมด'}
                         </button>
                     </div>
                 </div>

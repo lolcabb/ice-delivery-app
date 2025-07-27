@@ -45,7 +45,7 @@ const MaintenanceModal = ({
                                 <Wrench className="w-5 h-5 text-green-600" />
                             </div>
                             <h2 className="text-xl font-semibold text-gray-900">
-                                Add Maintenance Record
+                                เพิ่มบันทึกการบำรุงรักษา
                             </h2>
                         </div>
                         <button
@@ -58,7 +58,7 @@ const MaintenanceModal = ({
 
                     {/* Vehicle Info Banner */}
                     <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h3 className="font-medium text-blue-900 mb-1">Vehicle Information</h3>
+                        <h3 className="font-medium text-blue-900 mb-1">ข้อมูลยานพาหนะ</h3>
                         <p className="text-sm text-blue-800">
                             <span className="font-medium">{selectedVehicle?.vehicle_name}</span>
                             {selectedVehicle?.license_plate && (
@@ -77,7 +77,7 @@ const MaintenanceModal = ({
                         {/* Maintenance Date */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Maintenance Date *
+                                วันที่ซ่อมบำรุง *
                             </label>
                             <input
                                 type="date"
@@ -91,21 +91,21 @@ const MaintenanceModal = ({
                         {/* Description */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Description *
+                                รายละเอียดงาน *
                             </label>
                             <textarea
                                 rows={4}
                                 value={maintenanceForm.description || ''}
                                 onChange={(e) => handleInputChange('description', e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="Describe the maintenance work performed (e.g., Oil change, brake inspection, tire rotation...)"
+                                placeholder="รายละเอียดงานที่ทำ (เช่น เปลี่ยนน้ำมันเครื่อง, ตรวจเบรก)"
                             />
                         </div>
 
                         {/* Cost */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Cost (Optional)
+                                ค่าใช้จ่าย (ถ้ามี)
                             </label>
                             <div className="relative">
                                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">฿</span>
@@ -124,7 +124,7 @@ const MaintenanceModal = ({
                         {/* Next Maintenance Due */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Next Maintenance Due (Optional)
+                                กำหนดซ่อมบำรุงครั้งต่อไป (ถ้ามี)
                             </label>
                             <input
                                 type="date"
@@ -134,7 +134,7 @@ const MaintenanceModal = ({
                                 min={getTodayDate()}
                             />
                             <p className="text-xs text-gray-500 mt-1">
-                                Set a reminder for the next scheduled maintenance
+                                กำหนดวันที่เตือนการซ่อมบำรุงครั้งต่อไป
                             </p>
                         </div>
                     </div>
@@ -145,14 +145,14 @@ const MaintenanceModal = ({
                             onClick={onClose}
                             className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         >
-                            Cancel
+                            ยกเลิก
                         </button>
                         <button
                             onClick={handleSubmit}
                             disabled={loading}
                             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                         >
-                            {loading ? 'Adding...' : 'Add Maintenance'}
+                            {loading ? 'กำลังเพิ่ม...' : 'เพิ่มบันทึก'}
                         </button>
                     </div>
                 </div>

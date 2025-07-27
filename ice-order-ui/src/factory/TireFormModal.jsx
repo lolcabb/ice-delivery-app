@@ -23,7 +23,7 @@ const TireFormModal = ({
     const handleSubmit = () => {
         // Basic validation
         if (!tireForm.serial_number || !tireForm.brand || !tireForm.sidewall) {
-            alert('Please fill in all required fields');
+            alert('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
         onSubmit();
@@ -65,7 +65,7 @@ const TireFormModal = ({
                                 <Package className="w-5 h-5 text-green-600" />
                             </div>
                             <h2 className="text-xl font-semibold text-gray-900">
-                                {isEdit ? 'Edit Tire' : 'Add New Tire'}
+                                {isEdit ? 'แก้ไขข้อมูลยาง' : 'เพิ่มยางใหม่'}
                             </h2>
                         </div>
                         <button
@@ -213,7 +213,7 @@ const TireFormModal = ({
                             disabled={loading}
                             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                         >
-                            {loading ? (isEdit ? 'Updating...' : 'Adding...') : (isEdit ? 'แก้ไขยาง' : 'เพิ่มยาง')}
+                            {loading ? (isEdit ? 'กำลังอัปเดต...' : 'กำลังเพิ่ม...') : (isEdit ? 'แก้ไขยาง' : 'เพิ่มยาง')}
                         </button>
                     </div>
                 </div>

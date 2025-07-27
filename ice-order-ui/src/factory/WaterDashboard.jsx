@@ -24,6 +24,14 @@ const WaterDashboard = ({
         }
     };
 
+    const getSeverityText = (severity) => {
+        switch (severity) {
+            case 'high': return 'ความเสี่ยงสูง';
+            case 'medium': return 'ความเสี่ยงปานกลาง';
+            default: return 'ความเสี่ยงต่ำ';
+        }
+    };
+
     const formatParameterName = (parameter) => {
         switch (parameter) {
             case 'ph_value': return 'pH Level';
@@ -31,6 +39,10 @@ const WaterDashboard = ({
             case 'ec_us_cm_value': return 'EC';
             default: return parameter.replace('_', ' ').toUpperCase();
         }
+    };
+
+    const translateSession = (session) => {
+        return session === 'Morning' ? 'ช่วงเช้า' : 'ช่วงบ่าย';
     };
 
     return (
@@ -41,7 +53,7 @@ const WaterDashboard = ({
                     <div className="flex items-center gap-3 mb-4">
                         <AlertTriangle className="w-6 h-6 text-red-600" />
                         <h2 className="text-lg font-semibold text-red-800">
-                            🚨 Water Quality Alerts ({dashboardData.dangerousValues.length})
+                            🚨 การแจ้งเตือนคุณภาพน้ำ ({dashboardData.dangerousValues.length})
                         </h2>
                     </div>
                     
@@ -51,10 +63,10 @@ const WaterDashboard = ({
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
                                         <p className="font-medium text-gray-900">{alert.stage_name}</p>
-                                        <p className="text-sm text-gray-600">{alert.test_session}</p>
+                                        <p className="text-sm text-gray-600">{translateSession(alert.test_session)}</p>
                                     </div>
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getSeverityColor(alert.severity)}`}>
-                                        {alert.severity} risk
+                                        {getSeverityText(alert.severity)}
                                     </span>
                                 </div>
                                 
@@ -64,7 +76,7 @@ const WaterDashboard = ({
                                         <span className="ml-1 font-semibold">{alert.value}</span> {alert.threshold.unit}
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                        Safe range: {alert.threshold.min} - {alert.threshold.max} {alert.threshold.unit}
+                                        ช่วงปลอดภัย: {alert.threshold.min} - {alert.threshold.max} {alert.threshold.unit}
                                     </p>
                                     <p className="text-xs text-gray-400">
                                         {new Date(alert.test_timestamp).toLocaleDateString()} • {new Date(alert.test_timestamp).toLocaleTimeString()}
@@ -77,8 +89,8 @@ const WaterDashboard = ({
                     {dashboardData.dangerousValues.length > 6 && (
                         <div className="mt-4 text-center">
                             <p className="text-sm text-red-600">
-                                +{dashboardData.dangerousValues.length - 6} more alerts. 
-                                <span className="font-medium"> Immediate attention required!</span>
+                                +{dashboardData.dangerousValues.length - 6} การแจ้งเตือน. 
+                                <span className="font-medium"> โปรดติดตามการตรวจสอบค่าน้ำ</span>
                             </p>
                         </div>
                     )}
@@ -91,7 +103,7 @@ const WaterDashboard = ({
                 <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600">pH Level (7 days avg)</p>
+                            <p className="text-sm text-gray-600">ค่า pH (เฉลี่ย 7 วัน)</p>
                             <div className="flex items-center gap-2 mt-1">
                                 <p className="text-2xl font-semibold text-gray-900">
                                     {dashboardData.averages?.ph_value || 'N/A'}
@@ -112,7 +124,7 @@ const WaterDashboard = ({
                                 )}
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                                Safe range: {dangerThresholds.ph_value.min} - {dangerThresholds.ph_value.max}
+                                ช่วงปลอดภัย: {dangerThresholds.ph_value.min} - {dangerThresholds.ph_value.max}
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -128,7 +140,7 @@ const WaterDashboard = ({
                 <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600">TDS (7 days avg)</p>
+                            <p className="text-sm text-gray-600">TDS (เฉลี่ย 7 วัน)</p>
                             <div className="flex items-center gap-2 mt-1">
                                 <p className="text-2xl font-semibold text-gray-900">
                                     {dashboardData.averages?.tds_ppm_value || 'N/A'}
@@ -145,7 +157,7 @@ const WaterDashboard = ({
                                 )}
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                                Safe range: 0 - {dangerThresholds.tds_ppm_value.max} ppm
+                                ช่วงปลอดภัย: 0 - {dangerThresholds.tds_ppm_value.max} ppm
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -161,7 +173,7 @@ const WaterDashboard = ({
                 <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600">EC (7 days avg)</p>
+                            <p className="text-sm text-gray-600">EC (เฉลี่ย 7 วัน)</p>
                             <div className="flex items-center gap-2 mt-1">
                                 <p className="text-2xl font-semibold text-gray-900">
                                     {dashboardData.averages?.ec_us_cm_value || 'N/A'}
@@ -178,7 +190,7 @@ const WaterDashboard = ({
                                 )}
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                                Safe range: 0 - {dangerThresholds.ec_us_cm_value.max} µS/cm
+                                ช่วงปลอดภัย: 0 - {dangerThresholds.ec_us_cm_value.max} µS/cm
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -198,18 +210,18 @@ const WaterDashboard = ({
                         <div className="flex items-center gap-2">
                             <CheckCircle className="w-5 h-5 text-green-600" />
                             <span className="text-sm text-gray-700">
-                                Recent Tests: {dashboardData.recentLogs?.length || 0}
+                                การตรวจสอบล่าสุด: {dashboardData.recentLogs?.length || 0}
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
                             <AlertTriangle className="w-5 h-5 text-red-600" />
                             <span className="text-sm text-gray-700">
-                                Active Alerts: {dashboardData.dangerousValues?.length || 0}
+                                การแจ้งเตือน: {dashboardData.dangerousValues?.length || 0}
                             </span>
                         </div>
                     </div>
                     <div className="text-xs text-gray-500">
-                        Last updated: {new Date().toLocaleTimeString()}
+                        อัปเดตล่าสุด: {new Date().toLocaleTimeString()}
                     </div>
                 </div>
             </div>
