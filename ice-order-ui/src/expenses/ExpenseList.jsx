@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '../utils/currency';
 import PaymentMethodBadge from '../components/PaymentMethodBadge';
+import { useZoomPan } from '../hooks/useZoomPan';
 
 const formatDate = (dateString) => {
     if (!dateString) return 'ไม่มีข้อมูล';
@@ -14,240 +15,110 @@ const formatDate = (dateString) => {
 
 // === NEW RECEIPT MODAL COMPONENT ===
 const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
-    // Add error state for image loading - MUST be called before any early returns
-    const [imageError, setImageError] = useState(false);
-    const [imageLoading, setImageLoading] = useState(true);
-    const [zoomLevel, setZoomLevel] = useState(1);
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
-    
-    // Zoom functions - MUST be defined before early return
-    const handleZoomIn = () => {
-        setZoomLevel(prev => Math.min(prev + 0.25, 3));
-    };
+    const [imageState, setImageState] = useState({ loading: true, error: false });
 
-    const handleZoomOut = () => {
-        setZoomLevel(prev => Math.max(prev - 0.25, 0.5));
-    };
+    // Use the custom hook to manage zoom/pan interactions
+    const { 
+        containerRef, 
+        imageRef, 
+        imageStyle, 
+        handleZoomIn, 
+        handleZoomOut 
+    } = useZoomPan(isOpen);
 
-    const handleResetZoom = () => {
-        setZoomLevel(1);
-        setImagePosition({ x: 0, y: 0 });
-    };
-
-    // Mouse drag functions for panning when zoomed
-    const handleMouseDown = (e) => {
-        if (zoomLevel > 1) {
-            setIsDragging(true);
-            setDragStart({
-                x: e.clientX - imagePosition.x,
-                y: e.clientY - imagePosition.y
-            });
-        }
-    };
-    
-    // Reset error state when imageUrl changes - MUST be called before any early returns
+    // Reset image state when the URL or modal visibility changes
     useEffect(() => {
-        setImageError(false);
-        setImageLoading(true);
-        // Reset zoom and position when new image loads
-        setZoomLevel(1);
-        setImagePosition({ x: 0, y: 0 });
+        setImageState({ loading: true, error: false });
     }, [imageUrl, isOpen]);
 
-    // Keyboard shortcuts and mouse events - MUST be called before any early returns
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (!isOpen) return;
-            
-            // Only keep Escape key for closing
-            if (e.key === 'Escape') {
-                onClose();
-            }
-        };
-
-        const handleMouseMove = (e) => {
-            if (isDragging && zoomLevel > 1) {
-                setImagePosition({
-                    x: e.clientX - dragStart.x,
-                    y: e.clientY - dragStart.y
-                });
-            }
-        };
-
-        const handleMouseUp = () => {
-            setIsDragging(false);
-        };
-
-        // Handle scroll wheel for zooming
-        const handleWheel = (e) => {
-            if (!isOpen) return;
-            
-            // Check if the wheel event is over the image container
-            const imageContainer = e.target.closest('.zoom-container');
-            if (!imageContainer) return;
-            
-            e.preventDefault();
-            
-            const delta = e.deltaY;
-            const zoomSpeed = 0.1;
-            
-            if (delta < 0) {
-                // Scroll up - zoom in
-                setZoomLevel(prev => Math.min(prev + zoomSpeed, 3));
-            } else {
-                // Scroll down - zoom out
-                setZoomLevel(prev => Math.max(prev - zoomSpeed, 0.5));
-            }
-        };
-
-        if (isOpen) {
-            window.addEventListener('keydown', handleKeyDown);
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-            window.addEventListener('wheel', handleWheel, { passive: false });
-        }
-
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-            window.removeEventListener('wheel', handleWheel);
-        };
-    }, [isOpen, isDragging, dragStart, zoomLevel, onClose]);
-    
-    // Add error boundary and debugging
-    
-    // Early return AFTER all hooks are called
+    // Early return if modal is not open (all hooks have been called)
     if (!isOpen) return null;
 
-    const handleImageLoad = () => {
-        setImageLoading(false);
-    };
-
-    const handleImageError = (e) => {
-        console.error('Image failed to load:', {
-            src: e.target.src,
-            error: e,
-            naturalWidth: e.target.naturalWidth,
-            naturalHeight: e.target.naturalHeight
-        });
-        setImageError(true);
-        setImageLoading(false);
-    };
+    const handleImageLoad = () => setImageState({ loading: false, error: false });
+    const handleImageError = () => setImageState({ loading: false, error: true });
 
     const handleOverlayClick = (e) => {
-        // Only close if clicking the overlay itself, not the modal content
         if (e.target === e.currentTarget) {
             onClose();
         }
     };
+    
+    // Listen for Escape key to close the modal
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose]);
 
     return (
         <div 
             className="fixed inset-0 z-50 overflow-y-auto"
             onClick={handleOverlayClick}
+            aria-labelledby="modal-title"
+            role="dialog"
+            aria-modal="true"
         >
-            <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="flex items-center justify-center min-h-screen p-4 text-center">
                 {/* Backdrop */}
-                <div 
-                    className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-                    aria-hidden="true"
-                ></div>
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
 
-                {/* Modal */}
-                <div className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full max-h-screen">
+                {/* Modal Content */}
+                <div className="relative inline-block bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all my-8 max-w-4xl w-full">
                     {/* Header */}
-                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg leading-6 font-medium text-gray-900">
-                                ใบเสร็จ/หลักฐาน
-                            </h3>
-                            <button
-                                onClick={onClose}
-                                className="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600"
-                                type="button"
-                            >
-                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+                    <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 flex items-start justify-between">
+                        <div>
+                            <h3 id="modal-title" className="text-lg leading-6 font-medium text-gray-900">ใบเสร็จ/หลักฐาน</h3>
+                            {expenseDescription && (
+                                <p className="mt-2 text-sm text-gray-600">{expenseDescription}</p>
+                            )}
                         </div>
-                        {expenseDescription && (
-                            <p className="mt-2 text-sm text-gray-600">{expenseDescription}</p>
-                        )}
+                        <button onClick={onClose} className="text-gray-400 hover:text-gray-500">
+                            <span className="sr-only">Close</span>
+                            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
 
-                    {/* Image Content */}
+                    {/* Image Viewer */}
                     <div className="px-4 pb-4 sm:px-6 sm:pb-6">
-                        <div className="relative bg-gray-50 rounded-lg p-4 min-h-[200px] flex items-center justify-center zoom-container">
-                            {imageLoading && !imageError && (
-                                <div className="text-gray-500">กำลังโหลดรูปภาพ...</div>
-                            )}
+                        <div
+                            ref={containerRef}
+                            className="zoom-container relative bg-gray-100 rounded-lg min-h-[50vh] flex items-center justify-center overflow-hidden"
+                        >
+                            {imageState.loading && <div className="text-gray-500">กำลังโหลดรูปภาพ...</div>}
                             
-                            {imageError ? (
-                                <div className="text-center text-gray-500">
-                                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                    <p className="mt-2">ไม่สามารถโหลดรูปภาพได้</p>
-                                    <p className="text-xs text-gray-400 mt-1">URL: {imageUrl}</p>
+                            {imageState.error ? (
+                                <div className="text-center text-red-500 p-4">
+                                    <p>ไม่สามารถโหลดรูปภาพได้</p>
+                                    <p className="text-xs text-gray-400 mt-1 truncate">URL: {imageUrl}</p>
                                 </div>
                             ) : (
                                 <img
+                                    ref={imageRef}
                                     src={imageUrl}
                                     alt="ใบเสร็จ"
-                                    className={`max-w-full h-auto max-h-[70vh] object-contain rounded ${imageLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
+                                    className={`max-w-full h-auto max-h-[70vh] object-contain rounded transition-opacity duration-300 ${imageState.loading ? 'opacity-0' : 'opacity-100'}`}
                                     onLoad={handleImageLoad}
                                     onError={handleImageError}
-                                    onMouseDown={handleMouseDown}
+                                    style={imageStyle}
                                     onDragStart={(e) => e.preventDefault()}
-                                    style={{
-                                        transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${zoomLevel})`,
-                                        cursor: isDragging ? 'grabbing' : zoomLevel > 1 ? 'grab' : 'auto',
-                                    }}
                                 />
                             )}
 
                             {/* Zoom Controls */}
-                            <div className="absolute top-2 right-2 flex flex-col space-y-1">
-                                <button
-                                    type="button"
-                                    onClick={handleZoomIn}
-                                    className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"
-                                >
-                                    +
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleZoomOut}
-                                    className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"
-                                >
-                                    −
-                                </button>
+                            <div className="absolute top-2 right-2 flex flex-col space-y-1 bg-white/70 rounded-md shadow-lg">
+                                <button onClick={handleZoomIn} className="p-2 text-gray-700 hover:bg-gray-200 rounded-t-md">Zoom In (+)</button>
+                                <button onClick={handleZoomOut} className="p-2 text-gray-700 hover:bg-gray-200 rounded-b-md">Zoom Out (-)</button>
                             </div>
                         </div>
                     </div>
 
                     {/* Footer */}
                     <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
-                        >
-                            ปิด
-                        </button>
-                        {imageUrl && !imageError && (
-                            <a
-                                href={imageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                            >
-                                เปิดในแท็บใหม่
-                            </a>
+                        <button type="button" onClick={onClose} className="...">ปิด</button>
+                        {!imageState.error && (
+                            <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="...">เปิดในแท็บใหม่</a>
                         )}
                     </div>
                 </div>
