@@ -27,21 +27,24 @@ export const useZoomPan = (isOpen) => {
 
     // Calculate boundaries for panning
     const calculateBounds = useCallback(() => {
-        if (!imageDimensions.width || !containerDimensions.width) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+        if (!imageDimensions.width || !containerDimensions.width) {
+            return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+        }
 
         const scaledWidth = imageDimensions.width * zoomLevel;
         const scaledHeight = imageDimensions.height * zoomLevel;
 
-        // If image is smaller than container, center it
-        if (scaledWidth <= containerDimensions.width) {
+        const fitsWidth = scaledWidth <= containerDimensions.width;
+        const fitsHeight = scaledHeight <= containerDimensions.height;
+
+        if (fitsWidth && fitsHeight) {
             return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
         }
 
-        // Calculate how much the image can move
-        const maxX = (scaledWidth - containerDimensions.width) / 2;
-        const maxY = Math.max(0, (scaledHeight - containerDimensions.height) / 2);
+        const maxX = fitsWidth ? 0 : (scaledWidth - containerDimensions.width) / 2;
+        const maxY = fitsHeight ? 0 : (scaledHeight - containerDimensions.height) / 2;
 
-        return { minX: -maxX, maxX: maxX, minY: -maxY, maxY: maxY };
+        return { minX: -maxX, maxX, minY: -maxY, maxY };
     }, [imageDimensions, containerDimensions, zoomLevel]);
 
     // Clamp position within bounds
