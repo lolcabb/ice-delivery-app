@@ -14,6 +14,7 @@ export default function WaterTestLogManager() {
     const [error, setError] = useState(null);
     const [showLogForm, setShowLogForm] = useState(false);
     const [showDashboard, setShowDashboard] = useState(true);
+    const [initialLoad, setInitialLoad] = useState(true);
     
     // Filter states
     const [searchTerm, setSearchTerm] = useState('');
@@ -58,7 +59,7 @@ export default function WaterTestLogManager() {
         }
     }, []);
 
-    const fetchLogs = useCallback(async (date) => {
+    const fetchLogs = useCallback(async (date, showWarning = true) => {
         setLoading(true);
         setError(null);
         try {
@@ -68,7 +69,9 @@ export default function WaterTestLogManager() {
             console.error('Error fetching water logs:', err);
             if (err.status === 404) {
                 setLogs([]);
-                setError('ไม่มีบันทึกการตรวจสอบน้ำ');
+                if (showWarning) {
+                    setError('ไม่มีบันทึกการตรวจสอบน้ำ');
+                }
             } else {
                 setError('ไม่สามารถโหลดบันทึกการตรวจสอบน้ำได้ กรุณาลองใหม่อีกครั้ง');
             }
@@ -160,7 +163,8 @@ export default function WaterTestLogManager() {
     }, [fetchStages, fetchDashboardData]);
 
     useEffect(() => {
-        fetchLogs(selectedDate);
+        fetchLogs(selectedDate, !initialLoad);
+        setInitialLoad(false);
     }, [selectedDate, fetchLogs]);
 
     const resetForm = useCallback(() => {
