@@ -48,7 +48,7 @@ export default function VehicleMonitor() {
             setVehicles(Array.isArray(data) ? data : []);
         } catch (err) {
             console.error('Failed to fetch vehicles:', err);
-            setError('Failed to fetch vehicles. Please try again.');
+            setError('ไม่สามารถโหลดข้อมูลยานพาหนะได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -105,7 +105,7 @@ export default function VehicleMonitor() {
 
     const handleAddVehicle = async () => {
         if (!vehicleForm.vehicle_name || !vehicleForm.license_plate || !vehicleForm.vehicle_type) {
-            setError('Please fill in all required fields');
+            setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
 
@@ -118,7 +118,7 @@ export default function VehicleMonitor() {
             setError(null);
         } catch (err) {
             console.error('Failed to add vehicle:', err);
-            setError('Failed to add vehicle. Please try again.');
+            setError('ไม่สามารถเพิ่มยานพาหนะได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -126,7 +126,7 @@ export default function VehicleMonitor() {
 
     const handleEditVehicle = async () => {
         if (!vehicleForm.vehicle_name || !vehicleForm.license_plate || !vehicleForm.vehicle_type) {
-            setError('Please fill in all required fields');
+            setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
 
@@ -142,14 +142,14 @@ export default function VehicleMonitor() {
             setError(null);
         } catch (err) {
             console.error('Failed to update vehicle:', err);
-            setError('Failed to update vehicle. Please try again.');
+            setError('ไม่สามารถแก้ไขยานพาหนะได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteVehicle = async (vehicleId) => {
-        if (!window.confirm('Are you sure you want to delete this vehicle?')) return;
+        if (!window.confirm('คุณแน่ใจหรือไม่ที่จะลบยานพาหนะนี้?')) return;
         
         setLoading(true);
         try {
@@ -158,7 +158,7 @@ export default function VehicleMonitor() {
             setError(null);
         } catch (err) {
             console.error('Failed to delete vehicle:', err);
-            setError('Failed to delete vehicle. Please try again.');
+            setError('ไม่สามารถลบยานพาหนะได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -186,7 +186,7 @@ export default function VehicleMonitor() {
 
     const handleAddMaintenance = async () => {
         if (!maintenanceForm.maintenance_date || !maintenanceForm.description) {
-            setError('Please fill in the maintenance date and description');
+            setError('กรุณากรอกวันที่และรายละเอียดการซ่อมบำรุง');
             return;
         }
 
@@ -203,7 +203,7 @@ export default function VehicleMonitor() {
             setError(null);
         } catch (err) {
             console.error('Failed to add maintenance record:', err);
-            setError('Failed to add maintenance record. Please try again.');
+            setError('ไม่สามารถเพิ่มบันทึกการซ่อมบำรุงได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -222,8 +222,8 @@ export default function VehicleMonitor() {
                                 <Truck className="w-6 h-6 text-blue-600" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900">Vehicle Fleet Management</h1>
-                                <p className="text-gray-600">Manage your fleet vehicles and maintenance records</p>
+                                <h1 className="text-2xl font-bold text-gray-900">การจัดการยานพาหนะ</h1>
+                                <p className="text-gray-600">จัดการยานพาหนะและบันทึกการบำรุงรักษา</p>
                             </div>
                         </div>
                         <button
@@ -231,7 +231,7 @@ export default function VehicleMonitor() {
                             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                         >
                             <Plus className="w-5 h-5" />
-                            Add Vehicle
+                            เพิ่มยานพาหนะ
                         </button>
                     </div>
                 </div>
@@ -242,7 +242,7 @@ export default function VehicleMonitor() {
                         <div className="flex-1">
                             <input
                                 type="text"
-                                placeholder="Search vehicles..."
+                                placeholder="ค้นหายานพาหนะ..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -254,17 +254,17 @@ export default function VehicleMonitor() {
                                 onChange={(e) => setStatusFilter(e.target.value)}
                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
-                                <option value="All">All Statuses</option>
-                                <option value="Active">Active</option>
-                                <option value="In-Shop">In-Shop</option>
-                                <option value="Out of Service">Out of Service</option>
+                                <option value="All">สถานะทั้งหมด</option>
+                                <option value="Active">ใช้งาน</option>
+                                <option value="In-Shop">ซ่อมบำรุง</option>
+                                <option value="Out of Service">ไม่ใช้งาน</option>
                             </select>
                             <select
                                 value={typeFilter}
                                 onChange={(e) => setTypeFilter(e.target.value)}
                                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
-                                <option value="All">All Types</option>
+                                <option value="All">ประเภททั้งหมด</option>
                                 {vehicleTypes.map(type => (
                                     <option key={type} value={type}>{type}</option>
                                 ))}
@@ -303,8 +303,8 @@ export default function VehicleMonitor() {
                     ) : filteredVehicles.length === 0 ? (
                         <div className="col-span-full text-center py-12">
                             <Truck className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-500 text-lg">No vehicles found</p>
-                            <p className="text-gray-400">Try adjusting your search or filters</p>
+                            <p className="text-gray-500 text-lg">ไม่พบยานพาหนะ</p>
+                            <p className="text-gray-400">ลองปรับการค้นหาหรือตัวกรอง</p>
                         </div>
                     ) : (
                         filteredVehicles.map((vehicle) => (

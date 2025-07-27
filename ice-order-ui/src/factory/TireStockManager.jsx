@@ -57,7 +57,7 @@ export default function TireStockManager() {
             setAssignments(Array.isArray(assignmentsData) ? assignmentsData : []);
         } catch (err) {
             console.error('Failed to fetch tire data:', err);
-            setError('Failed to fetch tire data. Please try again.');
+            setError('ไม่สามารถโหลดข้อมูลยางได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -114,7 +114,7 @@ export default function TireStockManager() {
 
     const handleAddTire = async () => {
         if (!tireForm.serial_number || !tireForm.brand || !tireForm.sidewall) {
-            setError('Please fill in all required fields');
+            setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
 
@@ -127,7 +127,7 @@ export default function TireStockManager() {
             setError(null);
         } catch (err) {
             console.error('Failed to add tire:', err);
-            setError('Failed to add tire. Please try again.');
+            setError('ไม่สามารถเพิ่มยางได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -135,7 +135,7 @@ export default function TireStockManager() {
 
     const handleEditTire = async () => {
         if (!tireForm.serial_number || !tireForm.brand || !tireForm.sidewall) {
-            setError('Please fill in all required fields');
+            setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
 
@@ -151,14 +151,14 @@ export default function TireStockManager() {
             setError(null);
         } catch (err) {
             console.error('Failed to update tire:', err);
-            setError('Failed to update tire. Please try again.');
+            setError('ไม่สามารถแก้ไขข้อมูลยางได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteTire = async (tireId) => {
-        if (!window.confirm('Are you sure you want to delete this tire?')) return;
+        if (!window.confirm('คุณแน่ใจหรือไม่ที่จะลบยางนี้?')) return;
         
         setLoading(true);
         try {
@@ -167,7 +167,7 @@ export default function TireStockManager() {
             setError(null);
         } catch (err) {
             console.error('Failed to delete tire:', err);
-            setError('Failed to delete tire. Please try again.');
+            setError('ไม่สามารถลบยางได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
@@ -175,7 +175,7 @@ export default function TireStockManager() {
 
     const handleAssignTire = async () => {
         if (!assignmentForm.vehicle_id || !assignmentForm.position || !assignmentForm.mount_date) {
-            setError('Please fill in all required fields');
+            setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
             return;
         }
 
@@ -203,14 +203,14 @@ export default function TireStockManager() {
             
         } catch (err) {
             console.error('Failed to assign tire:', err);
-            setError('Failed to assign tire. Please try again.');
+            setError('ไม่สามารถติดตั้งยางได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
     };
 
     const handleUnmountTire = async (tire) => {
-        if (!window.confirm('Are you sure you want to unmount this tire?')) return;
+        if (!window.confirm('คุณแน่ใจหรือไม่ที่จะถอดยางนี้?')) return;
         
         setLoading(true);
         try {
@@ -228,7 +228,7 @@ export default function TireStockManager() {
             setError(null);
         } catch (err) {
             console.error('Failed to unmount tire:', err);
-            setError('Failed to unmount tire. Please try again.');
+            setError('ไม่สามารถถอดยางได้ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setLoading(false);
         }
