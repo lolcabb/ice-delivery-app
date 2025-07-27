@@ -31,8 +31,6 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
         setImageState({ loading: true, error: false });
     }, [imageUrl, isOpen]);
 
-    // Early return if modal is not open (all hooks have been called)
-    if (!isOpen) return null;
 
     const handleImageLoad = () => setImageState({ loading: false, error: false });
     const handleImageError = () => setImageState({ loading: false, error: true });
@@ -48,9 +46,14 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') onClose();
         };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+        if (isOpen) {
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+        }
+    }, [isOpen, onClose]);
+
+    // Early return if modal is not open (all hooks have been called)
+    if (!isOpen) return null;
 
     return (
         <div 
