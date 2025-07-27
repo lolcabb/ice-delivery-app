@@ -111,17 +111,30 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
 
                             {/* Zoom Controls */}
                             <div className="absolute top-2 right-2 flex flex-col space-y-1 bg-white/70 rounded-md shadow-lg">
-                                <button onClick={handleZoomIn} className="p-2 text-gray-700 hover:bg-gray-200 rounded-t-md">Zoom In (+)</button>
-                                <button onClick={handleZoomOut} className="p-2 text-gray-700 hover:bg-gray-200 rounded-b-md">Zoom Out (-)</button>
+                                <button onClick={handleZoomIn} className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"> + </button>
+                                <button onClick={handleZoomOut} className="bg-white/80 rounded p-1 text-sm leading-none hover:bg-white shadow"> - </button>
                             </div>
                         </div>
                     </div>
 
                     {/* Footer */}
                     <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                        <button type="button" onClick={onClose} className="...">ปิด</button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                        >
+                            ปิด
+                        </button>
                         {!imageState.error && (
-                            <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="...">เปิดในแท็บใหม่</a>
+                            <a
+                                href={imageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                            >
+                                เปิดในแท็บใหม่
+                            </a>
                         )}
                     </div>
                 </div>
