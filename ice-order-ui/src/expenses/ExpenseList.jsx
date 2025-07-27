@@ -75,7 +75,7 @@ const ReceiptModal = ({ isOpen, onClose, imageUrl, expenseDescription }) => {
                 <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
 
                 {/* Modal Content */}
-                <div className="relative bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+                <div className="relative bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[85vh] flex flex-col">
                     {/* Header */}
                     <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                         <div className="flex-1">
