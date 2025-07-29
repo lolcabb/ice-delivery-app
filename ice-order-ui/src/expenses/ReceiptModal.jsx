@@ -54,9 +54,9 @@ export default function ReceiptModal({ isOpen, onClose, imageUrl, expenseDescrip
             aria-modal="true"
         >
             <div className="flex items-center justify-center min-h-screen p-4">
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-                <div className="relative bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[85vh] flex flex-col">
-                    <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                <div className="relative bg-white rounded-lg shadow-xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden">
+                    <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
                         <div className="flex-1">
                             <h3 id="modal-title" className="text-lg leading-6 font-medium text-gray-900">
                                 ใบเสร็จ/หลักฐาน
@@ -75,7 +75,7 @@ export default function ReceiptModal({ isOpen, onClose, imageUrl, expenseDescrip
                             </svg>
                         </button>
                     </div>
-                    <div className="flex-1 relative bg-gray-50">
+                    <div className="flex-1 overflow-hidden bg-gray-100 relative">
                         <div
                             ref={containerRef}
                             className="zoom-container w-full h-full flex items-center justify-center"
@@ -143,13 +143,25 @@ export default function ReceiptModal({ isOpen, onClose, imageUrl, expenseDescrip
                                         <span className="text-xs text-gray-600">{Math.round(zoomLevel * 100)}%</span>
                                     </div>
                                 </div>
+                                )}
+
+                                {!imageState.error && !imageState.loading && (
+                                <div className="absolute bottom-4 left-4 bg-white/90 rounded-lg shadow-lg px-3 py-2 text-xs text-gray-600">
+                                    <div>• ใช้ล้อเมาส์เพื่อซูม</div>
+                                    <div>• ดับเบิลคลิกเพื่อซูมเข้า/ออก</div>
+                                    <div>• ลากเพื่อเลื่อนดูภาพ</div>
+                                </div>
                             )}
                         </div>
                     </div>
-                    <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex justify-between items-center">
-                        <div className="text-xs text-gray-500">
-                            ใช้ล้อเมาส์เพื่อซูม, ดับเบิลคลิกเพื่อซูมเข้า/ออก, ลากเพื่อเลื่อนดูภาพ
-                        </div>
+                    <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 flex flex-row-reverse gap-3 flex-shrink-0">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm transition-colors"
+                            >
+                                ปิด
+                            </button>
                         {!imageState.error && (
                             <a
                                 href={imageUrl}
