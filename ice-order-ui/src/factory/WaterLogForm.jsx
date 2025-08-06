@@ -36,7 +36,7 @@ const WaterLogForm = ({
             const stageData = formData[stageId];
             ['morning', 'afternoon'].forEach(session => {
                 const sessionData = stageData[session];
-                if (sessionData && (sessionData.ph_value || sessionData.tds_ppm_value || sessionData.ec_us_cm_value)) {
+                if (sessionData && (sessionData.ph_value || sessionData.tds_ppm_value || sessionData.ec_us_cm_value || sessionData.hardness_mg_l_caco3)) {
                     hasData = true;
                 }
             });
@@ -75,9 +75,22 @@ const WaterLogForm = ({
     };
 
     const getParameterThreshold = (parameter) => {
-        if (!dangerThresholds?.[parameter]) return '';
-        const threshold = dangerThresholds[parameter];
-        return `(${threshold.min}-${threshold.max})`;
+    if (!dangerThresholds?.[parameter]) return null;
+    
+    const threshold = dangerThresholds[parameter];
+    
+    switch(parameter) {
+        case 'ph_value':
+            return `ค่าปลอดภัย: ${threshold.min} - ${threshold.max} ${threshold.unit}`;
+        case 'tds_ppm_value':
+            return `ค่าปลอดภัย: 0 - ${threshold.max} ${threshold.unit}`;
+        case 'ec_us_cm_value':
+            return `ค่าปลอดภัย: 0 - ${threshold.max} ${threshold.unit}`;
+        case 'hardness_mg_l_caco3':
+            return `ค่าปลอดภัย: ${threshold.min} - ${threshold.max} ${threshold.unit}`;
+        default:
+            return `ค่าปลอดภัย: ${threshold.min} - ${threshold.max} ${threshold.unit}`;
+    }
     };
 
     return (
@@ -139,6 +152,10 @@ const WaterLogForm = ({
                                         <strong>EC:</strong> 0 - {dangerThresholds?.ec_us_cm_value?.max} µS/cm
                                         <div className="text-yellow-700">ค่าเหมาะสม: &lt; 100 µS/cm (หลัง RO)</div>
                                     </div>
+                                    <div>
+                                        <strong>Hardness:</strong> {dangerThresholds?.hardness_mg_l_caco3?.min} - {dangerThresholds?.hardness_mg_l_caco3?.max} mg/L CaCO₃
+                                        <div className="text-yellow-700">ค่าเหมาะสม: &lt; 60-120 mg/L CaCO₃</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -163,6 +180,9 @@ const WaterLogForm = ({
                                     </th>
                                     <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
                                         EC (µS/cm) {getParameterThreshold('ec_us_cm_value')}
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                        Hardness (mg/L CaCO₃) {getParameterThreshold('hardness_mg_l_caco3')}
                                     </th>
                                 </tr>
                             </thead>
@@ -242,6 +262,25 @@ const WaterLogForm = ({
                                                             placeholder="100"
                                                         />
                                                         {isValueDangerous('ec_us_cm_value', formData[stage.stage_id]?.[session]?.ec_us_cm_value) && (
+                                                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                        )}
+                                                    </div>
+                                                </td>
+
+                                                {/* Hardness Value */}
+                                                <td className="px-4 py-3 border border-gray-200 text-center">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            step="1"
+                                                            min="0"
+                                                            max="500"
+                                                            value={formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3 || ''}
+                                                            onChange={(e) => handleInputChange(stage.stage_id, session, 'hardness_mg_l_caco3', e.target.value)}
+                                                            className={getInputClassName('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3)}
+                                                            placeholder="120"
+                                                        />
+                                                        {isValueDangerous('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3) && (
                                                             <AlertTriangle className="w-4 h-4 text-red-500" />
                                                         )}
                                                     </div>

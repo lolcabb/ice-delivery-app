@@ -36,7 +36,8 @@ export default function WaterTestLogManager() {
     const dangerThresholds = {
         ph_value: { min: 6.5, max: 8.5, unit: 'pH' },
         tds_ppm_value: { min: 0, max: 500, unit: 'ppm' },
-        ec_us_cm_value: { min: 0, max: 1000, unit: 'µS/cm' }
+        ec_us_cm_value: { min: 0, max: 1000, unit: 'µS/cm' },
+        hardness_mg_l_caco3: { min: 50, max: 170, unit: 'mg/L CaCO₃' }
     };
 
     const fetchStages = useCallback(async () => {
@@ -48,8 +49,18 @@ export default function WaterTestLogManager() {
             const initialFormData = {};
             data.forEach(stage => {
                 initialFormData[stage.stage_id] = {
-                    morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' },
-                    afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' }
+                    morning: { 
+                        ph_value: '', 
+                        tds_ppm_value: '', 
+                        ec_us_cm_value: '',
+                        hardness_mg_l_caco3: '' 
+                    },
+                    afternoon: { 
+                        ph_value: '', 
+                        tds_ppm_value: '', 
+                        ec_us_cm_value: '',
+                        hardness_mg_l_caco3: '' 
+                    }
                 };
             });
             setFormData(initialFormData);
@@ -127,7 +138,7 @@ export default function WaterTestLogManager() {
 
     const calculateTrends = (logs) => {
         const trends = {};
-        const parameters = ['ph_value', 'tds_ppm_value', 'ec_us_cm_value'];
+        const parameters = ['ph_value', 'tds_ppm_value', 'ec_us_cm_value', 'hardness_mg_l_caco3'];
         
         parameters.forEach(param => {
             const values = logs.filter(log => log[param]).map(log => log[param]);
@@ -145,7 +156,7 @@ export default function WaterTestLogManager() {
 
     const calculateAverages = (logs) => {
         const averages = {};
-        const parameters = ['ph_value', 'tds_ppm_value', 'ec_us_cm_value'];
+        const parameters = ['ph_value', 'tds_ppm_value', 'ec_us_cm_value', 'hardness_mg_l_caco3'];
         
         parameters.forEach(param => {
             const values = logs.filter(log => log[param]).map(log => log[param]);
@@ -217,14 +228,15 @@ export default function WaterTestLogManager() {
                 const stageData = formData[stageId];
                 ['morning', 'afternoon'].forEach(session => {
                     const sessionData = stageData[session];
-                    if (sessionData && (sessionData.ph_value || sessionData.tds_ppm_value || sessionData.ec_us_cm_value)) {
+                    if (sessionData && (sessionData.ph_value || sessionData.tds_ppm_value || sessionData.ec_us_cm_value || sessionData.hardness_mg_l_caco3)) {
                         logsToSubmit.push({
                             stage_id: parseInt(stageId),
                             test_session: session.charAt(0).toUpperCase() + session.slice(1),
                             test_timestamp: new Date(`${selectedDate}T${session === 'morning' ? '08:00:00' : '14:00:00'}Z`).toISOString(),
                             ph_value: sessionData.ph_value || null,
                             tds_ppm_value: sessionData.tds_ppm_value || null,
-                            ec_us_cm_value: sessionData.ec_us_cm_value || null
+                            ec_us_cm_value: sessionData.ec_us_cm_value || null,
+                            hardness_mg_l_caco3: sessionData.hardness_mg_l_caco3 || null
                         });
                     }
                 });
@@ -247,8 +259,8 @@ export default function WaterTestLogManager() {
             const resetFormData = {};
             stages.forEach(stage => {
                 resetFormData[stage.stage_id] = {
-                    morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' },
-                    afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' }
+                    morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' },
+                    afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' }
                 };
             });
             setFormData(resetFormData);
@@ -428,6 +440,7 @@ export default function WaterTestLogManager() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ค่า pH</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TDS (ppm)</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EC (µS/cm)</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hardness (mg/L CaCO₃)</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เวลา</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">บันทึกโดย</th>
                                     </tr>
@@ -467,6 +480,14 @@ export default function WaterTestLogManager() {
                                                 <span className={`text-sm ${getValueColor('ec_us_cm_value', log.ec_us_cm_value)}`}>
                                                     {log.ec_us_cm_value || 'N/A'}
                                                     {isValueDangerous('ec_us_cm_value', log.ec_us_cm_value) && (
+                                                        <AlertTriangle className="inline w-4 h-4 ml-1 text-red-500" />
+                                                    )}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`text-sm ${getValueColor('hardness_mg_l_caco3', log.hardness_mg_l_caco3)}`}>
+                                                    {log.hardness_mg_l_caco3 || 'N/A'}
+                                                    {isValueDangerous('hardness_mg_l_caco3', log.hardness_mg_l_caco3) && (
                                                         <AlertTriangle className="inline w-4 h-4 ml-1 text-red-500" />
                                                     )}
                                                 </span>

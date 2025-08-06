@@ -7,7 +7,7 @@ exports.getAllWaterLogs = async (req, res) => {
     try {
         const query = `
             SELECT l.log_id, l.stage_id, s.stage_name, l.test_session,
-                   l.ph_value, l.tds_ppm_value, l.ec_us_cm_value,
+                   l.ph_value, l.tds_ppm_value, l.ec_us_cm_value, l.hardness_mg_l_caco3,
                    l.test_timestamp, u.username AS recorded_by
             FROM water_quality_logs l
             JOIN water_test_stages s ON l.stage_id = s.stage_id
@@ -34,7 +34,8 @@ exports.addWaterLog = async (req, res) => {
         test_timestamp,
         ph_value,
         tds_ppm_value,
-        ec_us_cm_value
+        ec_us_cm_value,
+        hardness_mg_l_caco3
     } = req.body;
 
     const recorded_by_user_id = req.user.id;
@@ -42,7 +43,8 @@ exports.addWaterLog = async (req, res) => {
         const query =`
             INSERT INTO water_quality_logs
                         (stage_id, test_session, test_timestamp, 
-                        ph_value, tds_ppm_value, ec_us_cm_value, recorded_by_user_id)
+                        ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, 
+                        recorded_by_user_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *
         `;
@@ -53,6 +55,7 @@ exports.addWaterLog = async (req, res) => {
             ph_value,
             tds_ppm_value,
             ec_us_cm_value,
+            hardness_mg_l_caco3,
             recorded_by_user_id
         ]);
         res.status(201).json(rows[0]);
@@ -93,6 +96,7 @@ exports.getRecentWaterLogs = async (req, res) => {
         const query = `
             SELECT l.log_id, l.stage_id, s.stage_name, l.test_session,
                    l.ph_value, l.tds_ppm_value, l.ec_us_cm_value,
+                   l.hardness_mg_l_caco3,
                    l.test_timestamp, u.username AS recorded_by
             FROM water_quality_logs l
             JOIN water_test_stages s ON l.stage_id = s.stage_id

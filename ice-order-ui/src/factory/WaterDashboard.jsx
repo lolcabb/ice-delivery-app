@@ -37,6 +37,7 @@ const WaterDashboard = ({
             case 'ph_value': return 'pH Level';
             case 'tds_ppm_value': return 'TDS';
             case 'ec_us_cm_value': return 'EC';
+            case 'hardness_mg_l_caco3': return 'Water Hardness';
             default: return parameter.replace('_', ' ').toUpperCase();
         }
     };
@@ -98,7 +99,7 @@ const WaterDashboard = ({
             )}
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                 {/* pH Level Card */}
                 <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
                     <div className="flex items-center justify-between">
@@ -197,6 +198,44 @@ const WaterDashboard = ({
                             {getTrendIcon(dashboardData.trends?.ec_us_cm_value)}
                             <div className="p-3 bg-purple-100 rounded-lg">
                                 <BarChart3 className="w-6 h-6 text-purple-600" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Hardness Card */}
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-gray-600">Hardness (เฉลี่ย 7 วัน)</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <p className="text-2xl font-semibold text-gray-900">
+                                    {dashboardData.averages?.hardness_mg_l_caco3 || 'N/A'}
+                                    {dashboardData.averages?.hardness_mg_l_caco3 && <span className="text-sm text-gray-500 ml-1">mg/L</span>}
+                                </p>
+                                {dashboardData.averages?.hardness_mg_l_caco3 && (
+                                    <span className={`text-xs px-2 py-1 rounded-full ${
+                                        parseFloat(dashboardData.averages.hardness_mg_l_caco3) >= dangerThresholds.hardness_mg_l_caco3.min &&
+                                        parseFloat(dashboardData.averages.hardness_mg_l_caco3) <= dangerThresholds.hardness_mg_l_caco3.max
+                                            ? 'bg-green-100 text-green-800' 
+                                            : 'bg-red-100 text-red-800'
+                                    }`}>
+                                        {parseFloat(dashboardData.averages.hardness_mg_l_caco3) >= dangerThresholds.hardness_mg_l_caco3.min &&
+                                         parseFloat(dashboardData.averages.hardness_mg_l_caco3) <= dangerThresholds.hardness_mg_l_caco3.max
+                                            ? 'Safe' 
+                                            : 'Alert'
+                                        }
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                                ช่วงปลอดภัย: {dangerThresholds.hardness_mg_l_caco3?.min} - {dangerThresholds.hardness_mg_l_caco3?.max} mg/L CaCO₃
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {getTrendIcon(dashboardData.trends?.hardness_mg_l_caco3)}
+                            <div className="p-3 bg-orange-100 rounded-lg">
+                                <Activity className="w-6 h-6 text-orange-600" />
                             </div>
                         </div>
                     </div>
