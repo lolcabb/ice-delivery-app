@@ -157,16 +157,49 @@ export default function WaterTestLogManager() {
     };
 
     const calculateAverages = (logs) => {
-        const averages = {};
         const parameters = ['ph_value', 'tds_ppm_value', 'ec_us_cm_value', 'hardness_mg_l_caco3'];
-        
-        parameters.forEach(param => {
-            const values = logs.filter(log => log[param]).map(log => log[param]);
-            averages[param] = values.length > 0 ? 
-                (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) : 
-                'N/A';
+
+        // Group logs by stage and calendar date
+        const grouped = {};
+        logs.forEach(log => {
+            const date = log.test_timestamp.split('T')[0];
+            const key = `${log.stage_id}-${date}`;
+            if (!grouped[key]) {
+                grouped[key] = {};
+                parameters.forEach(param => {
+                    grouped[key][param] = [];
+                });
+            }
+            parameters.forEach(param => {
+                const value = Number(log[param]);
+                if (log[param] !== null && log[param] !== '' && !isNaN(value)) {
+                    grouped[key][param].push(value);
+                }
+            });
         });
-        
+
+        // Calculate per-day averages for each parameter
+        const values = {};
+        parameters.forEach(param => { values[param] = []; });
+        Object.values(grouped).forEach(group => {
+            parameters.forEach(param => {
+                const arr = group[param];
+                if (arr.length > 0) {
+                    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+                    values[param].push(avg);
+                }
+            });
+        });
+
+        // Compute overall averages from per-day averages
+        const averages = {};
+        parameters.forEach(param => {
+            const arr = values[param];
+            averages[param] = arr.length > 0
+                ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2)
+                : 'N/A';
+        });
+
         return averages;
     };
 
