@@ -42,10 +42,10 @@ exports.addWaterLog = async (req, res) => {
     try{
         const query =`
             INSERT INTO water_quality_logs
-                        (stage_id, test_session, test_timestamp, 
-                        ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, 
+                        (stage_id, test_session, test_timestamp,
+                        ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3,
                         recorded_by_user_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
         `;
         const { rows } = await db.query(query, [
