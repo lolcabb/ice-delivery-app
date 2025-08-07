@@ -2,7 +2,7 @@ import React from 'react';
 import { X, Droplets, AlertTriangle, Sun, Moon, Calendar, Save } from 'lucide-react';
 import { getISODate } from '../utils/dateUtils';
 
-const WaterLogForm = ({ 
+const WaterLogForm = ({
     isOpen, 
     onClose, 
     onSubmit, 
@@ -15,6 +15,9 @@ const WaterLogForm = ({
     dangerThresholds
 }) => {
     if (!isOpen) return null;
+
+    const isROStage = (stage) => stage?.stage_name?.toLowerCase().includes('ro') || stage?.stage_id === 4;
+    const showHardness = stages.some(isROStage);
 
     const handleInputChange = (stageId, session, parameter, value) => {
         setFormData(prev => ({
@@ -181,9 +184,11 @@ const WaterLogForm = ({
                                     <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
                                         EC (µS/cm) {getParameterThreshold('ec_us_cm_value')}
                                     </th>
-                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                        Hardness (mg/L CaCO₃) {getParameterThreshold('hardness_mg_l_caco3')}
-                                    </th>
+                                    {showHardness && (
+                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                            Hardness (mg/L CaCO₃) {getParameterThreshold('hardness_mg_l_caco3')}
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
@@ -268,23 +273,25 @@ const WaterLogForm = ({
                                                 </td>
 
                                                 {/* Hardness Value */}
-                                                <td className="px-4 py-3 border border-gray-200 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <input
-                                                            type="number"
-                                                            step="1"
-                                                            min="0"
-                                                            max="500"
-                                                            value={formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3 || ''}
-                                                            onChange={(e) => handleInputChange(stage.stage_id, session, 'hardness_mg_l_caco3', e.target.value)}
-                                                            className={getInputClassName('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3)}
-                                                            placeholder="120"
-                                                        />
-                                                        {isValueDangerous('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3) && (
-                                                            <AlertTriangle className="w-4 h-4 text-red-500" />
-                                                        )}
-                                                    </div>
-                                                </td>
+                                                { isROStage(stage) && (
+                                                    <td className="px-4 py-3 border border-gray-200 text-center">
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                step="1"
+                                                                min="0"
+                                                                max="500"
+                                                                value={formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3 || ''}
+                                                                onChange={(e) => handleInputChange(stage.stage_id, session, 'hardness_mg_l_caco3', e.target.value)}
+                                                                className={getInputClassName('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3)}
+                                                                placeholder="120"
+                                                            />
+                                                            {isValueDangerous('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3) && (
+                                                                <AlertTriangle className="w-4 h-4 text-red-500" />
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </React.Fragment>
