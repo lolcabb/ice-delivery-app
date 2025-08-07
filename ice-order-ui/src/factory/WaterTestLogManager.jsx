@@ -182,8 +182,8 @@ export default function WaterTestLogManager() {
         const reset = {};
         stages.forEach(stage => {
             reset[stage.stage_id] = {
-                morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' },
-                afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '' }
+                morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' },
+                afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' }
             };
         });
         setFormData(reset);
@@ -204,7 +204,8 @@ export default function WaterTestLogManager() {
                     existingData[log.stage_id][sessionKey] = {
                         ph_value: log.ph_value || '',
                         tds_ppm_value: log.tds_ppm_value || '',
-                        ec_us_cm_value: log.ec_us_cm_value || ''
+                        ec_us_cm_value: log.ec_us_cm_value || '',
+                        hardness_mg_l_caco3: log.hardness_mg_l_caco3 || ''
                     };
                 });
                 setFormData(existingData);
