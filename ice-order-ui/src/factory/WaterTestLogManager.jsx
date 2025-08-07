@@ -40,6 +40,8 @@ export default function WaterTestLogManager() {
         hardness_mg_l_caco3: { min: 50, max: 170, unit: 'mg/L CaCO₃' }
     };
 
+    const isROStage = (stage) => stage?.stage_name?.toLowerCase().includes('ro') || stage?.stage_id === 4;
+
     const fetchStages = useCallback(async () => {
         try {
             const data = await apiService.get('/water/stages');
@@ -227,18 +229,24 @@ export default function WaterTestLogManager() {
             // Convert form data to individual log entries
             Object.keys(formData).forEach(stageId => {
                 const stageData = formData[stageId];
+                const stage = stages.find(s => s.stage_id === parseInt(stageId));
+                const includeHardness = isROStage(stage);
+
                 ['morning', 'afternoon'].forEach(session => {
                     const sessionData = stageData[session];
-                    if (sessionData && (sessionData.ph_value || sessionData.tds_ppm_value || sessionData.ec_us_cm_value || sessionData.hardness_mg_l_caco3)) {
-                        logsToSubmit.push({
+                    if (sessionData && (sessionData.ph_value || sessionData.tds_ppm_value || sessionData.ec_us_cm_value || (includeHardness && sessionData.hardness_mg_l_caco3))) {
+                        const logEntry = {
                             stage_id: parseInt(stageId),
                             test_session: session.charAt(0).toUpperCase() + session.slice(1),
                             test_timestamp: new Date(`${selectedDate}T${session === 'morning' ? '08:00:00' : '14:00:00'}Z`).toISOString(),
                             ph_value: sessionData.ph_value === '' ? null : Number(sessionData.ph_value),
                             tds_ppm_value: sessionData.tds_ppm_value === '' ? null : Number(sessionData.tds_ppm_value),
-                            ec_us_cm_value: sessionData.ec_us_cm_value === '' ? null : Number(sessionData.ec_us_cm_value),
-                            hardness_mg_l_caco3: sessionData.hardness_mg_l_caco3 === '' ? null : Number(sessionData.hardness_mg_l_caco3)
-                        });
+                            ec_us_cm_value: sessionData.ec_us_cm_value === '' ? null : Number(sessionData.ec_us_cm_value)
+                        };
+                        if (includeHardness) {
+                            logEntry.hardness_mg_l_caco3 = sessionData.hardness_mg_l_caco3 === '' ? null : Number(sessionData.hardness_mg_l_caco3);
+                        }
+                        logsToSubmit.push(logEntry);
                     }
                 });
             });
