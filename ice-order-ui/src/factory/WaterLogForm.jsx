@@ -16,7 +16,7 @@ const WaterLogForm = ({
 }) => {
     if (!isOpen) return null;
 
-    const isROStage = (stage) => stage?.stage_name?.toLowerCase().includes('ro') || stage?.stage_id === 4;
+    const isROStage = (stage) => stage?.stage_name?.toLowerCase().includes('reverse osmosis') || stage?.stage_id === 5;
     const showHardness = stages.some(isROStage);
 
     const handleInputChange = (stageId, session, parameter, value) => {
