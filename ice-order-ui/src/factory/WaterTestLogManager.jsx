@@ -334,7 +334,10 @@ useEffect(() => {
         
     } catch (err) {
         console.error('Failed to update water test logs:', err);
-        setError(err.response?.data?.message || 'ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
+        const message = err.status === 400
+            ? (err.data?.message || 'ข้อมูลไม่ถูกต้อง')
+            : (err.data?.message || 'ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
+        setError(message);
     } finally {
         setLoading(false);
     }

@@ -1,5 +1,7 @@
 const db = require('../db/postgres');
 
+const ALLOWED_SESSIONS = ['Morning', 'Afternoon'];
+
 // Get all water test logs filtered by a specific date
 // Updated with proper ordering
 exports.getAllWaterLogs = async (req, res) => {
@@ -47,24 +49,30 @@ exports.upsertWaterLogs = async (req, res) => {
 
         // Start transaction
         await db.query('BEGIN');
-        
+
         const upsertedLogs = [];
-        
+
         for (const logData of logs) {
             const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
-            
+
             // Validate required fields
             if (!stage_id || !test_session) {
-                throw new Error('Missing required fields: stage_id and test_session');
+                await db.query('ROLLBACK');
+                return res.status(400).json({ message: 'Missing required fields: stage_id and test_session' });
             }
-            
+
+            if (!ALLOWED_SESSIONS.includes(test_session)) {
+                await db.query('ROLLBACK');
+                return res.status(400).json({ message: `Unsupported test session: ${test_session}` });
+            }
+
             // Create timestamp for the session
             const hour = test_session === 'Morning' ? '08:00:00' : '14:00:00';
             const timestamp = new Date(`${date}T${hour}Z`).toISOString();
-            
+
             // PostgreSQL UPSERT using ON CONFLICT
             const query = `
-                INSERT INTO water_quality_logs 
+                INSERT INTO water_quality_logs
                     (stage_id, test_session, test_timestamp, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, recorded_by_user_id, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
                 ON CONFLICT (stage_id, test_session, DATE(test_timestamp))
@@ -122,6 +130,10 @@ exports.addWaterLog = async (req, res) => {
 
     const recorded_by_user_id = req.user.id;
     try {
+        if (!ALLOWED_SESSIONS.includes(test_session)) {
+            return res.status(400).json({ message: `Unsupported test session: ${test_session}` });
+        }
+
         // Ensure no existing log for same stage, session and date
         const checkQuery = `
             SELECT 1 FROM water_quality_logs
