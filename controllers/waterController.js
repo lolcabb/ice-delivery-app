@@ -16,6 +16,12 @@ const isValidTimestamp = (value) => {
     return !isNaN(date.getTime());
 };
 
+// Parse a date string (YYYY-MM-DD) into a UTC Date object
+const parseUTCDate = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+};
+
 // Get all water test logs filtered by a specific date
 // Updated with proper ordering
 exports.getAllWaterLogs = async (req, res) => {
@@ -54,7 +60,8 @@ exports.getAllWaterLogs = async (req, res) => {
 };
 
 // Upsert method for updating/inserting water logs
-// test_timestamp is generated from the provided date and session; clients should omit it
+// The `date` field must be in 'YYYY-MM-DD' and interpreted in UTC.
+// test_timestamp is generated in UTC at 08:00 or 14:00 based on the session; clients should omit it
 exports.upsertWaterLogs = async (req, res) => {
     const { date, logs } = req.body;
     const recorded_by_user_id = req.user.id;
@@ -94,8 +101,9 @@ exports.upsertWaterLogs = async (req, res) => {
         for (const logData of logs) {
             const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
 
-            const hour = test_session === 'Morning' ? '08:00:00' : '14:00:00';
-            const timestamp = new Date(`${date}T${hour}Z`).toISOString();
+            const [year, month, day] = date.split('-').map(Number);
+            const hour = test_session === 'Morning' ? 8 : 14;
+            const timestamp = new Date(Date.UTC(year, month - 1, day, hour)).toISOString();
 
             const query = `
                 INSERT INTO water_quality_logs
@@ -223,16 +231,20 @@ exports.getTestStages = async (req, res) => {
 };
 
 // Retrieve water test logs over a date range (defaults to last 7 days)
-// Add Hardness
+// Dates must be in 'YYYY-MM-DD' format and interpreted as UTC.
 exports.getRecentWaterLogs = async (req, res) => {
     let { start_date, end_date } = req.query;
 
     try {
-        const endDateObj = end_date ? new Date(end_date) : new Date();
-        const startDateObj = start_date ? new Date(start_date) : new Date(endDateObj);
+        const endDateStr = end_date || new Date().toISOString().split('T')[0];
+        const endDateObj = parseUTCDate(endDateStr);
 
-        if (!start_date) {
-            startDateObj.setDate(endDateObj.getDate() - 6);
+        let startDateObj;
+        if (start_date) {
+            startDateObj = parseUTCDate(start_date);
+        } else {
+            startDateObj = new Date(endDateObj);
+            startDateObj.setUTCDate(endDateObj.getUTCDate() - 6);
         }
 
         const end = endDateObj.toISOString().split('T')[0];
