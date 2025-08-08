@@ -77,3 +77,92 @@ describe('waterController.addWaterLog', () => {
     expect(res.json).toHaveBeenCalledWith({ message: 'Log already exists for this stage, session, and date' });
   });
 });
+
+describe('waterController.upsertWaterLogs', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('commits transaction and returns upserted logs', async () => {
+    const req = {
+      body: {
+        date: '2024-01-01',
+        logs: [
+          {
+            stage_id: 1,
+            test_session: 'Morning',
+            ph_value: 7,
+            tds_ppm_value: 50,
+            ec_us_cm_value: 100,
+            hardness_mg_l_caco3: 120
+          },
+          {
+            stage_id: 1,
+            test_session: 'Morning',
+            ph_value: 8,
+            tds_ppm_value: 55,
+            ec_us_cm_value: 105,
+            hardness_mg_l_caco3: 125
+          }
+        ]
+      },
+      user: { id: 1 }
+    };
+
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    db.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ log_id: 1, ph_value: 7 }] }) // insert
+      .mockResolvedValueOnce({ rows: [{ log_id: 1, ph_value: 8 }] }) // update via conflict
+      .mockResolvedValueOnce({}); // COMMIT
+
+    await waterController.upsertWaterLogs(req, res);
+
+    expect(db.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(db.query).toHaveBeenNthCalledWith(4, 'COMMIT');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Water logs updated successfully',
+      logs: [
+        { log_id: 1, ph_value: 7 },
+        { log_id: 1, ph_value: 8 }
+      ]
+    });
+  });
+
+  test('rolls back transaction on database error', async () => {
+    const req = {
+      body: {
+        date: '2024-01-01',
+        logs: [
+          {
+            stage_id: 1,
+            test_session: 'Morning',
+            ph_value: 7,
+            tds_ppm_value: 50,
+            ec_us_cm_value: 100,
+            hardness_mg_l_caco3: 120
+          }
+        ]
+      },
+      user: { id: 1 }
+    };
+
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    db.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockRejectedValueOnce(new Error('db failure')) // upsert error
+      .mockResolvedValueOnce({}); // ROLLBACK
+
+    await waterController.upsertWaterLogs(req, res);
+
+    expect(db.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(db.query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Server error during upsert' })
+    );
+  });
+});
