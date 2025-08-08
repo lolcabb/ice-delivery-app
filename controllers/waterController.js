@@ -2,6 +2,20 @@ const db = require('../db/postgres');
 
 const ALLOWED_SESSIONS = ['Morning', 'Afternoon'];
 
+// Numeric validation ranges
+const PH_RANGE = { min: 0, max: 14 };
+const TDS_RANGE = { min: 0, max: 2000 };
+const EC_RANGE = { min: 0, max: 5000 };
+const HARDNESS_RANGE = { min: 0, max: 1000 };
+
+const isValidNumber = (value, { min, max }) =>
+    typeof value === 'number' && !isNaN(value) && value >= min && value <= max;
+
+const isValidTimestamp = (value) => {
+    const date = new Date(value);
+    return !isNaN(date.getTime());
+};
+
 // Get all water test logs filtered by a specific date
 // Updated with proper ordering
 exports.getAllWaterLogs = async (req, res) => {
@@ -47,8 +61,29 @@ exports.upsertWaterLogs = async (req, res) => {
     
     try {
         // Validate input
-        if (!date || !logs || !Array.isArray(logs)) {
+        if (!date || !logs || !Array.isArray(logs) || !isValidTimestamp(`${date}T00:00:00Z`)) {
             return res.status(400).json({ message: 'Invalid input data' });
+        }
+
+        for (const logData of logs) {
+            const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
+
+            if (!stage_id || !test_session) {
+                return res.status(400).json({ message: 'Missing required fields: stage_id and test_session' });
+            }
+
+            if (!ALLOWED_SESSIONS.includes(test_session)) {
+                return res.status(400).json({ message: `Unsupported test session: ${test_session}` });
+            }
+
+            if (
+                !isValidNumber(ph_value, PH_RANGE) ||
+                !isValidNumber(tds_ppm_value, TDS_RANGE) ||
+                !isValidNumber(ec_us_cm_value, EC_RANGE) ||
+                !isValidNumber(hardness_mg_l_caco3, HARDNESS_RANGE)
+            ) {
+                return res.status(400).json({ message: 'Invalid numeric values in logs' });
+            }
         }
 
         // Start transaction
@@ -59,22 +94,9 @@ exports.upsertWaterLogs = async (req, res) => {
         for (const logData of logs) {
             const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
 
-            // Validate required fields
-            if (!stage_id || !test_session) {
-                await db.query('ROLLBACK');
-                return res.status(400).json({ message: 'Missing required fields: stage_id and test_session' });
-            }
-
-            if (!ALLOWED_SESSIONS.includes(test_session)) {
-                await db.query('ROLLBACK');
-                return res.status(400).json({ message: `Unsupported test session: ${test_session}` });
-            }
-
-            // Create timestamp for the session
             const hour = test_session === 'Morning' ? '08:00:00' : '14:00:00';
             const timestamp = new Date(`${date}T${hour}Z`).toISOString();
 
-            // PostgreSQL UPSERT using ON CONFLICT
             const query = `
                 INSERT INTO water_quality_logs
                     (stage_id, test_session, test_timestamp, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, recorded_by_user_id, created_at)
@@ -89,7 +111,7 @@ exports.upsertWaterLogs = async (req, res) => {
                     created_at = NOW()
                 RETURNING *
             `;
-            
+
             const { rows } = await db.query(query, [
                 stage_id,
                 test_session,
@@ -100,22 +122,21 @@ exports.upsertWaterLogs = async (req, res) => {
                 hardness_mg_l_caco3,
                 recorded_by_user_id
             ]);
-            
+
             upsertedLogs.push(rows[0]);
         }
-        
+
         await db.query('COMMIT');
-        res.status(200).json({ 
+        res.status(200).json({
             message: 'Water logs updated successfully',
             logs: upsertedLogs
         });
-        
     } catch (err) {
         await db.query('ROLLBACK');
         console.error('Upsert error:', err.message);
-        res.status(500).json({ 
+        res.status(500).json({
             message: 'Server error during upsert',
-            error: err.message 
+            error: err.message
         });
     }
 };
@@ -136,6 +157,19 @@ exports.addWaterLog = async (req, res) => {
     try {
         if (!ALLOWED_SESSIONS.includes(test_session)) {
             return res.status(400).json({ message: `Unsupported test session: ${test_session}` });
+        }
+
+        if (!isValidTimestamp(test_timestamp)) {
+            return res.status(400).json({ message: 'Invalid test_timestamp' });
+        }
+
+        if (
+            !isValidNumber(ph_value, PH_RANGE) ||
+            !isValidNumber(tds_ppm_value, TDS_RANGE) ||
+            !isValidNumber(ec_us_cm_value, EC_RANGE) ||
+            !isValidNumber(hardness_mg_l_caco3, HARDNESS_RANGE)
+        ) {
+            return res.status(400).json({ message: 'Invalid numeric values' });
         }
 
         // Ensure no existing log for same stage, session and date
