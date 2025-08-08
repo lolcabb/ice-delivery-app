@@ -13,7 +13,8 @@ const WaterLogForm = ({
     selectedDate,
     setSelectedDate,
     loading = false,
-    dangerThresholds
+    dangerThresholds,
+    hasExistingLogs = false
 }) => {
     if (!isOpen) return null;
 
@@ -98,18 +99,19 @@ const WaterLogForm = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[95vh] overflow-y-auto">
-                <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+                <div className="flex flex-col h-full">
                     {/* Header */}
-                    <div className="flex justify-between items-center mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <Droplets className="w-6 h-6 text-blue-600" />
-                            </div>
-                            <div>
-                                <h2 className="text-xl font-semibold text-gray-900">แบบฟอร์มตรวจสอบคุณภาพน้ำ</h2>
-                            </div>
+                    <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                        <div>
+                            <h2 className="text-xl font-semibold text-gray-900">
+                                {hasExistingLogs ? 'แก้ไขผลการตรวจสอบคุณภาพน้ำ' : 'เพิ่มผลการตรวจสอบคุณภาพน้ำ'}
+                            </h2>
+                            <p className="text-sm text-gray-600 mt-1">
+                                วันที่: {new Date(selectedDate).toLocaleDateString('th-TH')}
+                                {hasExistingLogs && <span className="text-blue-600 ml-2">• มีข้อมูลเดิมอยู่แล้ว</span>}
+                            </p>
                         </div>
                         <button
                             onClick={onClose}
@@ -324,24 +326,38 @@ const WaterLogForm = ({
                         </div>
                     </div>
 
-                    {/* Buttons */}
-                    <div className="flex gap-3">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            ยกเลิก
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={loading}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        >
-                            <Save className="w-5 h-5" />
-                            {loading ? 'กำลังบันทึก...' : 'บันทึกผลการตรวจสอบทั้งหมด'}
-                        </button>
+                    {/* Footer */}
+                    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                        <div className="flex gap-3">
+                            <button
+                                onClick={onClose}
+                                disabled={loading}
+                                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors ${
+                                    loading 
+                                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                                        {hasExistingLogs ? 'กำลังอัปเดต...' : 'กำลังบันทึก...'}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="w-4 h-4" />
+                                        {hasExistingLogs ? 'อัปเดตผลการตรวจสอบ' : 'บันทึกผลการตรวจสอบ'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

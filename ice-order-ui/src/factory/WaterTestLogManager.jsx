@@ -24,7 +24,9 @@ export default function WaterTestLogManager() {
 
     // Form data for logging tests
     const [formData, setFormData] = useState({});
-    
+
+    const [hasExistingLogs, setHasExistingLogs] = useState(false);
+
     // Dashboard data
     const [dashboardData, setDashboardData] = useState({
         recentLogs: [],
@@ -227,41 +229,61 @@ export default function WaterTestLogManager() {
         });
         setFormData(reset);
     }, [stages]);
+    
+useEffect(() => {
+    setHasExistingLogs(logs.length > 0);
+}, [logs]);
 
-    useEffect(() => {
-        if (showLogForm) {
-            if (logs.length > 0) {
-                const existingData = {};
-                stages.forEach(s => {
-                    existingData[s.stage_id] = { morning: {}, afternoon: {} };
-                });
-                logs.forEach(log => {
-                    const sessionKey = log.test_session.toLowerCase();
-                    if (!existingData[log.stage_id]) {
-                        existingData[log.stage_id] = { morning: {}, afternoon: {} };
-                    }
+useEffect(() => {
+    if (showLogForm) {
+        if (logs.length > 0) {
+            const existingData = {};
+            
+            // Initialize all stages first
+            stages.forEach(stage => {
+                existingData[stage.stage_id] = {
+                    morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' },
+                    afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' }
+                };
+            });
+            
+            // Populate with existing log data (deduplicated by log_id)
+            const processedLogs = new Set();
+            logs.forEach(log => {
+                // Skip if we've already processed this exact log
+                if (processedLogs.has(log.log_id)) return;
+                processedLogs.add(log.log_id);
+                
+                const sessionKey = log.test_session.toLowerCase();
+                if (existingData[log.stage_id] && (sessionKey === 'morning' || sessionKey === 'afternoon')) {
                     existingData[log.stage_id][sessionKey] = {
                         ph_value: log.ph_value || '',
                         tds_ppm_value: log.tds_ppm_value || '',
                         ec_us_cm_value: log.ec_us_cm_value || '',
                         hardness_mg_l_caco3: log.hardness_mg_l_caco3 || ''
                     };
-                });
-                setFormData(existingData);
-            }
+                }
+            });
+            
+            setFormData(existingData);
         } else {
             resetForm();
         }
-    }, [showLogForm, logs, stages, resetForm]);
+    } else {
+        resetForm();
+    }
+}, [showLogForm, logs, stages, resetForm]);
 
     useEffect(() => {
         resetForm();
     }, [selectedDate, resetForm]);
 
     const handleSubmitLogs = async () => {
+        if (loading) return; // Prevent double submission
+    
         setLoading(true);
         try {
-            const logsToSubmit = [];
+            const logsToUpsert = [];
             
             // Convert form data to individual log entries
             Object.keys(formData).forEach(stageId => {
@@ -283,41 +305,44 @@ export default function WaterTestLogManager() {
                         if (includeHardness) {
                             logEntry.hardness_mg_l_caco3 = sessionData.hardness_mg_l_caco3 === '' ? null : Number(sessionData.hardness_mg_l_caco3);
                         }
-                        logsToSubmit.push(logEntry);
+                        logsToUpsert.push(logEntry);
                     }
                 });
             });
 
-            // Submit all logs
-            for (const logData of logsToSubmit) {
-                await apiService.post('/water/logs', logData);
-            }
-
-            // Refresh data
-            await Promise.all([
-                fetchLogs(selectedDate),
-                fetchDashboardData()
-            ]);
-
-            setShowLogForm(false);
-            
-            // Reset form
-            const resetFormData = {};
-            stages.forEach(stage => {
-                resetFormData[stage.stage_id] = {
-                    morning: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' },
-                    afternoon: { ph_value: '', tds_ppm_value: '', ec_us_cm_value: '', hardness_mg_l_caco3: '' }
-                };
-            });
-            setFormData(resetFormData);
-            setError(null);
-        } catch (err) {
-            console.error('Failed to submit water test logs:', err);
-            setError('ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
-        } finally {
+        if (logsToUpsert.length === 0) {
+            setError('กรุณากรอกข้อมูลการตรวจสอบอย่างน้อยหนึ่งรายการ');
             setLoading(false);
+            return;
         }
-    };
+
+        // Use new upsert endpoint
+        await apiService.put('/water/logs/upsert', {
+            date: selectedDate,
+            logs: logsToUpsert
+        });
+
+        // Refresh data
+        await Promise.all([
+            fetchLogs(selectedDate),
+            fetchDashboardData()
+        ]);
+
+        setShowLogForm(false);
+        resetForm();
+        setError(null);
+        
+    } catch (err) {
+        console.error('Failed to update water test logs:', err);
+        if (err.response?.data?.code === 'DUPLICATE_ENTRY') {
+            setError('มีข้อมูลการตรวจสอบในวันนี้แล้ว กรุณาใช้ฟังก์ชันแก้ไขแทน');
+        } else {
+            setError('ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
+        }
+    } finally {
+        setLoading(false);
+    }
+};
 
     const isValueDangerous = (parameter, value) => {
         if (!value || !dangerThresholds[parameter]) return false;
@@ -563,6 +588,7 @@ export default function WaterTestLogManager() {
                     setSelectedDate={setSelectedDate}
                     loading={loading}
                     dangerThresholds={dangerThresholds}
+                    hasExistingLogs={hasExistingLogs}
                 />
 
             </div>
