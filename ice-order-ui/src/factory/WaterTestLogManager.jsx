@@ -74,7 +74,7 @@ export default function WaterTestLogManager() {
             setFormData(initialFormData);
         } catch (err) {
             console.error('Error fetching stages:', err);
-            setError(err.response?.data?.message || 'ไม่สามารถโหลดข้อมูลขั้นตอนการตรวจสอบได้');
+            setError(err.data?.message || 'ไม่สามารถโหลดข้อมูลขั้นตอนการตรวจสอบได้');
         }
     }, []);
 
@@ -89,10 +89,10 @@ export default function WaterTestLogManager() {
             if (err.status === 404) {
                 setLogs([]);
                 if (showWarning) {
-                    setError(err.response?.data?.message || 'ไม่มีบันทึกการตรวจสอบน้ำ');
+                    setError(err.data?.message || 'ไม่มีบันทึกการตรวจสอบน้ำ');
                 }
             } else {
-                setError(err.response?.data?.message || 'ไม่สามารถโหลดบันทึกการตรวจสอบน้ำได้ กรุณาลองใหม่อีกครั้ง');
+                setError(err.data?.message || 'ไม่สามารถโหลดบันทึกการตรวจสอบน้ำได้ กรุณาลองใหม่อีกครั้ง');
             }
         } finally {
             setLoading(false);
@@ -334,10 +334,7 @@ useEffect(() => {
         
     } catch (err) {
         console.error('Failed to update water test logs:', err);
-        const message = err.status === 400
-            ? (err.data?.message || 'ข้อมูลไม่ถูกต้อง')
-            : (err.data?.message || 'ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
-        setError(message);
+        setError(err.data?.message || 'ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
         setLoading(false);
     }
