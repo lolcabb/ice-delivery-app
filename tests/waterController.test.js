@@ -76,6 +76,50 @@ describe('waterController.addWaterLog', () => {
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ message: 'Log already exists for this stage, session, and date' });
   });
+
+  test('returns 400 for invalid test timestamp', async () => {
+    const req = {
+      body: {
+        stage_id: 5,
+        test_session: 'Morning',
+        test_timestamp: 'not-a-date',
+        ph_value: 7.0,
+        tds_ppm_value: 50,
+        ec_us_cm_value: 100,
+        hardness_mg_l_caco3: 120
+      },
+      user: { id: 1 }
+    };
+
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.addWaterLog(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('returns 400 for out-of-range numeric values', async () => {
+    const req = {
+      body: {
+        stage_id: 5,
+        test_session: 'Morning',
+        test_timestamp: '2024-01-01T08:00:00Z',
+        ph_value: 20,
+        tds_ppm_value: 50,
+        ec_us_cm_value: 100,
+        hardness_mg_l_caco3: 120
+      },
+      user: { id: 1 }
+    };
+
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.addWaterLog(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
 });
 
 describe('waterController.upsertWaterLogs', () => {
@@ -164,6 +208,41 @@ describe('waterController.upsertWaterLogs', () => {
   expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Server error during upsert' })
     );
+  });
+
+  test('returns 400 for invalid date', async () => {
+    const req = { body: { date: 'bad-date', logs: [] }, user: { id: 1 } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.upsertWaterLogs(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('returns 400 for invalid numeric values', async () => {
+    const req = {
+      body: {
+        date: '2024-01-01',
+        logs: [
+          {
+            stage_id: 1,
+            test_session: 'Morning',
+            ph_value: 20,
+            tds_ppm_value: 50,
+            ec_us_cm_value: 100,
+            hardness_mg_l_caco3: 120
+          }
+        ]
+      },
+      user: { id: 1 }
+    };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.upsertWaterLogs(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
   });
 });
 
