@@ -38,9 +38,10 @@ describe('water routes', () => {
 
   test('POST /logs adds log', async () => {
     waterController.addWaterLog.mockImplementation((req, res) => res.status(201).json({ id: 1 }));
-    const res = await request(app).post('/api/water/logs');
+    const res = await request(app).post('/api/water/logs').send({ hardness_mg_l_caco3: 120 });
     expect(res.statusCode).toBe(201);
     expect(waterController.addWaterLog).toHaveBeenCalled();
+    expect(waterController.addWaterLog.mock.calls[0][0].body.hardness_mg_l_caco3).toBe(120);
   });
 
   test('GET /logs/recent calls controller', async () => {

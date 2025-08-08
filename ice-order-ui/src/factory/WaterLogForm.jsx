@@ -1,6 +1,7 @@
 import React from 'react';
 import { X, Droplets, AlertTriangle, Sun, Moon, Calendar, Save } from 'lucide-react';
 import { getISODate } from '../utils/dateUtils';
+import { isROStage } from '../utils/stageUtils';
 
 const WaterLogForm = ({
     isOpen, 
@@ -16,7 +17,7 @@ const WaterLogForm = ({
 }) => {
     if (!isOpen) return null;
 
-    const isROStage = (stage) => stage?.stage_name?.toLowerCase().includes('reverse osmosis') || stage?.stage_id === 5;
+    // Determine whether any stage is RO to conditionally show hardness input
     const showHardness = stages.some(isROStage);
 
     const handleInputChange = (stageId, session, parameter, value) => {
