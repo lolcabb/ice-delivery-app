@@ -99,9 +99,9 @@ const WaterDashboard = ({
             )}
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 auto-rows-fr gap-6 mb-6">
                 {/* pH Level Card */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600">ค่า pH (เฉลี่ย 7 วัน)</p>
@@ -138,7 +138,7 @@ const WaterDashboard = ({
                 </div>
 
                 {/* TDS Card */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600">TDS (เฉลี่ย 7 วัน)</p>
@@ -171,7 +171,7 @@ const WaterDashboard = ({
                 </div>
 
                 {/* EC Card */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600">EC (เฉลี่ย 7 วัน)</p>
@@ -204,7 +204,7 @@ const WaterDashboard = ({
                 </div>
 
                 {/* Hardness Card */}
-                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 h-full flex flex-col justify-between">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600">Hardness (เฉลี่ย 7 วัน)</p>
@@ -228,7 +228,7 @@ const WaterDashboard = ({
                                     </span>
                                 )}
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 mt-1 whitespace-nowrap">
                                 ช่วงปลอดภัย: {dangerThresholds.hardness_mg_l_caco3?.min} - {dangerThresholds.hardness_mg_l_caco3?.max} mg/L CaCO₃
                             </p>
                         </div>
