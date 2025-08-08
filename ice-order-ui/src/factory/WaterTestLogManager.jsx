@@ -74,7 +74,7 @@ export default function WaterTestLogManager() {
             setFormData(initialFormData);
         } catch (err) {
             console.error('Error fetching stages:', err);
-            setError(err.response?.data?.message || 'ไม่สามารถโหลดข้อมูลขั้นตอนการตรวจสอบได้');
+            setError(err.data?.message || 'ไม่สามารถโหลดข้อมูลขั้นตอนการตรวจสอบได้');
         }
     }, []);
 
@@ -89,10 +89,10 @@ export default function WaterTestLogManager() {
             if (err.status === 404) {
                 setLogs([]);
                 if (showWarning) {
-                    setError(err.response?.data?.message || 'ไม่มีบันทึกการตรวจสอบน้ำ');
+                    setError(err.data?.message || 'ไม่มีบันทึกการตรวจสอบน้ำ');
                 }
             } else {
-                setError(err.response?.data?.message || 'ไม่สามารถโหลดบันทึกการตรวจสอบน้ำได้ กรุณาลองใหม่อีกครั้ง');
+                setError(err.data?.message || 'ไม่สามารถโหลดบันทึกการตรวจสอบน้ำได้ กรุณาลองใหม่อีกครั้ง');
             }
         } finally {
             setLoading(false);
@@ -297,7 +297,6 @@ useEffect(() => {
                         const logEntry = {
                             stage_id: parseInt(stageId),
                             test_session: session.charAt(0).toUpperCase() + session.slice(1),
-                            test_timestamp: new Date(`${selectedDate}T${session === 'morning' ? '08:00:00' : '14:00:00'}Z`).toISOString(),
                             ph_value: sessionData.ph_value === '' ? null : Number(sessionData.ph_value),
                             tds_ppm_value: sessionData.tds_ppm_value === '' ? null : Number(sessionData.tds_ppm_value),
                             ec_us_cm_value: sessionData.ec_us_cm_value === '' ? null : Number(sessionData.ec_us_cm_value)
@@ -334,7 +333,7 @@ useEffect(() => {
         
     } catch (err) {
         console.error('Failed to update water test logs:', err);
-        setError(err.response?.data?.message || 'ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
+        setError(err.data?.message || 'ไม่สามารถบันทึกผลการตรวจสอบได้ กรุณาลองใหม่อีกครั้ง');
     } finally {
         setLoading(false);
     }

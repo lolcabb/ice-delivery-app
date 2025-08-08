@@ -1,9 +1,34 @@
 const db = require('../db/postgres');
 
+const ALLOWED_SESSIONS = ['Morning', 'Afternoon'];
+
+// Numeric validation ranges
+const PH_RANGE = { min: 0, max: 14 };
+const TDS_RANGE = { min: 0, max: 2000 };
+const EC_RANGE = { min: 0, max: 5000 };
+const HARDNESS_RANGE = { min: 0, max: 1000 };
+
+const isValidNumber = (value, { min, max }) =>
+    typeof value === 'number' && !isNaN(value) && value >= min && value <= max;
+
+const isValidTimestamp = (value) => {
+    const date = new Date(value);
+    return !isNaN(date.getTime());
+};
+
+// Parse a date string (YYYY-MM-DD) into a UTC Date object
+const parseUTCDate = (dateStr) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day));
+};
+
 // Get all water test logs filtered by a specific date
 // Updated with proper ordering
 exports.getAllWaterLogs = async (req, res) => {
     const { date } = req.query;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ message: 'Valid date (YYYY-MM-DD) is required.' });
+    }
 
     try {
         const query = `
@@ -35,38 +60,55 @@ exports.getAllWaterLogs = async (req, res) => {
 };
 
 // Upsert method for updating/inserting water logs
+// The `date` field must be in 'YYYY-MM-DD' and interpreted in UTC.
+// test_timestamp is generated in UTC at 08:00 or 14:00 based on the session; clients should omit it
 exports.upsertWaterLogs = async (req, res) => {
     const { date, logs } = req.body;
     const recorded_by_user_id = req.user.id;
     
     try {
         // Validate input
-        if (!date || !logs || !Array.isArray(logs)) {
+        if (!date || !logs || !Array.isArray(logs) || !isValidTimestamp(`${date}T00:00:00Z`)) {
             return res.status(400).json({ message: 'Invalid input data' });
+        }
+
+        for (const logData of logs) {
+            const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
+
+            if (!stage_id || !test_session) {
+                return res.status(400).json({ message: 'Missing required fields: stage_id and test_session' });
+            }
+
+            if (!ALLOWED_SESSIONS.includes(test_session)) {
+                return res.status(400).json({ message: `Unsupported test session: ${test_session}` });
+            }
+
+            if (
+                !isValidNumber(ph_value, PH_RANGE) ||
+                !isValidNumber(tds_ppm_value, TDS_RANGE) ||
+                !isValidNumber(ec_us_cm_value, EC_RANGE) ||
+                !isValidNumber(hardness_mg_l_caco3, HARDNESS_RANGE)
+            ) {
+                return res.status(400).json({ message: 'Invalid numeric values in logs' });
+            }
         }
 
         // Start transaction
         await db.query('BEGIN');
-        
+
         const upsertedLogs = [];
-        
+
         for (const logData of logs) {
             const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
             
-            // Validate required fields
-            if (!stage_id || !test_session) {
-                throw new Error('Missing required fields: stage_id and test_session');
-            }
-            
-            // Create timestamp for the session
-            const hour = test_session === 'Morning' ? '08:00:00' : '14:00:00';
-            const timestamp = new Date(`${date}T${hour}Z`).toISOString();
-            
-            // PostgreSQL UPSERT using ON CONFLICT tied to unique constraint on stage, session and date
+            const [year, month, day] = date.split('-').map(Number);
+            const hour = test_session === 'Morning' ? 8 : 14;
+            const timestamp = new Date(Date.UTC(year, month - 1, day, hour)).toISOString();
+
             const query = `
                 INSERT INTO water_quality_logs
-                    (stage_id, test_session, test_timestamp, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, recorded_by_user_id, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                    (stage_id, test_session, test_timestamp, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, recorded_by_user_id, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
                 ON CONFLICT ON CONSTRAINT water_quality_logs_stage_session_test_date_key
                 DO UPDATE SET
                     ph_value = EXCLUDED.ph_value,
@@ -74,10 +116,10 @@ exports.upsertWaterLogs = async (req, res) => {
                     ec_us_cm_value = EXCLUDED.ec_us_cm_value,
                     hardness_mg_l_caco3 = EXCLUDED.hardness_mg_l_caco3,
                     recorded_by_user_id = EXCLUDED.recorded_by_user_id,
-                    created_at = NOW()
+                    updated_at = NOW()
                 RETURNING *
             `;
-            
+
             const { rows } = await db.query(query, [
                 stage_id,
                 test_session,
@@ -88,22 +130,21 @@ exports.upsertWaterLogs = async (req, res) => {
                 hardness_mg_l_caco3,
                 recorded_by_user_id
             ]);
-            
+
             upsertedLogs.push(rows[0]);
         }
-        
+
         await db.query('COMMIT');
-        res.status(200).json({ 
+        res.status(200).json({
             message: 'Water logs updated successfully',
             logs: upsertedLogs
         });
-        
     } catch (err) {
         await db.query('ROLLBACK');
         console.error('Upsert error:', err.message);
-        res.status(500).json({ 
+        res.status(500).json({
             message: 'Server error during upsert',
-            error: err.message 
+            error: err.message
         });
     }
 };
@@ -121,11 +162,40 @@ exports.addWaterLog = async (req, res) => {
     } = req.body;
 
     const recorded_by_user_id = req.user.id;
-    try{
-        const query =`
+    try {
+        if (!ALLOWED_SESSIONS.includes(test_session)) {
+            return res.status(400).json({ message: `Unsupported test session: ${test_session}` });
+        }
+
+        if (!isValidTimestamp(test_timestamp)) {
+            return res.status(400).json({ message: 'Invalid test_timestamp' });
+        }
+
+        if (
+            !isValidNumber(ph_value, PH_RANGE) ||
+            !isValidNumber(tds_ppm_value, TDS_RANGE) ||
+            !isValidNumber(ec_us_cm_value, EC_RANGE) ||
+            !isValidNumber(hardness_mg_l_caco3, HARDNESS_RANGE)
+        ) {
+            return res.status(400).json({ message: 'Invalid numeric values' });
+        }
+
+        // Ensure no existing log for same stage, session and date
+        const checkQuery = `
+            SELECT 1 FROM water_quality_logs
+            WHERE stage_id = $1 AND test_session = $2 AND DATE(test_timestamp) = $3
+            LIMIT 1
+        `;
+        const testDate = new Date(test_timestamp).toISOString().split('T')[0];
+        const existing = await db.query(checkQuery, [stage_id, test_session, testDate]);
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ message: 'Log already exists for this stage, session, and date' });
+        }
+
+        const query = `
             INSERT INTO water_quality_logs
-                        (stage_id, test_session, test_timestamp, 
-                        ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, 
+                        (stage_id, test_session, test_timestamp,
+                        ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3,
                         recorded_by_user_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
@@ -144,7 +214,7 @@ exports.addWaterLog = async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
-    }      
+    }
 };
 
 // Retrieve all configured water test stages
@@ -161,16 +231,20 @@ exports.getTestStages = async (req, res) => {
 };
 
 // Retrieve water test logs over a date range (defaults to last 7 days)
-// Add Hardness
+// Dates must be in 'YYYY-MM-DD' format and interpreted as UTC.
 exports.getRecentWaterLogs = async (req, res) => {
     let { start_date, end_date } = req.query;
 
     try {
-        const endDateObj = end_date ? new Date(end_date) : new Date();
-        const startDateObj = start_date ? new Date(start_date) : new Date(endDateObj);
+        const endDateStr = end_date || new Date().toISOString().split('T')[0];
+        const endDateObj = parseUTCDate(endDateStr);
 
-        if (!start_date) {
-            startDateObj.setDate(endDateObj.getDate() - 6);
+        let startDateObj;
+        if (start_date) {
+            startDateObj = parseUTCDate(start_date);
+        } else {
+            startDateObj = new Date(endDateObj);
+            startDateObj.setUTCDate(endDateObj.getUTCDate() - 6);
         }
 
         const end = endDateObj.toISOString().split('T')[0];
@@ -199,10 +273,13 @@ exports.getRecentWaterLogs = async (req, res) => {
 // Delete logs by date (for cleanup/admin purposes)
 exports.deleteWaterLogsByDate = async (req, res) => {
     const { date } = req.query;
-    
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ message: 'Valid date (YYYY-MM-DD) is required.' });
+    }
+
     try {
         const query = `
-            DELETE FROM water_quality_logs 
+            DELETE FROM water_quality_logs
             WHERE DATE(test_timestamp) = $1
             RETURNING log_id
         `;

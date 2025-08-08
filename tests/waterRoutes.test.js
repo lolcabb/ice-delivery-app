@@ -57,4 +57,28 @@ describe('water routes', () => {
     expect(res.statusCode).toBe(200);
     expect(waterController.getTestStages).toHaveBeenCalled();
   });
+
+  test('PUT /logs/upsert calls controller', async () => {
+    waterController.upsertWaterLogs.mockImplementation((req, res) =>
+      res.status(200).json({ message: 'ok' })
+    );
+    const res = await request(app)
+      .put('/api/water/logs/upsert')
+      .send({ date: '2024-01-01', logs: [] });
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ message: 'ok' });
+    expect(waterController.upsertWaterLogs).toHaveBeenCalled();
+  });
+
+  test('PUT /logs/upsert propagates controller errors', async () => {
+    waterController.upsertWaterLogs.mockImplementation((req, res) =>
+      res.status(400).json({ error: 'bad' })
+    );
+    const res = await request(app)
+      .put('/api/water/logs/upsert')
+      .send({});
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'bad' });
+    expect(waterController.upsertWaterLogs).toHaveBeenCalled();
+  });
 });
