@@ -49,6 +49,41 @@ describe('waterController.addWaterLog', () => {
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
+  test('allows omission of optional numeric values', async () => {
+    const req = {
+      body: {
+        stage_id: 5,
+        test_session: 'Morning',
+        test_timestamp: '2024-01-01T08:00:00Z'
+      },
+      user: { id: 1 }
+    };
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{}] });
+
+    await waterController.addWaterLog(req, res);
+
+    expect(db.query).toHaveBeenCalledTimes(2);
+    expect(db.query).toHaveBeenNthCalledWith(2, expect.any(String), [
+      5,
+      'Morning',
+      '2024-01-01T08:00:00Z',
+      null,
+      null,
+      null,
+      null,
+      1
+    ]);
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
   test('returns 409 if log already exists', async () => {
     const req = {
       body: {
@@ -173,6 +208,45 @@ describe('waterController.upsertWaterLogs', () => {
         { log_id: 1, ph_value: 8 }
       ]
     });
+  });
+
+  test('allows omission of optional numeric values in logs', async () => {
+    const req = {
+      body: {
+        date: '2024-01-01',
+        logs: [
+          {
+            stage_id: 1,
+            test_session: 'Morning'
+          }
+        ]
+      },
+      user: { id: 1 }
+    };
+
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    const expectedTimestamp = new Date(Date.UTC(2024, 0, 1, 8)).toISOString();
+
+    db.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ log_id: 1 }] }) // insert
+      .mockResolvedValueOnce({}); // COMMIT
+
+    await waterController.upsertWaterLogs(req, res);
+
+    expect(db.query).toHaveBeenNthCalledWith(2, expect.any(String), [
+      1,
+      'Morning',
+      expectedTimestamp,
+      null,
+      null,
+      null,
+      null,
+      1
+    ]);
+    expect(db.query).toHaveBeenNthCalledWith(3, 'COMMIT');
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 
   test('rolls back transaction on database error', async () => {
