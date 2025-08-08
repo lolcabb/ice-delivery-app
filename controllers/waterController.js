@@ -121,11 +121,23 @@ exports.addWaterLog = async (req, res) => {
     } = req.body;
 
     const recorded_by_user_id = req.user.id;
-    try{
-        const query =`
+    try {
+        // Ensure no existing log for same stage, session and date
+        const checkQuery = `
+            SELECT 1 FROM water_quality_logs
+            WHERE stage_id = $1 AND test_session = $2 AND DATE(test_timestamp) = $3
+            LIMIT 1
+        `;
+        const testDate = new Date(test_timestamp).toISOString().split('T')[0];
+        const existing = await db.query(checkQuery, [stage_id, test_session, testDate]);
+        if (existing.rows.length > 0) {
+            return res.status(409).json({ message: 'Log already exists for this stage, session, and date' });
+        }
+
+        const query = `
             INSERT INTO water_quality_logs
-                        (stage_id, test_session, test_timestamp, 
-                        ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, 
+                        (stage_id, test_session, test_timestamp,
+                        ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3,
                         recorded_by_user_id)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
@@ -144,7 +156,7 @@ exports.addWaterLog = async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
-    }      
+    }
 };
 
 // Retrieve all configured water test stages
