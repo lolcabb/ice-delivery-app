@@ -6,6 +6,9 @@ const ALLOWED_SESSIONS = ['Morning', 'Afternoon'];
 // Updated with proper ordering
 exports.getAllWaterLogs = async (req, res) => {
     const { date } = req.query;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ message: 'Valid date (YYYY-MM-DD) is required.' });
+    }
 
     try {
         const query = `
@@ -224,10 +227,13 @@ exports.getRecentWaterLogs = async (req, res) => {
 // Delete logs by date (for cleanup/admin purposes)
 exports.deleteWaterLogsByDate = async (req, res) => {
     const { date } = req.query;
-    
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ message: 'Valid date (YYYY-MM-DD) is required.' });
+    }
+
     try {
         const query = `
-            DELETE FROM water_quality_logs 
+            DELETE FROM water_quality_logs
             WHERE DATE(test_timestamp) = $1
             RETURNING log_id
         `;

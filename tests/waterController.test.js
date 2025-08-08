@@ -161,8 +161,60 @@ describe('waterController.upsertWaterLogs', () => {
     expect(db.query).toHaveBeenNthCalledWith(1, 'BEGIN');
     expect(db.query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith(
+  expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'Server error during upsert' })
     );
+  });
+});
+
+describe('waterController.getAllWaterLogs', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('returns 400 when date is missing', async () => {
+    const req = { query: {} };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.getAllWaterLogs(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('returns 400 when date format is invalid', async () => {
+    const req = { query: { date: '20240101' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.getAllWaterLogs(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+});
+
+describe('waterController.deleteWaterLogsByDate', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('returns 400 when date is missing', async () => {
+    const req = { query: {} };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.deleteWaterLogsByDate(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('returns 400 when date format is invalid', async () => {
+    const req = { query: { date: 'invalid' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await waterController.deleteWaterLogsByDate(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
   });
 });
