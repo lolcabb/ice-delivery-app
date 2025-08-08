@@ -40,7 +40,7 @@ export default function WaterTestLogManager() {
         ph_value: { min: 6.5, max: 8.5, unit: 'pH' },
         tds_ppm_value: { min: 0, max: 500, unit: 'ppm' },
         ec_us_cm_value: { min: 0, max: 1000, unit: 'µS/cm' },
-        hardness_mg_l_caco3: { min: 50, max: 170, unit: 'mg/L CaCO₃' }
+        hardness_mg_l_caco3: { min: 1, max: 10, unit: 'mg/L CaCO₃' }
     };
 
     // Determine if a water treatment stage should be treated as RO
