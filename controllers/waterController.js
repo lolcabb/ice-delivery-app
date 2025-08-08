@@ -9,7 +9,8 @@ const EC_RANGE = { min: 0, max: 5000 };
 const HARDNESS_RANGE = { min: 0, max: 1000 };
 
 const isValidNumber = (value, { min, max }) =>
-    typeof value === 'number' && !isNaN(value) && value >= min && value <= max;
+    value == null ||
+    (typeof value === 'number' && !isNaN(value) && value >= min && value <= max);
 
 const isValidTimestamp = (value) => {
     const date = new Date(value);
@@ -73,7 +74,14 @@ exports.upsertWaterLogs = async (req, res) => {
         }
 
         for (const logData of logs) {
-            const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
+            const {
+                stage_id,
+                test_session,
+                ph_value = null,
+                tds_ppm_value = null,
+                ec_us_cm_value = null,
+                hardness_mg_l_caco3 = null
+            } = logData;
 
             if (!stage_id || !test_session) {
                 return res.status(400).json({ message: 'Missing required fields: stage_id and test_session' });
@@ -99,7 +107,14 @@ exports.upsertWaterLogs = async (req, res) => {
         const upsertedLogs = [];
 
         for (const logData of logs) {
-            const { stage_id, test_session, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3 } = logData;
+            const {
+                stage_id,
+                test_session,
+                ph_value = null,
+                tds_ppm_value = null,
+                ec_us_cm_value = null,
+                hardness_mg_l_caco3 = null
+            } = logData;
             
             const [year, month, day] = date.split('-').map(Number);
             const hour = test_session === 'Morning' ? 8 : 14;
@@ -155,10 +170,10 @@ exports.addWaterLog = async (req, res) => {
         stage_id,
         test_session,
         test_timestamp,
-        ph_value,
-        tds_ppm_value,
-        ec_us_cm_value,
-        hardness_mg_l_caco3
+        ph_value = null,
+        tds_ppm_value = null,
+        ec_us_cm_value = null,
+        hardness_mg_l_caco3 = null
     } = req.body;
 
     const recorded_by_user_id = req.user.id;
