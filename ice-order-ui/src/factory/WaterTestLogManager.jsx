@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Droplets, Plus, Calendar, AlertTriangle, X, BarChart3, Search, Filter } from 'lucide-react';
 import { apiService } from '../apiService';
 import { getISODate } from '../utils/dateUtils';
+import { isROStage } from '../utils/stageUtils';
 
 import WaterDashboard from './WaterDashboard';
 import WaterLogForm from './WaterLogForm';
@@ -40,7 +41,10 @@ export default function WaterTestLogManager() {
         hardness_mg_l_caco3: { min: 50, max: 170, unit: 'mg/L CaCO₃' }
     };
 
-    const isROStage = (stage) => stage?.stage_name?.toLowerCase().includes('ro') || stage?.stage_id === 4;
+    // Determine if a water treatment stage should be treated as RO
+    // A stage is considered RO if its name contains "reverse osmosis",
+    // is exactly "ro", or has a stage_id of 5
+    // Uses the shared isROStage utility for consistency across components
 
     const fetchStages = useCallback(async () => {
         try {
