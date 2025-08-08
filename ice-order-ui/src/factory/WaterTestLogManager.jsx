@@ -297,7 +297,6 @@ useEffect(() => {
                         const logEntry = {
                             stage_id: parseInt(stageId),
                             test_session: session.charAt(0).toUpperCase() + session.slice(1),
-                            test_timestamp: new Date(`${selectedDate}T${session === 'morning' ? '08:00:00' : '14:00:00'}Z`).toISOString(),
                             ph_value: sessionData.ph_value === '' ? null : Number(sessionData.ph_value),
                             tds_ppm_value: sessionData.tds_ppm_value === '' ? null : Number(sessionData.tds_ppm_value),
                             ec_us_cm_value: sessionData.ec_us_cm_value === '' ? null : Number(sessionData.ec_us_cm_value)

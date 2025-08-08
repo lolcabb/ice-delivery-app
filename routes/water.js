@@ -8,8 +8,8 @@ router.route('/logs')
     .post(authMiddleware, waterController.addWaterLog) // Accessible by any authenticated user
     .delete(authMiddleware, requireRole(['admin']), waterController.deleteWaterLogsByDate);
 
-// NEW: Upsert (update/insert) water logs
-router.put('/logs/upsert', authMiddleware, waterController.upsertWaterLogs);    
+// Upsert (update/insert) water logs; timestamp derived from date and session
+router.put('/logs/upsert', authMiddleware, waterController.upsertWaterLogs);
 
 // Get recent water logs over a date range (defaults to last 7 days)
 router.route('/logs/recent')
