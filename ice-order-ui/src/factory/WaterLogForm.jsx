@@ -41,7 +41,12 @@ const WaterLogForm = ({
             const stageData = formData[stageId];
             ['morning', 'afternoon'].forEach(session => {
                 const sessionData = stageData[session];
-                if (sessionData && (sessionData.ph_value || sessionData.tds_ppm_value || sessionData.ec_us_cm_value || sessionData.hardness_mg_l_caco3)) {
+                if (sessionData && (
+                    sessionData.ph_value || 
+                    sessionData.tds_ppm_value || 
+                    sessionData.ec_us_cm_value || 
+                    sessionData.hardness_mg_l_caco3
+                )) {
                     hasData = true;
                 }
             });
@@ -80,22 +85,22 @@ const WaterLogForm = ({
     };
 
     const getParameterThreshold = (parameter) => {
-    if (!dangerThresholds?.[parameter]) return null;
-    
-    const threshold = dangerThresholds[parameter];
-    
-    switch(parameter) {
-        case 'ph_value':
-            return `ค่าปลอดภัย: ${threshold.min} - ${threshold.max} ${threshold.unit}`;
-        case 'tds_ppm_value':
-            return `ค่าปลอดภัย: 0 - ${threshold.max} ${threshold.unit}`;
-        case 'ec_us_cm_value':
-            return `ค่าปลอดภัย: 0 - ${threshold.max} ${threshold.unit}`;
-        case 'hardness_mg_l_caco3':
-            return `ค่าปลอดภัย: ${threshold.min} - ${threshold.max} ${threshold.unit}`;
-        default:
-            return `ค่าปลอดภัย: ${threshold.min} - ${threshold.max} ${threshold.unit}`;
-    }
+        if (!dangerThresholds?.[parameter]) return null;
+        
+        const threshold = dangerThresholds[parameter];
+        
+        switch(parameter) {
+            case 'ph_value':
+                return `(${threshold.min} - ${threshold.max} ${threshold.unit})`;
+            case 'tds_ppm_value':
+                return `(0 - ${threshold.max} ${threshold.unit})`;
+            case 'ec_us_cm_value':
+                return `(0 - ${threshold.max} ${threshold.unit})`;
+            case 'hardness_mg_l_caco3':
+                return `(${threshold.min} - ${threshold.max} ${threshold.unit})`;
+            default:
+                return `(${threshold.min} - ${threshold.max} ${threshold.unit})`;
+        }
     };
 
     return (
@@ -115,91 +120,89 @@ const WaterLogForm = ({
                         </div>
                         <button
                             onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600"
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
                         >
                             <X className="w-6 h-6" />
                         </button>
                     </div>
 
-                    {/* Date Selection */}
-                    <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center gap-3">
-                            <Calendar className="w-5 h-5 text-blue-600" />
-                            <label className="text-sm font-medium text-blue-900">วันที่ตรวจสอบ:</label>
-                            <input
-                                type="date"
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                className="px-3 py-1 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                max={getISODate(new Date())}
-                            />
-                            <div className="ml-auto text-xs text-blue-700">
-                                <strong>หมายเหตุ:</strong> กรอกค่าที่วัดได้จากการตรวจสอบคุณภาพน้ำในแต่ละขั้นตอน สามารถกรอกเฉพาะช่วงเวลาที่ต้องการได้
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto p-6">
+                        {/* Date Selector */}
+                        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                            <div className="flex items-center gap-3">
+                                <Calendar className="w-5 h-5 text-gray-400" />
+                                <label className="text-sm font-medium text-gray-700">เลือกวันที่:</label>
+                                <input
+                                    type="date"
+                                    value={selectedDate}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    max={getISODate(new Date())}
+                                    className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
                             </div>
                         </div>
-                    </div>
 
-                    {/* Safety Guidelines */}
-                    <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
-                            <div>
-                                <h3 className="text-sm font-medium text-yellow-900 mb-2">ช่วงค่ามาตรฐาน</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-yellow-800">
-                                    <div>
-                                        <strong>pH Level:</strong> {dangerThresholds?.ph_value?.min} - {dangerThresholds?.ph_value?.max}
-                                        <div className="text-yellow-700">ค่าเหมาะสม: 6.5 - 8.5</div>
-                                    </div>
-                                    <div>
-                                        <strong>TDS:</strong> 0 - {dangerThresholds?.tds_ppm_value?.max} ppm
-                                        <div className="text-yellow-700">ค่าเหมาะสม: &lt; 50 ppm (หลัง RO)</div>
-                                    </div>
-                                    <div>
-                                        <strong>EC:</strong> 0 - {dangerThresholds?.ec_us_cm_value?.max} µS/cm
-                                        <div className="text-yellow-700">ค่าเหมาะสม: &lt; 100 µS/cm (หลัง RO)</div>
-                                    </div>
-                                    <div>
-                                        <strong>Hardness:</strong> {dangerThresholds?.hardness_mg_l_caco3?.min} - {dangerThresholds?.hardness_mg_l_caco3?.max} mg/L CaCO₃
-                                        <div className="text-yellow-700">ค่าเหมาะสม: &lt; 60-120 mg/L CaCO₃</div>
+                        {/* Safety Guidelines - Updated for Ice Production */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <div className="flex items-start gap-3">
+                                <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5" />
+                                <div>
+                                    <h3 className="font-medium text-blue-900 mb-2">ค่ามาตรฐานการตรวจสอบคุณภาพน้ำสำหรับการผลิตน้ำแข็ง</h3>
+                                    <div className="text-sm text-blue-800 space-y-1">
+                                        <div>
+                                            <strong>pH:</strong> 6.5 - {dangerThresholds?.ph_value?.max}
+                                            <div className="text-green-700">ค่าเหมาะสม: 6.5 - 8.5</div>
+                                        </div>
+                                        <div>
+                                            <strong>TDS:</strong> 0 - {dangerThresholds?.tds_ppm_value?.max} ppm
+                                            <div className="text-green-700">ค่าเหมาะสม: &lt; 50 ppm (หลัง RO)</div>
+                                        </div>
+                                        <div>
+                                            <strong>EC:</strong> 0 - {dangerThresholds?.ec_us_cm_value?.max} µS/cm
+                                            <div className="text-green-700">ค่าเหมาะสม: &lt; 100 µS/cm (หลัง RO)</div>
+                                        </div>
+                                        <div>
+                                            <strong>Hardness:</strong> {dangerThresholds?.hardness_mg_l_caco3?.min} - {dangerThresholds?.hardness_mg_l_caco3?.max} mg/L CaCO₃
+                                            <div className="text-green-700 font-medium">สำหรับการผลิตน้ำแข็ง: &lt; 10 mg/L (เหมาะสม: 1-5 mg/L)</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Test Data Table */}
-                    <div className="overflow-x-auto mb-6">
-                        <table className="min-w-full">
-                            <thead>
-                                <tr className="bg-gray-50">
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                                        ขั้นตอนการกรองน้ำ
-                                    </th>
-                                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
-                                        ช่วงทดสอบ
-                                    </th>
-                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                        ค่า pH {getParameterThreshold('ph_value')}
-                                    </th>
-                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                        TDS (ppm) {getParameterThreshold('tds_ppm_value')}
-                                    </th>
-                                    <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                        EC (µS/cm) {getParameterThreshold('ec_us_cm_value')}
-                                    </th>
-                                    {showHardness && (
-                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
-                                            Hardness (mg/L CaCO₃) {getParameterThreshold('hardness_mg_l_caco3')}
+                        {/* Test Data Table */}
+                        <div className="overflow-x-auto mb-6">
+                            <table className="min-w-full">
+                                <thead>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                                            ขั้นตอนการกรองน้ำ
                                         </th>
-                                    )}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {stages.map((stage) => (
-                                    <React.Fragment key={stage.stage_id}>
-                                        {['morning', 'afternoon'].map((session, sessionIndex) => (
+                                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 border border-gray-200">
+                                            ช่วงทดสอบ
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                            ค่า pH {getParameterThreshold('ph_value')}
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                            TDS {getParameterThreshold('tds_ppm_value')}
+                                        </th>
+                                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                            EC {getParameterThreshold('ec_us_cm_value')}
+                                        </th>
+                                        {showHardness && (
+                                            <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200">
+                                                Hardness {getParameterThreshold('hardness_mg_l_caco3')}
+                                            </th>
+                                        )}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {stages.flatMap(stage =>
+                                        ['morning', 'afternoon'].map((session, sessionIndex) => (
                                             <tr key={`${stage.stage_id}-${session}`} className="hover:bg-gray-50">
-                                                {/* Stage Name (only show for first session) */}
+                                                {/* Stage Name */}
                                                 <td className="px-4 py-3 border border-gray-200">
                                                     {sessionIndex === 0 ? (
                                                         <div className="font-medium text-gray-900">
@@ -215,7 +218,7 @@ const WaterLogForm = ({
                                                     <div className="flex items-center gap-2">
                                                         {getSessionIcon(session)}
                                                         <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getSessionColor(session)}`}>
-                                                            {session.charAt(0).toUpperCase() + session.slice(1)}
+                                                            {session === 'morning' ? 'เช้า' : 'บ่าย'}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -275,19 +278,19 @@ const WaterLogForm = ({
                                                     </div>
                                                 </td>
 
-                                                {/* Hardness Value */}
-                                                { isROStage(stage) && (
+                                                {/* Hardness Value - Only show for RO stages */}
+                                                {showHardness && isROStage(stage) && (
                                                     <td className="px-4 py-3 border border-gray-200 text-center">
                                                         <div className="flex items-center justify-center gap-1">
                                                             <input
                                                                 type="number"
-                                                                step="1"
+                                                                step="0.1"
                                                                 min="0"
-                                                                max="500"
+                                                                max="100"
                                                                 value={formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3 || ''}
                                                                 onChange={(e) => handleInputChange(stage.stage_id, session, 'hardness_mg_l_caco3', e.target.value)}
                                                                 className={getInputClassName('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3)}
-                                                                placeholder="120"
+                                                                placeholder="3.0"
                                                             />
                                                             {isValueDangerous('hardness_mg_l_caco3', formData[stage.stage_id]?.[session]?.hardness_mg_l_caco3) && (
                                                                 <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -295,34 +298,50 @@ const WaterLogForm = ({
                                                         </div>
                                                     </td>
                                                 )}
+                                                {/* Empty cell for non-RO stages when hardness column is shown */}
+                                                {showHardness && !isROStage(stage) && (
+                                                    <td className="px-4 py-3 border border-gray-200 text-center">
+                                                        <span className="text-gray-400 text-sm">—</span>
+                                                    </td>
+                                                )}
                                             </tr>
-                                        ))}
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
 
-                    {/* Legend */}
-                    <div className="mb-6 p-3 bg-gray-50 rounded-lg">
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
-                            <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 bg-green-50 border border-green-300 rounded"></div>
-                                <span>ช่วงปลอดภัย</span>
+                        {/* Parameter Guidelines - Updated for Ice Production */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-gray-50 rounded-lg p-3">
+                                <h4 className="font-medium text-gray-900 mb-1">ค่า pH</h4>
+                                <p className="text-xs text-gray-600">
+                                    ช่วงปลอดภัย: 6.5 - 8.5
+                                </p>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <div className="w-3 h-3 bg-red-50 border border-red-300 rounded"></div>
-                                <AlertTriangle className="w-3 h-3 text-red-500" />
-                                <span>ค่าอันตราย</span>
+                            <div className="bg-gray-50 rounded-lg p-3">
+                                <h4 className="font-medium text-gray-900 mb-1">TDS (ppm)</h4>
+                                <p className="text-xs text-gray-600">
+                                    เป้าหมาย: &lt; 50 ppm
+                                </p>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <Sun className="w-3 h-3 text-yellow-600" />
-                                <span>ตรวจน้ำช่วงเช้า</span>
+                            <div className="bg-gray-50 rounded-lg p-3">
+                                <h4 className="font-medium text-gray-900 mb-1">EC (µS/cm)</h4>
+                                <p className="text-xs text-gray-600">
+                                    เป้าหมาย: &lt; 100 µS/cm
+                                </p>
                             </div>
-                            <div className="flex items-center gap-1">
-                                <Moon className="w-3 h-3 text-blue-600" />
-                                <span>ตรวจน้ำช่วงบ่าย</span>
-                            </div>
+                            {showHardness && (
+                                <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                                    <h4 className="font-medium text-orange-900 mb-1">Hardness (mg/L)</h4>
+                                    <p className="text-xs text-orange-700 font-medium">
+                                        การผลิตน้ำแข็ง: &lt; 10 mg/L
+                                    </p>
+                                    <p className="text-xs text-green-700">
+                                        เหมาะสม: 1-5 mg/L
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
 
