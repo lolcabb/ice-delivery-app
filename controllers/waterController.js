@@ -62,12 +62,12 @@ exports.upsertWaterLogs = async (req, res) => {
             const hour = test_session === 'Morning' ? '08:00:00' : '14:00:00';
             const timestamp = new Date(`${date}T${hour}Z`).toISOString();
             
-            // PostgreSQL UPSERT using ON CONFLICT
+            // PostgreSQL UPSERT using ON CONFLICT tied to unique constraint on stage, session and date
             const query = `
-                INSERT INTO water_quality_logs 
+                INSERT INTO water_quality_logs
                     (stage_id, test_session, test_timestamp, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, recorded_by_user_id, created_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-                ON CONFLICT (stage_id, test_session, DATE(test_timestamp))
+                ON CONFLICT ON CONSTRAINT water_quality_logs_stage_session_test_date_key
                 DO UPDATE SET
                     ph_value = EXCLUDED.ph_value,
                     tds_ppm_value = EXCLUDED.tds_ppm_value,
