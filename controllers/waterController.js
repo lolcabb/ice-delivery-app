@@ -37,6 +37,7 @@ exports.getAllWaterLogs = async (req, res) => {
 };
 
 // Upsert method for updating/inserting water logs
+// test_timestamp is generated from the provided date and session; clients should omit it
 exports.upsertWaterLogs = async (req, res) => {
     const { date, logs } = req.body;
     const recorded_by_user_id = req.user.id;
