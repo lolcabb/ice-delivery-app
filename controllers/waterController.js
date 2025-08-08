@@ -99,8 +99,8 @@ exports.upsertWaterLogs = async (req, res) => {
 
             const query = `
                 INSERT INTO water_quality_logs
-                    (stage_id, test_session, test_timestamp, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, recorded_by_user_id, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                    (stage_id, test_session, test_timestamp, ph_value, tds_ppm_value, ec_us_cm_value, hardness_mg_l_caco3, recorded_by_user_id, created_at, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
                 ON CONFLICT (stage_id, test_session, DATE(test_timestamp))
                 DO UPDATE SET
                     ph_value = EXCLUDED.ph_value,
@@ -108,7 +108,7 @@ exports.upsertWaterLogs = async (req, res) => {
                     ec_us_cm_value = EXCLUDED.ec_us_cm_value,
                     hardness_mg_l_caco3 = EXCLUDED.hardness_mg_l_caco3,
                     recorded_by_user_id = EXCLUDED.recorded_by_user_id,
-                    created_at = NOW()
+                    updated_at = NOW()
                 RETURNING *
             `;
 
