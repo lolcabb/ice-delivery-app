@@ -7,6 +7,46 @@ import { isROStage } from '../utils/stageUtils';
 import WaterDashboard from './WaterDashboard';
 import WaterLogForm from './WaterLogForm';
 
+export const dangerThresholds = {
+    ph_value: { min: 6.5, max: 8.5, unit: 'pH' },
+    tds_ppm_value: { min: 0, max: 500, unit: 'ppm' },
+    ec_us_cm_value: { min: 0, max: 1000, unit: 'µS/cm' },
+    hardness_mg_l_caco3: { min: 1, max: 10, unit: 'mg/L CaCO₃' }
+};
+
+export const evaluateDangerousValues = (logs, thresholds = dangerThresholds) => {
+    const dangerMap = new Map();
+    const sortedLogs = [...logs].sort(
+        (a, b) => new Date(a.test_timestamp) - new Date(b.test_timestamp)
+    );
+
+    sortedLogs.forEach(log => {
+        Object.keys(thresholds).forEach(param => {
+            const value = log[param];
+            if (value === null || value === undefined) return;
+            const threshold = thresholds[param];
+            const key = `${log.stage_id}-${param}`;
+
+            if (value < threshold.min || value > threshold.max) {
+                dangerMap.set(key, {
+                    ...log,
+                    parameter: param,
+                    value,
+                    threshold,
+                    severity:
+                        value < threshold.min * 0.8 || value > threshold.max * 1.2
+                            ? 'high'
+                            : 'medium'
+                });
+            } else {
+                dangerMap.delete(key);
+            }
+        });
+    });
+
+    return Array.from(dangerMap.values());
+};
+
 export default function WaterTestLogManager() {
     const [logs, setLogs] = useState([]);
     const [stages, setStages] = useState([]);
@@ -34,14 +74,6 @@ export default function WaterTestLogManager() {
         trends: {},
         averages: {}
     });
-
-    // Water quality danger thresholds
-    const dangerThresholds = {
-        ph_value: { min: 6.5, max: 8.5, unit: 'pH' },
-        tds_ppm_value: { min: 0, max: 500, unit: 'ppm' },
-        ec_us_cm_value: { min: 0, max: 1000, unit: 'µS/cm' },
-        hardness_mg_l_caco3: { min: 1, max: 10, unit: 'mg/L CaCO₃' }
-    };
 
     // Determine if a water treatment stage should be treated as RO
     // A stage is considered RO if its name contains "reverse osmosis",
@@ -114,24 +146,8 @@ export default function WaterTestLogManager() {
             }).toString();
 
             const recentLogs = await apiService.get(`/water/logs/recent?${query}`);
-            
-            // Calculate dangerous values
-            const dangerousValues = [];
-            recentLogs.forEach(log => {
-                Object.keys(dangerThresholds).forEach(param => {
-                    const value = log[param];
-                    const threshold = dangerThresholds[param];
-                    if (value && (value < threshold.min || value > threshold.max)) {
-                        dangerousValues.push({
-                            ...log,
-                            parameter: param,
-                            value: value,
-                            threshold: threshold,
-                            severity: value < threshold.min * 0.8 || value > threshold.max * 1.2 ? 'high' : 'medium'
-                        });
-                    }
-                });
-            });
+
+            const dangerousValues = evaluateDangerousValues(recentLogs || []);
 
             setDashboardData({
                 recentLogs: recentLogs || [],
