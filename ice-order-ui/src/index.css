@@ -3,6 +3,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
 
 @theme {
-	--font-display: "Prompt", "sans-serif";
+        --font-display: "Prompt", "sans-serif";
+}
+
+html, body {
+  height: 100%;
+}
+body {
+  overflow: auto;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+body::-webkit-scrollbar {
+  display: none;             /* Chrome, Safari, Opera */
 }
 
