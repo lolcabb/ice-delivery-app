@@ -129,6 +129,8 @@ const EnhancedFilterSection = React.memo(({
         const clearEvents = [
             { target: { name: 'startDate', value: '' } },
             { target: { name: 'endDate', value: '' } },
+            { target: { name: 'paidStartDate', value: '' } },
+            { target: { name: 'paidEndDate', value: '' } },
             { target: { name: 'category_id', value: '' } },
             { target: { name: 'payment_method', value: '' } },
             { target: { name: 'is_petty_cash_expense', value: '' } }
@@ -235,6 +237,34 @@ const EnhancedFilterSection = React.memo(({
                                     name="endDate"
                                     id="endDate"
                                     value={filters.endDate}
+                                    onChange={onFilterChange}
+                                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="paidStartDate" className="block text-sm font-medium text-gray-700 mb-1">
+                                    วันที่จ่ายเริ่มต้น
+                                </label>
+                                <input
+                                    type="date"
+                                    name="paidStartDate"
+                                    id="paidStartDate"
+                                    value={filters.paidStartDate}
+                                    onChange={onFilterChange}
+                                    className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="paidEndDate" className="block text-sm font-medium text-gray-700 mb-1">
+                                    วันที่จ่ายสิ้นสุด
+                                </label>
+                                <input
+                                    type="date"
+                                    name="paidEndDate"
+                                    id="paidEndDate"
+                                    value={filters.paidEndDate}
                                     onChange={onFilterChange}
                                     className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                 />
@@ -372,8 +402,8 @@ export default function ExpenseListManager() {
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
-        paid_startDate: '',
-        paid_endDate: '',
+        paidStartDate: '',
+        paidEndDate: '',
         category_id: '',
         payment_method: '',
         is_petty_cash_expense: '', // Will be 'true', 'false', or ''
@@ -389,6 +419,20 @@ export default function ExpenseListManager() {
             setIsLoading(true);
         }
         setError(null);
+
+        if (currentFilters.startDate && currentFilters.endDate && new Date(currentFilters.startDate) > new Date(currentFilters.endDate)) {
+            setError('ช่วงวันที่บิลไม่ถูกต้อง');
+            setIsLoading(false);
+            setIsFiltering(false);
+            return;
+        }
+        if (currentFilters.paidStartDate && currentFilters.paidEndDate && new Date(currentFilters.paidStartDate) > new Date(currentFilters.paidEndDate)) {
+            setError('ช่วงวันที่ชำระเงินไม่ถูกต้อง');
+            setIsLoading(false);
+            setIsFiltering(false);
+            return;
+        }
+
         try {
             const params = { ...currentFilters, page, limit: pagination.limit };
             Object.keys(params).forEach(key => {
@@ -398,7 +442,6 @@ export default function ExpenseListManager() {
             });
             const response = await apiService.getExpenses(params);
             setExpenses(Array.isArray(response.data) ? response.data : []);
-            //setPagination(prev => ({ ...prev, ...(response.pagination || { page: 1, totalPages: 1, totalItems: 0 }) }));
             const safeTotalPages = Math.max(1, response.pagination?.totalPages || 1);
             const safePage = Math.min(Math.max(1, response.pagination?.page || 1), safeTotalPages);
             setPagination(prev => ({
