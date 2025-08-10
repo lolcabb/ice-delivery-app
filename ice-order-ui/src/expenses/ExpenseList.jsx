@@ -77,7 +77,7 @@ const ActionButtons = ({ expense, onEdit, onDelete, onViewReceipt }) => {
             </button>
             {/* Delete Button */}
             <button
-                onClick={() => onDelete(expense.expense_id)}
+                onClick={() => onDelete(expense)}
                 className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-150"
             >
                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -93,7 +93,7 @@ const ActionButtons = ({ expense, onEdit, onDelete, onViewReceipt }) => {
 const LoadingRow = () => {
     return (
         <tr className="animate-pulse">
-            {[...Array(7)].map((_, index) => (
+            {[...Array(8)].map((_, index) => (
                 <td key={index} className="px-6 py-4 whitespace-nowrap">
                     <div className="h-4 bg-gray-200 rounded"></div>
                 </td>
@@ -106,7 +106,7 @@ const LoadingRow = () => {
 const EmptyState = ({ isFiltered }) => {
     return (
         <tr>
-            <td colSpan="7" className="px-6 py-12 text-center">
+            <td colSpan="8" className="px-6 py-12 text-center">
                 <div className="flex flex-col items-center">
                     <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v11a2 2 0 002 2h2m0-13v13m0-13h2a2 2 0 012 2v11a2 2 0 01-2 2h-2m-6-9h6m-6 4h6" />
@@ -280,6 +280,12 @@ export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, isF
         });
     };
 
+    const sortedExpenses = [...expenses].sort((a, b) => {
+        const dateA = new Date(a.paid_date || a.expense_date);
+        const dateB = new Date(b.paid_date || b.expense_date);
+        return dateB - dateA;
+    });
+
     return (
         <div className="bg-white shadow-lg rounded-lg overflow-hidden">
             {/* Header with summary */}
@@ -312,6 +318,9 @@ export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, isF
                                 วันที่
                             </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                วันที่จ่าย
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 หมวดหมู่
                             </th>
                             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -340,15 +349,18 @@ export default function ExpenseList({ expenses, onEdit, onDelete, isLoading, isF
                             <EmptyState isFiltered={hasFilters} />
                         ) : (
                             // Show actual expense data
-                            expenses.map((expense) => (
-                                <tr 
-                                    key={expense.expense_id} 
+                            sortedExpenses.map((expense) => (
+                                <tr
+                                    key={`${expense.expense_id}-${expense.paid_date || expense.expense_date}`}
                                     className={`hover:bg-gray-50 transition-colors duration-150 ${
                                         expense.is_petty_cash_expense ? 'border-l-4 border-green-300' : 'border-l-4 border-blue-300'
                                     }`}
                                 >
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                                         {formatDate(expense.expense_date)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                                        {expense.paid_date ? formatDate(expense.paid_date) : '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                                         <CategoryBadge categoryName={expense.category_name} />

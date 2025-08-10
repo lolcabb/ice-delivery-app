@@ -9,6 +9,7 @@ jest.mock('../components/PaymentMethodBadge.jsx', () => () => <div data-testid="
 const sampleExpense = {
   expense_id: 1,
   expense_date: '2023-01-01',
+  paid_date: '2023-01-02',
   category_name: 'Meals',
   description: 'Lunch',
   reference_details: 'Ref',
@@ -37,4 +38,19 @@ test('shows receipt button and opens modal on click', async () => {
 
   const img = await screen.findByAltText('ใบเสร็จ');
   expect(img).toHaveAttribute('src', sampleExpense.related_document_url);
+});
+
+test('displays paid date when available', () => {
+  render(
+    <ExpenseList
+      expenses={[sampleExpense]}
+      onEdit={jest.fn()}
+      onDelete={jest.fn()}
+      isLoading={false}
+      pagination={{ page: 1, totalPages: 1, totalItems: 1 }}
+      onPageChange={jest.fn()}
+    />
+  );
+
+  expect(screen.getByText('2 ม.ค. 2566')).toBeInTheDocument();
 });
