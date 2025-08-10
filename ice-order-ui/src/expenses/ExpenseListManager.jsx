@@ -519,8 +519,8 @@ export default function ExpenseListManager() {
         }
     }, [editingExpense, fetchExpenses, filters, pagination.page, handleCloseModal]);
 
-    const handleDeleteExpense = useCallback(async (expenseId) => {
-        const expenseToDelete = expenses.find(exp => exp.expense_id === expenseId);
+    const handleDeleteExpense = useCallback(async (expense) => {
+        const expenseToDelete = expense;
         if (!expenseToDelete) return;
 
         const confirmAction = window.confirm(
@@ -532,7 +532,7 @@ export default function ExpenseListManager() {
             setError(null);
             setSuccessMessage('');
             try {
-                await apiService.deleteExpense(expenseId);
+                await apiService.deleteExpense(expenseToDelete.expense_id);
                 setSuccessMessage(`ค่าใช้จ่าย "${expenseToDelete.description}" ถูกลบเรียบร้อยแล้ว.`);
                 const newTotalItems = pagination.totalItems - 1;
                 const newTotalPages = Math.ceil(newTotalItems / pagination.limit);
