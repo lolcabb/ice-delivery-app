@@ -482,7 +482,7 @@ router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', '
 
 // GET /api/expenses/reports/detailed (keep as is)
 router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
-    const { startDate, endDate, category_id, payment_method, is_petty_cash_expense, user_id } = req.query;
+    const { startDate, endDate, paidStartDate, paidEndDate, category_id, payment_method, is_petty_cash_expense, user_id } = req.query;
     let sqlQuery = `
         SELECT
             e.expense_id, e.expense_date, e.paid_date, ec.category_name, e.description, e.amount,
@@ -492,8 +492,10 @@ router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountan
         JOIN expense_categories ec ON e.category_id = ec.category_id
         LEFT JOIN users u ON e.user_id = u.id`;
     const conditions = []; const values = []; let paramCount = 1;
-    if (startDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) >= $${paramCount++}`); values.push(startDate); }
-    if (endDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) <= $${paramCount++}`); values.push(endDate); }
+    if (startDate) { conditions.push(`e.expense_date >= $${paramCount++}`); values.push(startDate); }
+    if (endDate) { conditions.push(`e.expense_date <= $${paramCount++}`); values.push(endDate); }
+    if (paidStartDate) { conditions.push(`e.paid_date >= $${paramCount++}`); values.push(paidStartDate); }
+    if (paidEndDate) { conditions.push(`e.paid_date <= $${paramCount++}`); values.push(paidEndDate); }
     if (category_id) { conditions.push(`e.category_id = $${paramCount++}`); values.push(parseInt(category_id)); }
     if (payment_method) { conditions.push(`e.payment_method ILIKE $${paramCount++}`); values.push(`%${payment_method}%`); }
     if (is_petty_cash_expense !== undefined && is_petty_cash_expense !== '') {
@@ -910,12 +912,14 @@ router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), asyn
 
 // GET /api/expenses (List expenses - keep as is)
 router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
-    const { startDate, endDate, category_id, user_id, payment_method, is_petty_cash_expense, page = 1, limit = 20 } = req.query;
+    const { startDate, endDate, paidStartDate, paidEndDate, category_id, user_id, payment_method, is_petty_cash_expense, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let sqlQuery = `SELECT e.*, ec.category_name FROM expenses e JOIN expense_categories ec ON e.category_id = ec.category_id`;
     const conditions = []; const values = []; let paramCount = 1;
-    if (startDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) >= $${paramCount++}`); values.push(startDate); }
-    if (endDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) <= $${paramCount++}`); values.push(endDate); }
+    if (startDate) { conditions.push(`e.expense_date >= $${paramCount++}`); values.push(startDate); }
+    if (endDate) { conditions.push(`e.expense_date <= $${paramCount++}`); values.push(endDate); }
+    if (paidStartDate) { conditions.push(`e.paid_date >= $${paramCount++}`); values.push(paidStartDate); }
+    if (paidEndDate) { conditions.push(`e.paid_date <= $${paramCount++}`); values.push(paidEndDate); }
     if (category_id) { conditions.push(`e.category_id = $${paramCount++}`); values.push(parseInt(category_id)); }
     if (user_id) { conditions.push(`e.user_id = $${paramCount++}`); values.push(parseInt(user_id)); }
     if (payment_method) { conditions.push(`e.payment_method ILIKE $${paramCount++}`); values.push(`%${payment_method}%`); }

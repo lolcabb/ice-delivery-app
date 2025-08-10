@@ -254,18 +254,19 @@ const enhancedExportToCSV = (reportData, summary, insights) => {
 
     // Enhanced headers with more business context
     const headers = [
-        "วันที่", "หมวดหมู่", "รายละเอียด", "จำนวนเงิน (บาท)", 
-        "วิธีการชำระเงิน", "เงินสดย่อย", "บันทึกโดย", "อ้างอิง", 
+        "วันที่", "วันที่จ่าย", "หมวดหมู่", "รายละเอียด", "จำนวนเงิน (บาท)",
+        "วิธีการชำระเงิน", "เงินสดย่อย", "บันทึกโดย", "อ้างอิง",
         "บันทึกเมื่อ", "วันในสัปดาห์", "ประเภท"
     ];
 
     const rows = reportData.map(row => {
-        const expenseDate = new Date(row.expense_date);
-        const dayOfWeek = expenseDate.toLocaleDateString('th-TH', { weekday: 'long' });
+        const baseDate = new Date(row.paid_date || row.expense_date);
+        const dayOfWeek = baseDate.toLocaleDateString('th-TH', { weekday: 'long' });
         const expenseType = row.is_petty_cash_expense ? 'เงินสดย่อย' : 'โอนธนาคาร';
 
         return [
             escapeCSV(formatDate(row.expense_date)),
+            escapeCSV(row.paid_date ? formatDate(row.paid_date) : ''),
             escapeCSV(row.category_name),
             escapeCSV(row.description),
             escapeCSV(row.amount),
@@ -327,8 +328,8 @@ export default function EnhancedExpenseReports() {
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
-        paid_startDate: '',
-        paid_endDate: '',
+        paidStartDate: '',
+        paidEndDate: '',
         category_id: '',
         payment_method: '',
         is_petty_cash_expense: '',
@@ -375,8 +376,8 @@ export default function EnhancedExpenseReports() {
 
         // High spending day detection
         const expensesByDate = data.reduce((acc, expense) => {
-            const date = expense.expense_date.split('T')[0];
-            acc[date] = (acc[date] || 0) + parseFloat(expense.amount);
+            const usedDate = (expense.paid_date || expense.expense_date).split('T')[0];
+            acc[usedDate] = (acc[usedDate] || 0) + parseFloat(expense.amount);
             return acc;
         }, {});
 
@@ -422,7 +423,7 @@ export default function EnhancedExpenseReports() {
 
         // Weekend vs weekday spending
         const weekendExpenses = data.filter(expense => {
-            const day = new Date(expense.expense_date).getDay();
+            const day = new Date(expense.paid_date || expense.expense_date).getDay();
             return day === 0 || day === 6; // Sunday or Saturday
         });
 
@@ -442,6 +443,17 @@ export default function EnhancedExpenseReports() {
         setIsLoading(true);
         setError(null);
         setHasGeneratedReport(true);
+
+        if (filters.startDate && filters.endDate && new Date(filters.startDate) > new Date(filters.endDate)) {
+            setError('ช่วงวันที่บิลไม่ถูกต้อง');
+            setIsLoading(false);
+            return;
+        }
+        if (filters.paidStartDate && filters.paidEndDate && new Date(filters.paidStartDate) > new Date(filters.paidEndDate)) {
+            setError('ช่วงวันที่ชำระเงินไม่ถูกต้อง');
+            setIsLoading(false);
+            return;
+        }
 
         try {
             const activeFilters = { ...filters };
@@ -472,7 +484,7 @@ export default function EnhancedExpenseReports() {
                     }, {});
 
                     const total = Object.values(categoryTotals).reduce((sum, amount) => sum + amount, 0);
-                    
+
                     return Object.entries(categoryTotals)
                         .map(([name, amount]) => ({
                             name,
@@ -483,7 +495,7 @@ export default function EnhancedExpenseReports() {
                 })(),
                 // Add trends analysis
                 trends: {
-                    dailyAverage: data.length > 0 ? response.summary.grandTotal / new Set(data.map(item => item.expense_date.split('T')[0])).size : 0,
+                    dailyAverage: data.length > 0 ? response.summary.grandTotal / new Set(data.map(item => (item.paid_date || item.expense_date).split('T')[0])).size : 0,
                 }
             };
 
@@ -540,6 +552,30 @@ export default function EnhancedExpenseReports() {
                                 name="endDate"
                                 id="endDate"
                                 value={filters.endDate}
+                                onChange={handleFilterChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="paidStartDate" className="block text-sm font-medium text-gray-700 mb-1">วันที่จ่ายเริ่มต้น</label>
+                            <input
+                                type="date"
+                                name="paidStartDate"
+                                id="paidStartDate"
+                                value={filters.paidStartDate}
+                                onChange={handleFilterChange}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label htmlFor="paidEndDate" className="block text-sm font-medium text-gray-700 mb-1">วันที่จ่ายสิ้นสุด</label>
+                            <input
+                                type="date"
+                                name="paidEndDate"
+                                id="paidEndDate"
+                                value={filters.paidEndDate}
                                 onChange={handleFilterChange}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                             />
@@ -660,6 +696,7 @@ export default function EnhancedExpenseReports() {
                                     <thead className="bg-gray-50">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">วันที่จ่าย</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">หมวดหมู่</th>
                                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รายละเอียด</th>
                                             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">จำนวนเงิน (บาท)</th>
@@ -673,6 +710,9 @@ export default function EnhancedExpenseReports() {
                                             <tr key={item.expense_id} className="hover:bg-gray-50">
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                                                     {formatDate(item.expense_date)}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                                    {item.paid_date ? formatDate(item.paid_date) : ''}
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-sm">
                                                     <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
