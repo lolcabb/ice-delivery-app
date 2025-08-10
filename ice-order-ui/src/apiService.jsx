@@ -158,7 +158,21 @@ export const apiService = {
     updateOrderStatusAndDriver: (orderId, data) => { 
         return apiService.put(`/orders/${orderId}`, data);
     },
-    addExpenseWithFile: (formData) => {
+    addExpenseWithFile: (expenseData) => {
+        // Build FormData and ensure paid_date is included when provided
+        const formData = new FormData();
+        const { receipt_file, paid_date, ...fields } = expenseData || {};
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                formData.append(key, value);
+            }
+        });
+        if (paid_date) {
+            formData.append('paid_date', paid_date);
+        }
+        if (receipt_file) {
+            formData.append('receipt_file', receipt_file);
+        }
         return fetch(`${API_BASE_URL}/expenses`, {
             method: 'POST',
             headers: {
@@ -179,7 +193,21 @@ export const apiService = {
     },
 
     // New method for updating expense with file upload
-    updateExpenseWithFile: (expenseId, formData) => {
+    updateExpenseWithFile: (expenseId, expenseData) => {
+        // Build FormData and ensure paid_date is included when provided
+        const formData = new FormData();
+        const { receipt_file, paid_date, ...fields } = expenseData || {};
+        Object.entries(fields).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                formData.append(key, value);
+            }
+        });
+        if (paid_date) {
+            formData.append('paid_date', paid_date);
+        }
+        if (receipt_file) {
+            formData.append('receipt_file', receipt_file);
+        }
         return fetch(`${API_BASE_URL}/expenses/${expenseId}`, {
             method: 'PUT',
             headers: {
@@ -203,8 +231,13 @@ export const apiService = {
     updateExpenseCategory: (categoryId, categoryData) => apiService.put(`/expenses/expense-categories/${categoryId}`, categoryData),
     deleteExpenseCategory: (categoryId) => apiService.delete(`/expenses/expense-categories/${categoryId}`),
     getExpenses: (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
-        return apiService.get(`/expenses?${queryParams}`);
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params.append(key, value);
+            }
+        });
+        return apiService.get(`/expenses?${params.toString()}`);
     },
     getExpenseById: (expenseId) => apiService.get(`/expenses/${expenseId}`),
     addExpense: (expenseData) => apiService.post('/expenses', expenseData),
@@ -219,21 +252,41 @@ export const apiService = {
     updatePettyCashLog: (logDate, logData) => apiService.put(`/expenses/petty-cash/${logDate}`, logData),
     reconcilePettyCashLog: (logDate) => apiService.post(`/expenses/petty-cash/${logDate}/reconcile`, {}),
     getDashboardSummaryCards: () => apiService.get('/expenses/dashboard/summary-cards'),
-    getDashboardExpensesByCategory: (period = 'current_month') => {
-        const queryParams = new URLSearchParams({ period }).toString();
-        return apiService.get(`/expenses/dashboard/expenses-by-category?${queryParams}`);
+    getDashboardExpensesByCategory: (period = 'current_month', filters = {}) => {
+        const params = new URLSearchParams({ period });
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params.append(key, value);
+            }
+        });
+        return apiService.get(`/expenses/dashboard/expenses-by-category?${params.toString()}`);
     },
-    getDashboardMonthlyTrend: (months = 6) => {
-        const queryParams = new URLSearchParams({ months }).toString();
-        return apiService.get(`/expenses/dashboard/monthly-trend?${queryParams}`);
+    getDashboardMonthlyTrend: (months = 6, filters = {}) => {
+        const params = new URLSearchParams({ months });
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params.append(key, value);
+            }
+        });
+        return apiService.get(`/expenses/dashboard/monthly-trend?${params.toString()}`);
     },
-    getDashboardRecentExpenses: (limit = 5) => {
-        const queryParams = new URLSearchParams({ limit }).toString();
-        return apiService.get(`/expenses/dashboard/recent-expenses?${queryParams}`);
+    getDashboardRecentExpenses: (limit = 5, filters = {}) => {
+        const params = new URLSearchParams({ limit });
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params.append(key, value);
+            }
+        });
+        return apiService.get(`/expenses/dashboard/recent-expenses?${params.toString()}`);
     },
     getDetailedExpenseReport: (filters = {}) => {
-        const queryParams = new URLSearchParams(filters).toString();
-        return apiService.get(`/expenses/reports/detailed?${queryParams}`);
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                params.append(key, value);
+            }
+        });
+        return apiService.get(`/expenses/reports/detailed?${params.toString()}`);
     },
     getInventoryItemTypes: () => apiService.get('/inventory/item-types'),
     addInventoryItemType: (itemTypeData) => apiService.post('/inventory/item-types', itemTypeData),
