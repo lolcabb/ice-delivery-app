@@ -12,7 +12,7 @@ const ExpenseForm = ({
 }) => {
     const getInitialFormState = useCallback(() => ({
         expense_date: getCurrentLocalDateISO(), // Default to today
-        paid_date: getCurrentLocalDateISO(),
+        paid_date: '',
         category_id: categories.length > 0 ? categories[0].category_id.toString() : '',
         description: '',
         amount: '',
@@ -34,7 +34,7 @@ const ExpenseForm = ({
             if (expense) {
                 setFormData({
                     expense_date: formatDateForInput(expense.expense_date),
-                    paid_date: expense.paid_date ? formatDateForInput(expense.paid_date) : formatDateForInput(expense.expense_date),
+                    paid_date: expense.paid_date ? formatDateForInput(expense.paid_date) : '',
                     category_id: expense.category_id?.toString() || '',
                     description: expense.description || '',
                     amount: expense.amount?.toString() || '',
@@ -108,8 +108,10 @@ const ExpenseForm = ({
         setIsLoading(true);
         try {
             // === PREPARE DATA FOR FILE UPLOAD ===
+            const effectivePaidDate = formData.paid_date || formData.expense_date;
             const submitData = {
                 ...formData,
+                paid_date: effectivePaidDate,
                 amount: parseFloat(formData.amount),
                 category_id: parseInt(formData.category_id),
                 is_petty_cash_expense: formData.is_petty_cash_expense
@@ -132,7 +134,7 @@ const ExpenseForm = ({
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={expense ? 'แก้ไขรายการค่าใช้จ่าย' : 'บันทึกรายการค่าใช้จ่ายใหม่'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label htmlFor="expense_date" className="block text-sm font-medium text-gray-700 mb-1">
                             วันที่ <span className="text-red-500">*</span>
@@ -145,6 +147,20 @@ const ExpenseForm = ({
                             onChange={handleChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-50"
                             required
+                            disabled={isLoading}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="paid_date" className="block text-sm font-medium text-gray-700 mb-1">
+                            วันที่ชำระ
+                        </label>
+                        <input
+                            type="date"
+                            name="paid_date"
+                            id="paid_date"
+                            value={formData.paid_date}
+                            onChange={handleChange}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-50"
                             disabled={isLoading}
                         />
                     </div>
