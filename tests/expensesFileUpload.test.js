@@ -85,6 +85,7 @@ describe('expense file upload', () => {
   test('PUT /api/expenses/:id updates expense with file', async () => {
     const oldRow = {
       expense_date: new Date('2024-02-01T00:00:00Z'),
+      paid_date: null,
       is_petty_cash_expense: false,
       related_document_url: 'old'
     };
@@ -92,6 +93,7 @@ describe('expense file upload', () => {
       expense_id: 3,
       is_petty_cash_expense: false,
       expense_date: '2024-02-01',
+      paid_date: '2024-02-01',
       related_document_url: 'http://fake.url/new.jpg'
     };
     mockClient.query
@@ -122,6 +124,7 @@ describe('expense file upload', () => {
       expect.stringContaining('UPDATE expenses'),
       [
         '2024-02-01',
+        '2024-02-01',
         1,
         'Upd',
         15,
@@ -138,6 +141,7 @@ describe('expense file upload', () => {
   test('DELETE /api/expenses/:id removes petty cash expense', async () => {
     const selectRow = {
       expense_date: new Date('2024-02-02T00:00:00Z'),
+      paid_date: null,
       is_petty_cash_expense: true
     };
     const deletedRow = { expense_id: 4 };
