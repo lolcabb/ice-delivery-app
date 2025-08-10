@@ -31,7 +31,12 @@ describe('expense file upload', () => {
   });
 
   test('multipart POST /api/expenses uploads a file', async () => {
-    const expenseRow = { expense_id: 1, related_document_url: 'http://fake.url/receipt.jpg', is_petty_cash_expense: false };
+    const expenseRow = {
+      expense_id: 1,
+      related_document_url: 'http://fake.url/receipt.jpg',
+      is_petty_cash_expense: false,
+      paid_date: '2024-01-02'
+    };
     mockClient.query
       .mockResolvedValueOnce({}) // BEGIN
       .mockResolvedValueOnce({ rows: [expenseRow] }) // INSERT
@@ -42,6 +47,7 @@ describe('expense file upload', () => {
     const res = await request(app)
       .post('/api/expenses')
       .field('expense_date', '2024-01-01')
+      .field('paid_date', '2024-01-02')
       .field('category_id', '1')
       .field('description', 'Test expense')
       .field('amount', '10')
@@ -53,10 +59,16 @@ describe('expense file upload', () => {
     expect(res.statusCode).toBe(201);
     expect(expensesRoutes.uploadExpenseReceiptToGCS).toHaveBeenCalled();
     expect(res.body.related_document_url).toBe('http://fake.url/receipt.jpg');
+    expect(res.body.paid_date).toBe('2024-01-02');
   });
 
   test('JSON POST /api/expenses works without file', async () => {
-    const expenseRow = { expense_id: 2, related_document_url: 'http://existing.url/doc.pdf', is_petty_cash_expense: false };
+    const expenseRow = {
+      expense_id: 2,
+      related_document_url: 'http://existing.url/doc.pdf',
+      is_petty_cash_expense: false,
+      paid_date: '2024-01-04'
+    };
     mockClient.query
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({ rows: [expenseRow] })
@@ -67,7 +79,8 @@ describe('expense file upload', () => {
     const res = await request(app)
       .post('/api/expenses')
       .send({
-        expense_date: '2024-01-02',
+        expense_date: '2024-01-03',
+        paid_date: '2024-01-04',
         category_id: '1',
         description: 'No file',
         amount: '20',
@@ -80,6 +93,7 @@ describe('expense file upload', () => {
     expect(res.statusCode).toBe(201);
     expect(expensesRoutes.uploadExpenseReceiptToGCS).toHaveBeenCalledWith(undefined);
     expect(res.body.related_document_url).toBe('http://existing.url/doc.pdf');
+    expect(res.body.paid_date).toBe('2024-01-04');
   });
 
   test('PUT /api/expenses/:id updates expense with file', async () => {
@@ -93,7 +107,7 @@ describe('expense file upload', () => {
       expense_id: 3,
       is_petty_cash_expense: false,
       expense_date: '2024-02-01',
-      paid_date: '2024-02-01',
+      paid_date: '2024-02-02',
       related_document_url: 'http://fake.url/new.jpg'
     };
     mockClient.query
@@ -109,6 +123,7 @@ describe('expense file upload', () => {
     const res = await request(app)
       .put('/api/expenses/3')
       .field('expense_date', '2024-02-01')
+      .field('paid_date', '2024-02-02')
       .field('category_id', '1')
       .field('description', 'Upd')
       .field('amount', '15')
@@ -124,7 +139,7 @@ describe('expense file upload', () => {
       expect.stringContaining('UPDATE expenses'),
       [
         '2024-02-01',
-        '2024-02-01',
+        '2024-02-02',
         1,
         'Upd',
         15,
@@ -136,6 +151,7 @@ describe('expense file upload', () => {
       ]
     );
     expect(res.body.related_document_url).toBe('http://fake.url/new.jpg');
+    expect(res.body.paid_date).toBe('2024-02-02');
   });
 
   test('DELETE /api/expenses/:id removes petty cash expense', async () => {
