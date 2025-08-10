@@ -428,6 +428,9 @@ router.get('/dashboard/expenses-by-category', authMiddleware, requireRole(['admi
 // GET /api/expenses/dashboard/monthly-trend
 router.get('/dashboard/monthly-trend', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const monthsCount = parseInt(req.query.months) || 6;
+    const dateBasis = req.query.dateBasis === 'bill'
+        ? 'expense_date'
+        : "COALESCE(paid_date, expense_date)";
     try {
         const nowInThailand = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
         const startDateForTrend = new Date(nowInThailand.getFullYear(), nowInThailand.getMonth() - (monthsCount - 1), 1);
@@ -435,11 +438,11 @@ router.get('/dashboard/monthly-trend', authMiddleware, requireRole(['admin', 'ac
 
         const result = await query(
             `SELECT
-                TO_CHAR(COALESCE(paid_date, expense_date), 'YYYY-MM') as month_year,
+                TO_CHAR(${dateBasis}, 'YYYY-MM') as month_year,
                 COALESCE(SUM(amount), 0) as total_expenses
              FROM expenses
-             WHERE COALESCE(paid_date, expense_date) >= $1::date
-             GROUP BY TO_CHAR(COALESCE(paid_date, expense_date), 'YYYY-MM')
+             WHERE ${dateBasis} >= $1::date
+             GROUP BY TO_CHAR(${dateBasis}, 'YYYY-MM')
              ORDER BY month_year ASC`,
             [startDateString]
         );
@@ -454,9 +457,11 @@ router.get('/dashboard/monthly-trend', authMiddleware, requireRole(['admin', 'ac
 
 
 // --- Existing Endpoints to be kept ---
-// GET /api/expenses/dashboard/recent-expenses (keep as is)
+// GET /api/expenses/dashboard/recent-expenses
 router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const limit = parseInt(req.query.limit) || 5;
+    // Determine whether to reference paid_date or expense_date for ordering
+    const dateBasis = req.query.dateBasis === 'bill' ? 'e.expense_date' : 'COALESCE(e.paid_date, e.expense_date)';
     try {
         const result = await query(
             `SELECT
@@ -470,7 +475,7 @@ router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', '
                 ec.category_name
              FROM expenses e
              JOIN expense_categories ec ON e.category_id = ec.category_id
-             ORDER BY COALESCE(e.paid_date, e.expense_date) DESC, e.created_at DESC
+             ORDER BY ${dateBasis} DESC, e.created_at DESC
              LIMIT $1`,
             [limit]
         );

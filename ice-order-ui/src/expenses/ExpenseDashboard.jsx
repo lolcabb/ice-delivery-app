@@ -126,15 +126,16 @@ export default function ExpenseDashboard() {
     const [expensesByCategory, setExpensesByCategory] = useState([]);
     const [monthlyTrend, setMonthlyTrend] = useState([]);
     const [recentExpenses, setRecentExpenses] = useState([]);
-    
+
     const [loadingSummary, setLoadingSummary] = useState(true);
     const [loadingByCategory, setLoadingByCategory] = useState(true);
     const [loadingTrend, setLoadingTrend] = useState(true);
     const [loadingRecent, setLoadingRecent] = useState(true);
-    
+
     const [error, setError] = useState(null); // General error for the page
 
     const [categoryChartPeriod, setCategoryChartPeriod] = useState('current_month');
+    const [dateBasis, setDateBasis] = useState('paid'); // 'paid' or 'bill'
 
     const processedPieData = processPieChartData(expensesByCategory, 6); // Process data for Pie Chart
 
@@ -151,8 +152,8 @@ export default function ExpenseDashboard() {
                 // Use the new enhanced endpoint
                 apiService.getEnhancedDashboardSummary(),
                 apiService.getDashboardExpensesByCategory(categoryChartPeriod),
-                apiService.getDashboardMonthlyTrend(6),
-                apiService.getDashboardRecentExpenses(5)
+                apiService.getDashboardMonthlyTrend(6, { dateBasis }),
+                apiService.getDashboardRecentExpenses(5, { dateBasis })
             ]);
             
             setSummaryData(enhancedSummary);
@@ -171,7 +172,7 @@ export default function ExpenseDashboard() {
             setLoadingTrend(false);
             setLoadingRecent(false);
         }
-    }, [categoryChartPeriod]);
+    }, [categoryChartPeriod, dateBasis]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -180,6 +181,10 @@ export default function ExpenseDashboard() {
     const handleCategoryPeriodChange = (e) => {
         setCategoryChartPeriod(e.target.value);
         // fetchDashboardData will be called by useEffect due to dependency change
+    };
+
+    const handleDateBasisChange = (e) => {
+        setDateBasis(e.target.value);
     };
 
     // Colors for Pie Chart
@@ -345,7 +350,20 @@ export default function ExpenseDashboard() {
 
                 {/* Monthly Expense Trend (Line Chart) */}
                 <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
-                    <h2 className="text-xl font-semibold text-gray-700 mb-4">แนวโน้มค่าใช้จ่ายรายเดือน</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold text-gray-700">แนวโน้มค่าใช้จ่ายรายเดือน</h2>
+                        <div className="text-sm text-gray-600">
+                            แสดงตาม:
+                            <select
+                                value={dateBasis}
+                                onChange={handleDateBasisChange}
+                                className="ml-2 border rounded p-1 text-sm"
+                            >
+                                <option value="paid">วันที่จ่าย</option>
+                                <option value="bill">วันที่บิล</option>
+                            </select>
+                        </div>
+                    </div>
                     {loadingTrend ? (
                          <div className="text-center py-8"><p className="text-gray-500">กำลังโหลดข้อมูลแนวโน้ม...</p></div>
                     ) : monthlyTrend.length > 0 ? (
@@ -367,7 +385,9 @@ export default function ExpenseDashboard() {
 
             {/* Recent Expenses List */}
             <div className="bg-white p-6 rounded-xl shadow-lg">
-                <h2 className="text-xl font-semibold text-gray-700 mb-4">ค่าใช้จ่ายล่าสุด</h2>
+                <h2 className="text-xl font-semibold text-gray-700 mb-4">
+                    ค่าใช้จ่ายล่าสุด ({dateBasis === 'paid' ? 'ตามวันที่จ่าย' : 'ตามวันที่บิล'})
+                </h2>
                 {loadingRecent ? (
                     <div className="text-center py-8"><p className="text-gray-500">กำลังโหลดค่าใช้จ่ายล่าสุด...</p></div>
                 ) : recentExpenses.length > 0 ? (
@@ -377,13 +397,13 @@ export default function ExpenseDashboard() {
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between mb-2">
                                         <p className="text-sm font-medium text-indigo-600">{expense.description}</p>
-                                        <PaymentMethodBadge 
-                                            isPettyCash={expense.is_petty_cash_expense} 
-                                            paymentMethod={expense.payment_method} 
+                                        <PaymentMethodBadge
+                                            isPettyCash={expense.is_petty_cash_expense}
+                                            paymentMethod={expense.payment_method}
                                         />
                                     </div>
                                     <p className="text-xs text-gray-500">
-                                        {new Date(expense.expense_date).toLocaleDateString('th-TH')} - {expense.category_name}
+                                        {expense.paid_date ? new Date(expense.paid_date).toLocaleDateString('th-TH') : 'ยังไม่จ่าย'} • {expense.category_name}
                                     </p>
                                 </div>
                                 <p className="text-sm font-semibold text-gray-800 ml-4">{formatCurrency(expense.amount)}</p>
