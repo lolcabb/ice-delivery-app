@@ -96,7 +96,7 @@ async function updatePettyCashTotalForDate(logDate, dbQueryFn) {
     try {
         console.log(`[PettyCashUpdate] Recalculating petty cash total for date: ${logDate}`);
         const expensesResult = await dbQueryFn(
-            'SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE expense_date = $1 AND is_petty_cash_expense = TRUE',
+            'SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE COALESCE(paid_date, expense_date) = $1 AND is_petty_cash_expense = TRUE',
             [logDate]
         );
         const total_daily_petty_expenses = parseFloat(expensesResult.rows[0]?.total_expenses || 0);
@@ -162,14 +162,14 @@ router.get('/dashboard/enhanced-summary', authMiddleware, requireRole(['admin', 
 
         ] = await Promise.all([
             // Current totals
-            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date = $1", [todayYYYYMMDD]),
-            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1", [firstDayCurrentMonth]),
-            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND expense_date <= $2", [firstDayLastMonth, lastDayLastMonth]),
-            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1", [firstDayCurrentYear]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) = $1", [todayYYYYMMDD]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1", [firstDayCurrentMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1 AND COALESCE(paid_date, expense_date) <= $2", [firstDayLastMonth, lastDayLastMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1", [firstDayCurrentYear]),
 
             // Payment method breakdown
-            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND is_petty_cash_expense = FALSE", [firstDayCurrentMonth]),
-            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND is_petty_cash_expense = TRUE", [firstDayCurrentMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1 AND is_petty_cash_expense = FALSE", [firstDayCurrentMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1 AND is_petty_cash_expense = TRUE", [firstDayCurrentMonth]),
 
             // Petty cash status
             query(`SELECT 
@@ -189,68 +189,68 @@ router.get('/dashboard/enhanced-summary', authMiddleware, requireRole(['admin', 
                    WHERE log_date >= $1`, [firstDayCurrentMonth]),
 
             // Historical comparisons
-            query(`SELECT AVG(monthly_total) as quarterly_avg 
+            query(`SELECT AVG(monthly_total) as quarterly_avg
                    FROM (
-                       SELECT DATE_TRUNC('month', expense_date) as month, SUM(amount) as monthly_total
-                       FROM expenses 
-                       WHERE expense_date >= $1 AND expense_date < $2
-                       GROUP BY DATE_TRUNC('month', expense_date)
+                       SELECT DATE_TRUNC('month', COALESCE(paid_date, expense_date)) as month, SUM(amount) as monthly_total
+                       FROM expenses
+                       WHERE COALESCE(paid_date, expense_date) >= $1 AND COALESCE(paid_date, expense_date) < $2
+                       GROUP BY DATE_TRUNC('month', COALESCE(paid_date, expense_date))
                    ) monthly_totals`, [firstDayThreeMonthsAgo, firstDayCurrentMonth]),
-            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND expense_date <= $2", [firstDayLastYearSameMonth, lastDayLastYearSameMonth]),
+            query("SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1 AND COALESCE(paid_date, expense_date) <= $2", [firstDayLastYearSameMonth, lastDayLastYearSameMonth]),
 
             // Category analysis vs historical averages
             query(`WITH category_averages AS (
-                       SELECT 
+                       SELECT
                            e.category_id,
                            ec.category_name,
                            AVG(monthly_amount) as avg_amount
                        FROM expense_categories ec
                        LEFT JOIN (
-                           SELECT 
+                           SELECT
                                category_id,
-                               DATE_TRUNC('month', expense_date) as month,
+                               DATE_TRUNC('month', COALESCE(paid_date, expense_date)) as month,
                                SUM(amount) as monthly_amount
-                           FROM expenses 
-                           WHERE expense_date >= $1 AND expense_date < $2
-                           GROUP BY category_id, DATE_TRUNC('month', expense_date)
+                           FROM expenses
+                           WHERE COALESCE(paid_date, expense_date) >= $1 AND COALESCE(paid_date, expense_date) < $2
+                           GROUP BY category_id, DATE_TRUNC('month', COALESCE(paid_date, expense_date))
                        ) e ON ec.category_id = e.category_id
                        WHERE ec.is_active = TRUE
                        GROUP BY e.category_id, ec.category_name
                    ),
                    current_month_totals AS (
-                       SELECT 
+                       SELECT
                            e.category_id,
                            ec.category_name,
                            COALESCE(SUM(e.amount), 0) as current_amount
                        FROM expense_categories ec
-                       LEFT JOIN expenses e ON ec.category_id = e.category_id AND e.expense_date >= $3
+                       LEFT JOIN expenses e ON ec.category_id = e.category_id AND COALESCE(e.paid_date, e.expense_date) >= $3
                        WHERE ec.is_active = TRUE
                        GROUP BY e.category_id, ec.category_name
                    )
-                   SELECT 
+                   SELECT
                        ca.category_name,
                        COALESCE(ca.avg_amount, 0) as historical_average,
                        COALESCE(cmt.current_amount, 0) as current_amount,
-                       CASE 
-                           WHEN ca.avg_amount > 0 THEN 
+                       CASE
+                           WHEN ca.avg_amount > 0 THEN
                                ((cmt.current_amount - ca.avg_amount) / ca.avg_amount) * 100
-                           ELSE 0 
+                           ELSE 0
                        END as variance_percent
                    FROM category_averages ca
                    LEFT JOIN current_month_totals cmt ON ca.category_name = cmt.category_name
                    WHERE ca.avg_amount > 0 OR cmt.current_amount > 0
-                   ORDER BY ABS(CASE WHEN ca.avg_amount > 0 THEN ((cmt.current_amount - ca.avg_amount) / ca.avg_amount) * 100 ELSE 0 END) DESC`, 
+                   ORDER BY ABS(CASE WHEN ca.avg_amount > 0 THEN ((cmt.current_amount - ca.avg_amount) / ca.avg_amount) * 100 ELSE 0 END) DESC`,
                    [firstDayThreeMonthsAgo, firstDayCurrentMonth, firstDayCurrentMonth]),
 
             // Additional metrics
             query("SELECT COUNT(*) as total FROM expense_categories WHERE is_active = TRUE"),
-            query("SELECT COUNT(*) as total FROM expenses WHERE expense_date >= $1", [firstDayCurrentMonth]),
-            query(`SELECT AVG(daily_total) as avg_daily 
+            query("SELECT COUNT(*) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1", [firstDayCurrentMonth]),
+            query(`SELECT AVG(daily_total) as avg_daily
                    FROM (
-                       SELECT expense_date, SUM(amount) as daily_total 
-                       FROM expenses 
-                       WHERE expense_date >= $1 
-                       GROUP BY expense_date
+                       SELECT COALESCE(paid_date, expense_date) as expense_date, SUM(amount) as daily_total
+                       FROM expenses
+                       WHERE COALESCE(paid_date, expense_date) >= $1
+                       GROUP BY COALESCE(paid_date, expense_date)
                    ) daily_sums`, [firstDayCurrentMonth])
         ]);
 
@@ -354,15 +354,15 @@ router.get('/dashboard/summary-cards', authMiddleware, requireRole(['admin', 'ac
         const { todayYYYYMMDD, firstDayCurrentMonth, firstDayLastMonth, lastDayLastMonth } = getThailandDateStrings();
 
         const totalExpensesTodayResult = await query(
-            "SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date = $1",
+            "SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) = $1",
             [todayYYYYMMDD] // Use today's date
         );
         const totalExpensesThisMonthResult = await query(
-            "SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1",
+            "SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1",
             [firstDayCurrentMonth]
         );
         const totalExpensesLastMonthResult = await query(
-            "SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE expense_date >= $1 AND expense_date <= $2",
+            "SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE COALESCE(paid_date, expense_date) >= $1 AND COALESCE(paid_date, expense_date) <= $2",
             [firstDayLastMonth, lastDayLastMonth]
         );
         const activeCategoriesResult = await query(
@@ -408,11 +408,11 @@ router.get('/dashboard/expenses-by-category', authMiddleware, requireRole(['admi
             SELECT ec.category_name, COALESCE(SUM(e.amount), 0) as total_amount
             FROM expenses e
             JOIN expense_categories ec ON e.category_id = ec.category_id
-            WHERE e.expense_date >= $1 AND ec.is_active = TRUE`;
+            WHERE COALESCE(e.paid_date, e.expense_date) >= $1 AND ec.is_active = TRUE`;
         const queryParams = [startDate];
 
         if (period === 'last_month' && endDate) {
-            queryText += ' AND e.expense_date <= $2';
+            queryText += ' AND COALESCE(e.paid_date, e.expense_date) <= $2';
             queryParams.push(endDate);
         }
         
@@ -434,12 +434,12 @@ router.get('/dashboard/monthly-trend', authMiddleware, requireRole(['admin', 'ac
         const startDateString = startDateForTrend.toLocaleDateString('en-CA');
 
         const result = await query(
-            `SELECT 
-                TO_CHAR(expense_date, 'YYYY-MM') as month_year, 
+            `SELECT
+                TO_CHAR(COALESCE(paid_date, expense_date), 'YYYY-MM') as month_year,
                 COALESCE(SUM(amount), 0) as total_expenses
              FROM expenses
-             WHERE expense_date >= $1::date 
-             GROUP BY TO_CHAR(expense_date, 'YYYY-MM')
+             WHERE COALESCE(paid_date, expense_date) >= $1::date
+             GROUP BY TO_CHAR(COALESCE(paid_date, expense_date), 'YYYY-MM')
              ORDER BY month_year ASC`,
             [startDateString]
         );
@@ -462,6 +462,7 @@ router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', '
             `SELECT
                 e.expense_id,
                 e.expense_date,
+                e.paid_date,
                 e.description,
                 e.amount,
                 e.payment_method,
@@ -469,7 +470,7 @@ router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', '
                 ec.category_name
              FROM expenses e
              JOIN expense_categories ec ON e.category_id = ec.category_id
-             ORDER BY e.expense_date DESC, e.created_at DESC
+             ORDER BY COALESCE(e.paid_date, e.expense_date) DESC, e.created_at DESC
              LIMIT $1`,
             [limit]
         );
@@ -483,16 +484,16 @@ router.get('/dashboard/recent-expenses', authMiddleware, requireRole(['admin', '
 router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountant', 'manager']), async (req, res, next) => {
     const { startDate, endDate, category_id, payment_method, is_petty_cash_expense, user_id } = req.query;
     let sqlQuery = `
-        SELECT 
-            e.expense_id, e.expense_date, ec.category_name, e.description, e.amount, 
+        SELECT
+            e.expense_id, e.expense_date, e.paid_date, ec.category_name, e.description, e.amount,
             e.payment_method, e.reference_details, e.is_petty_cash_expense,
             u.username as recorded_by, e.created_at as recorded_at
         FROM expenses e
         JOIN expense_categories ec ON e.category_id = ec.category_id
         LEFT JOIN users u ON e.user_id = u.id`;
     const conditions = []; const values = []; let paramCount = 1;
-    if (startDate) { conditions.push(`e.expense_date >= $${paramCount++}`); values.push(startDate); }
-    if (endDate) { conditions.push(`e.expense_date <= $${paramCount++}`); values.push(endDate); }
+    if (startDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) >= $${paramCount++}`); values.push(startDate); }
+    if (endDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) <= $${paramCount++}`); values.push(endDate); }
     if (category_id) { conditions.push(`e.category_id = $${paramCount++}`); values.push(parseInt(category_id)); }
     if (payment_method) { conditions.push(`e.payment_method ILIKE $${paramCount++}`); values.push(`%${payment_method}%`); }
     if (is_petty_cash_expense !== undefined && is_petty_cash_expense !== '') {
@@ -501,7 +502,7 @@ router.get('/reports/detailed', authMiddleware, requireRole(['admin', 'accountan
     }
     if (user_id) { conditions.push(`e.user_id = $${paramCount++}`); values.push(parseInt(user_id)); }
     if (conditions.length > 0) { sqlQuery += ' WHERE ' + conditions.join(' AND '); }
-    sqlQuery += ` ORDER BY e.expense_date ASC, e.created_at ASC`;
+    sqlQuery += ` ORDER BY COALESCE(e.paid_date, e.expense_date) ASC, e.created_at ASC`;
     try {
         const result = await query(sqlQuery, values);
         const totalAmountResult = await query(
@@ -594,7 +595,7 @@ router.post('/petty-cash', authMiddleware, requireRole(['admin', 'accountant']),
     try {
         await client.query('BEGIN');
         // Calculate initial total_daily_petty_expenses
-        const expensesResult = await client.query('SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE expense_date = $1 AND is_petty_cash_expense = TRUE', [log_date]);
+        const expensesResult = await client.query('SELECT COALESCE(SUM(amount), 0) as total_expenses FROM expenses WHERE COALESCE(paid_date, expense_date) = $1 AND is_petty_cash_expense = TRUE', [log_date]);
         const total_daily_petty_expenses = parseFloat(expensesResult.rows[0]?.total_expenses || 0);
 
         const result = await client.query(
@@ -741,7 +742,7 @@ router.post('/petty-cash/:log_date/reconcile', authMiddleware, requireRole(['adm
 // --- Expenses Endpoints (Modified for Petty Cash Reconciliation) ---
 // POST /api/expenses
 router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res, next) => {
-    const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
+    const { expense_date, paid_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
     const pettyCash = String(is_petty_cash_expense).toLowerCase() === 'true';
     const user_id_who_recorded = req.user.id;
 
@@ -758,16 +759,19 @@ router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager'])
 
         //Upload File to GCS if provided
         const receipt_file_url = await router.uploadExpenseReceiptToGCS(req.file);
-        
+
+        const effectivePaidDate = paid_date || expense_date;
+
         const result = await client.query(
-            `INSERT INTO expenses (expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url, user_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+            `INSERT INTO expenses (expense_date, paid_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url, user_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
             [
-                expense_date, 
-                parseInt(category_id), 
-                description, 
-                parseFloat(amount), 
-                payment_method, 
+                expense_date,
+                effectivePaidDate,
+                parseInt(category_id),
+                description,
+                parseFloat(amount),
+                payment_method,
                 reference_details,
                 pettyCash,
                 receipt_file_url || related_document_url,
@@ -777,7 +781,7 @@ router.post('/', authMiddleware, requireRole(['admin', 'accountant', 'manager'])
 
         const newExpense = result.rows[0];
         if (newExpense.is_petty_cash_expense) {
-            await updatePettyCashTotalForDate(newExpense.expense_date, client.query.bind(client));
+            await updatePettyCashTotalForDate(newExpense.paid_date || newExpense.expense_date, client.query.bind(client));
         }
         await client.query('COMMIT');
         res.status(201).json(newExpense);
@@ -803,7 +807,7 @@ router.get('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
 // PUT /api/expenses/:id
 router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager']), upload.single('receipt_file'), async (req, res, next) => {
     const expenseId = parseInt(req.params.id);
-    const { expense_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
+    const { expense_date, paid_date, category_id, description, amount, payment_method, reference_details, is_petty_cash_expense, related_document_url } = req.body;
     const pettyCash = String(is_petty_cash_expense).toLowerCase() === 'true';
 
     if (isNaN(expenseId)) return res.status(400).json({ error: 'Invalid expense ID' });
@@ -813,10 +817,10 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
     const client = await getClient();
     try {
         await client.query('BEGIN');
-        const oldExpenseResult = await client.query('SELECT expense_date, is_petty_cash_expense, related_document_url FROM expenses WHERE expense_id = $1', [expenseId]);
+        const oldExpenseResult = await client.query('SELECT expense_date, paid_date, is_petty_cash_expense, related_document_url FROM expenses WHERE expense_id = $1', [expenseId]);
         if (oldExpenseResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Expense not found' }); }
         const oldExpense = oldExpenseResult.rows[0];
-        const oldExpenseDate = oldExpense.expense_date.toISOString().split('T')[0];
+        const oldExpenseDate = (oldExpense.paid_date || oldExpense.expense_date).toISOString().split('T')[0];
         const oldIsPettyCash = oldExpense.is_petty_cash_expense;
 
         // Upload new file if provided, otherwise keep existing url or ise provided url
@@ -827,26 +831,29 @@ router.put('/:id', authMiddleware, requireRole(['admin', 'accountant', 'manager'
             final_document_url = related_document_url;
         }
 
+        const effectivePaidDate = paid_date || expense_date;
+
         const result = await client.query(
-            `UPDATE expenses 
-             SET expense_date = $1, category_id = $2, description = $3, amount = $4, payment_method = $5, 
-                 reference_details = $6, is_petty_cash_expense = $7, related_document_url = $8, updated_at = NOW()
-             WHERE expense_id = $9 RETURNING *`,
+            `UPDATE expenses
+             SET expense_date = $1, paid_date = $2, category_id = $3, description = $4, amount = $5, payment_method = $6,
+                 reference_details = $7, is_petty_cash_expense = $8, related_document_url = $9, updated_at = NOW()
+             WHERE expense_id = $10 RETURNING *`,
             [
-                expense_date, 
-                parseInt(category_id), 
-                description, 
-                parseFloat(amount), 
-                payment_method, 
+                expense_date,
+                effectivePaidDate,
+                parseInt(category_id),
+                description,
+                parseFloat(amount),
+                payment_method,
                 reference_details,
-                pettyCash, 
+                pettyCash,
                 final_document_url,
                 expenseId
             ]
         );
         const updatedExpense = result.rows[0];
         const newIsPettyCash = updatedExpense.is_petty_cash_expense;
-        const newExpenseDate = updatedExpense.expense_date; // This is already YYYY-MM-DD from DB or input
+        const newExpenseDate = updatedExpense.paid_date || updatedExpense.expense_date; // This is already YYYY-MM-DD
 
         // If new state is petty cash, update its date's total
         if (newIsPettyCash) {
@@ -879,11 +886,11 @@ router.delete('/:id', authMiddleware, requireRole(['admin', 'accountant']), asyn
     const client = await getClient();
     try {
         await client.query('BEGIN');
-        const expenseDataResult = await client.query('SELECT expense_date, is_petty_cash_expense FROM expenses WHERE expense_id = $1', [expenseId]);
+        const expenseDataResult = await client.query('SELECT expense_date, paid_date, is_petty_cash_expense FROM expenses WHERE expense_id = $1', [expenseId]);
         if (expenseDataResult.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Expense not found' }); }
-        
-        const { expense_date, is_petty_cash_expense } = expenseDataResult.rows[0];
-        const dateString = expense_date.toISOString().split('T')[0]; // Format to YYYY-MM-DD
+
+        const { expense_date, paid_date, is_petty_cash_expense } = expenseDataResult.rows[0];
+        const dateString = (paid_date || expense_date).toISOString().split('T')[0]; // Format to YYYY-MM-DD
 
         const result = await client.query('DELETE FROM expenses WHERE expense_id = $1 RETURNING *', [expenseId]);
         
@@ -907,8 +914,8 @@ router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']),
     const offset = (parseInt(page) - 1) * parseInt(limit);
     let sqlQuery = `SELECT e.*, ec.category_name FROM expenses e JOIN expense_categories ec ON e.category_id = ec.category_id`;
     const conditions = []; const values = []; let paramCount = 1;
-    if (startDate) { conditions.push(`e.expense_date >= $${paramCount++}`); values.push(startDate); }
-    if (endDate) { conditions.push(`e.expense_date <= $${paramCount++}`); values.push(endDate); }
+    if (startDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) >= $${paramCount++}`); values.push(startDate); }
+    if (endDate) { conditions.push(`COALESCE(e.paid_date, e.expense_date) <= $${paramCount++}`); values.push(endDate); }
     if (category_id) { conditions.push(`e.category_id = $${paramCount++}`); values.push(parseInt(category_id)); }
     if (user_id) { conditions.push(`e.user_id = $${paramCount++}`); values.push(parseInt(user_id)); }
     if (payment_method) { conditions.push(`e.payment_method ILIKE $${paramCount++}`); values.push(`%${payment_method}%`); }
@@ -919,7 +926,7 @@ router.get('/', authMiddleware, requireRole(['admin', 'accountant', 'manager']),
     if (conditions.length > 0) { sqlQuery += ' WHERE ' + conditions.join(' AND '); }
     let countQuery = `SELECT COUNT(*) FROM expenses e ${conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''}`;
     const countValues = [...values];
-    sqlQuery += ` ORDER BY e.expense_date DESC, e.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
+    sqlQuery += ` ORDER BY COALESCE(e.paid_date, e.expense_date) DESC, e.created_at DESC LIMIT $${paramCount++} OFFSET $${paramCount++}`;
     values.push(parseInt(limit), parseInt(offset));
     try {
         const result = await query(sqlQuery, values);
