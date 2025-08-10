@@ -12,6 +12,7 @@ const ExpenseForm = ({
 }) => {
     const getInitialFormState = useCallback(() => ({
         expense_date: getCurrentLocalDateISO(), // Default to today
+        paid_date: getCurrentLocalDateISO(),
         category_id: categories.length > 0 ? categories[0].category_id.toString() : '',
         description: '',
         amount: '',
@@ -33,6 +34,7 @@ const ExpenseForm = ({
             if (expense) {
                 setFormData({
                     expense_date: formatDateForInput(expense.expense_date),
+                    paid_date: expense.paid_date ? formatDateForInput(expense.paid_date) : formatDateForInput(expense.expense_date),
                     category_id: expense.category_id?.toString() || '',
                     description: expense.description || '',
                     amount: expense.amount?.toString() || '',
@@ -105,27 +107,20 @@ const ExpenseForm = ({
 
         setIsLoading(true);
         try {
-            // === PREPARE FORM DATA FOR FILE UPLOAD ===
-            const submitData = new FormData();
-            
-            // Add all form fields
-            Object.keys(formData).forEach(key => {
-                if (formData[key] !== '' && formData[key] !== null && formData[key] !== undefined) {
-                    submitData.append(key, formData[key]);
-                }
-            });
-            
-            // Add parsed amount and category_id as numbers
-            submitData.set('amount', parseFloat(formData.amount));
-            submitData.set('category_id', parseInt(formData.category_id));
-            submitData.set('is_petty_cash_expense', formData.is_petty_cash_expense);
-            
+            // === PREPARE DATA FOR FILE UPLOAD ===
+            const submitData = {
+                ...formData,
+                amount: parseFloat(formData.amount),
+                category_id: parseInt(formData.category_id),
+                is_petty_cash_expense: formData.is_petty_cash_expense
+            };
+
             // Add file if present
             if (receiptFile) {
-                submitData.append('receipt_file', receiptFile);
+                submitData.receipt_file = receiptFile;
             }
 
-            await onSave(submitData, expense?.expense_id); // Pass FormData instead of JSON
+            await onSave(submitData, expense?.expense_id);
         } catch (err) {
             console.error("Error in ExpenseForm submit:", err);
             setError(err.message || 'บันทึกค่าใช้จ่ายไม่สำเร็จ.');

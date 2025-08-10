@@ -369,9 +369,11 @@ export default function ExpenseListManager() {
     const [editingExpense, setEditingExpense] = useState(null);
     const [successMessage, setSuccessMessage] = useState('');
     const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalItems: 0 });
-    const [filters, setFilters] = useState({ 
+    const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
+        paid_startDate: '',
+        paid_endDate: '',
         category_id: '',
         payment_method: '',
         is_petty_cash_expense: '', // Will be 'true', 'false', or ''

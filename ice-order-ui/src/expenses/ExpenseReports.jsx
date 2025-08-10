@@ -327,6 +327,8 @@ export default function EnhancedExpenseReports() {
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
+        paid_startDate: '',
+        paid_endDate: '',
         category_id: '',
         payment_method: '',
         is_petty_cash_expense: '',
